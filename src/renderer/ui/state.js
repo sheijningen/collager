@@ -15,6 +15,8 @@ export const state = {
 };
 /** hashes of the selected items (shared by the collage and the file panel) */
 export const selected = new Set();
+/** hash -> item; see reindexItems */
+export const itemsByHash = new Map();
 /** hash -> tile element */
 export const tiles = new Map();
 /** hash -> packed position {x, y, w, h} from the last render */
@@ -27,6 +29,14 @@ export const itemCount = document.getElementById('item-count');
 export const toastEl = document.getElementById('toast');
 
 export const prefs = createPrefs(window.localStorage);
+
+/* Rebuilds itemsByHash from state.items. Every render does this, and so
+ * must any code that replaces state.items and then waits before rendering,
+ * since tile and drag lookups go through the map rather than the list. */
+export function reindexItems() {
+  itemsByHash.clear();
+  for (const item of state.items) itemsByHash.set(item.hash, item);
+}
 
 /* ---------------- toast ---------------- */
 

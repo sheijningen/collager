@@ -27,7 +27,8 @@ docs/                README media
 
 - The renderer is ES modules. `ui/app.js` is the entry (`index.html` loads only it) and imports
   every other module, which is what wires their handlers up. Shared mutable state lives in
-  `ui/state.js`: `state.items`, `state.selectionAnchor` and the `selected` set; other modules
+  `ui/state.js`: `state.items`, `state.selectionAnchor`, the `selected` set and the derived
+  `itemsByHash` index (rebuilt by `reindexItems`, which every render calls); other modules
   own their state and export setters for what others may change. Module top levels touch only
   their own DOM and `state.js`; cross-module calls happen inside functions and handlers, which
   keeps the import cycles between ui modules harmless. Module evaluation order also decides the
@@ -65,6 +66,8 @@ docs/                README media
   cannot insert the same hash twice.
 - **Escape order**: context menu, lightbox, help/about overlays, selection, fullscreen. One
   keydown handler in `shortcuts.js` walks that ladder and closes exactly one layer.
+- **File panel list**: rebuilt only when what it shows changes (sort mode, and each entry's
+  hash, path, type and missing state in order); other renders leave its DOM alone.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
 - **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and

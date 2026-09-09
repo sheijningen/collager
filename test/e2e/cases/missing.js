@@ -1,7 +1,11 @@
-/* Missing files: the explanatory tooltip and the clear-missing button. */
+/* Missing files: the explanatory tooltip, repair by re-adding, and the
+ * clear-missing button. */
+const fs = require('fs');
+const path = require('path');
+
 module.exports = {
   name: 'missing',
-  async run({ js, check, loadFixtures }) {
+  async run({ js, check, workDir, fixtures, loadFixtures }) {
     await loadFixtures();
     const missingTip = await js(`(() => {
       const item = T.state.items[0];
@@ -19,6 +23,26 @@ module.exports = {
       return tileHint && listHint;
     })()`);
     check('missing files explain themselves in a tooltip', missingTip);
+
+    // re-adding the same content from a new path repairs the entry, and the
+    // panel entry follows the new name
+    const movedDir = path.join(workDir, 'moved');
+    fs.mkdirSync(movedDir, { recursive: true });
+    const movedPath = path.join(movedDir, 'tall-moved.png');
+    fs.copyFileSync(
+      fixtures.find((fixture) => fixture.endsWith('tall.png')),
+      movedPath
+    );
+    const repaired = await js(`(async () => {
+      const item = T.state.items.find((i) => i.path.endsWith('tall.png'));
+      item.missing = true;
+      T.render();
+      await T.addPaths(${JSON.stringify([movedPath])});
+      const li = T.listEntries.get(item.hash);
+      return !item.missing && item.path === ${JSON.stringify(movedPath)}
+        && li.querySelector('.fname').textContent === 'tall-moved.png' && li.title === item.path;
+    })()`);
+    check('re-adding repairs a missing entry and renames its panel entry', repaired);
 
     const clearMissing = await js(`(async () => {
       const btn = document.getElementById('btn-clear-missing');

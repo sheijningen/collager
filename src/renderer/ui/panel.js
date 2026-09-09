@@ -33,17 +33,35 @@ export const removeSelectedBtn = document.getElementById('btn-remove-selected');
 export const listEntries = new Map();
 let sortMode = prefs.string('sort', 'added');
 export let panelOpen = prefs.bool('panel', true);
+let renderedListKey = null; // what the list currently shows, or null while hidden
 
 function sortedItems() {
   return sortItems(state.items, sortMode);
 }
 
+/* Everything an entry shows, in display order: hash, path (name and title),
+ * type (badge) and missing state. Selection is applied separately, so a
+ * render that changes none of these (a resize, a column change) leaves the
+ * list DOM alone. */
+function listKey(items) {
+  const entries = items.map((i) => `${i.hash}\t${i.path}\t${i.type}\t${i.missing ? '!' : ''}`);
+  return `${sortMode}\n${entries.join('\n')}`;
+}
+
 export function renderList() {
+  if (!panelOpen) {
+    closeCtxMenu();
+    renderedListKey = null; // rebuilt on reopen (setPanelOpen → render)
+    return;
+  }
+  const items = sortedItems();
+  const key = listKey(items);
+  if (key === renderedListKey) return; // selection classes are already current
+  renderedListKey = key;
   closeCtxMenu(); // list is being rebuilt under the menu
-  if (!panelOpen) return; // hidden list is rebuilt on reopen (setPanelOpen → render)
   fileList.textContent = '';
   listEntries.clear();
-  for (const item of sortedItems()) {
+  for (const item of items) {
     const li = document.createElement('li');
     li.className = (selected.has(item.hash) ? 'selected' : '') + (item.missing ? ' missing' : '');
     li.title = item.missing ? `${item.path}\n\n${MISSING_FILE_HINT}` : item.path;
