@@ -1,7 +1,28 @@
-'use strict';
+/* App entry: toolbar button wiring, OS file drag & drop, startup, and the
+ * hook the e2e harness drives the app through. Importing the other modules
+ * here is what wires their event handlers up. */
 
-/* App shell: toolbar wiring, fullscreen, OS file drag & drop, and startup.
- * Loads last — every other module's declarations are available here. */
+import * as layout from '../core/layout.js';
+import * as stateModule from './state.js';
+import * as collageModule from './collage.js';
+import { state, selected, showToast, persist } from './state.js';
+// named imports stay live; destructuring the namespace would freeze `columns`
+import {
+  columns,
+  setColumns,
+  shuffle,
+  render,
+  addPaths,
+  measureMissingDimensions,
+  queueLibraryOperation
+} from './collage.js';
+import * as panelModule from './panel.js';
+import * as tiledragModule from './tiledrag.js';
+import * as lightboxModule from './lightbox.js';
+import * as autoscrollModule from './autoscroll.js';
+import * as shortcutsModule from './shortcuts.js';
+import * as toolbarModule from './toolbar.js';
+import * as fullscreenModule from './fullscreen.js';
 
 /* ---------------- OS file drag & drop ---------------- */
 
@@ -36,74 +57,26 @@ document.getElementById('btn-add').addEventListener('click', async () => {
 document.getElementById('btn-shuffle').addEventListener('click', shuffle);
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
 document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
-document.getElementById('col-count').textContent = String(columns);
 document.getElementById('btn-clear').addEventListener('click', () => {
-  if (!items.length) return;
-  const n = items.length;
+  const n = state.items.length;
+  if (!n) return;
   if (!confirm(`Remove all ${n} item${n === 1 ? '' : 's'} from the collage?`)) return;
-  items = [];
+  state.items = [];
   selected.clear();
-  selectionAnchor = null;
+  state.selectionAnchor = null;
   render();
   persist();
   showToast(`Cleared ${n} item${n === 1 ? '' : 's'}`);
 });
 document.getElementById('btn-clear-missing').addEventListener('click', () => {
-  const n = items.filter((i) => i.missing).length;
+  const n = state.items.filter((i) => i.missing).length;
   if (!n) return;
   if (!confirm(`Remove all ${n} missing file${n === 1 ? '' : 's'} from the collage?`)) return;
-  items = items.filter((i) => !i.missing);
+  state.items = state.items.filter((i) => !i.missing);
   // render() prunes the selection of anything that no longer exists
   render();
   persist();
   showToast(`Removed ${n} missing file${n === 1 ? '' : 's'}`);
-});
-
-/* minimizable toolbar: collapsing gives the collage the full window height;
- * the floating chevron stays put so the toolbar can always be brought back */
-const toolbarToggleBtn = document.getElementById('btn-toolbar-toggle');
-let toolbarOpen = prefs.bool('toolbar', true);
-
-function setToolbarOpen(open) {
-  toolbarOpen = open;
-  document.body.classList.toggle('toolbar-collapsed', !open);
-  toolbarToggleBtn.innerHTML = open ? '&#x25B4;' : '&#x25BE;';
-  toolbarToggleBtn.title = open ? 'Hide toolbar' : 'Show toolbar';
-  prefs.set('toolbar', open);
-  // the height change can flip scrollbar presence, which changes the
-  // packing width — same reason setPanelOpen re-renders
-  render();
-}
-
-toolbarToggleBtn.addEventListener('click', () => setToolbarOpen(!toolbarOpen));
-setToolbarOpen(toolbarOpen);
-
-/* ---------------- fullscreen ----------------
- * The default application menu is removed in the main process, so this
- * handler owns the F11 binding outright. */
-
-let isFullscreen = false;
-const fullscreenBtn = document.getElementById('btn-fullscreen');
-fullscreenBtn.addEventListener('click', () => window.api.toggleFullscreen());
-function applyFullscreenState(state) {
-  isFullscreen = state;
-  fullscreenBtn.classList.toggle('active', state);
-}
-window.api.onFullscreenChanged(applyFullscreenState);
-// transitions before this listener attached (or a window created fullscreen)
-// would otherwise leave the state stale and disarm the Escape fallback
-window.api.isFullscreen().then(applyFullscreenState);
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'F11' || e.repeat || e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return;
-  e.preventDefault();
-  // a lightbox video's native controls can enter HTML element-fullscreen,
-  // which Electron promotes to window fullscreen; unwind that first or the
-  // page would be stuck in element-fullscreen layout inside a normal window
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {});
-    return;
-  }
-  window.api.toggleFullscreen();
 });
 
 /* ---------------- window resize ---------------- */
@@ -120,23 +93,61 @@ window.api.onGpuFallback(() => {
   );
 });
 
+/* ---------------- e2e hook ----------------
+ * When the main process loads the page with ?e2e (set by the test harness),
+ * every module export is reachable from the test's executeJavaScript calls
+ * through one flat object. Getters keep the live bindings, so reassigned
+ * exports read their current value. */
+
+function exposeForTests(modules) {
+  const surface = {};
+  for (const mod of modules) {
+    for (const key of Object.keys(mod)) {
+      if (key in surface) console.warn(`test surface: ${key} is exported twice`);
+      Object.defineProperty(surface, key, {
+        get: () => mod[key],
+        enumerable: true,
+        configurable: true
+      });
+    }
+  }
+  window.collagerTest = surface;
+}
+
+if (new URLSearchParams(location.search).has('e2e')) {
+  exposeForTests([
+    layout,
+    stateModule,
+    collageModule,
+    panelModule,
+    tiledragModule,
+    lightboxModule,
+    autoscrollModule,
+    shortcutsModule,
+    toolbarModule,
+    fullscreenModule
+  ]);
+}
+
 /* ---------------- startup ---------------- */
+
+render(); // empty state and toolbar geometry before the library arrives
 
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
-opQueue = opQueue.then(async function init() {
+queueLibraryOperation(async function init() {
   try {
     const loaded = await window.api.loadLibrary();
-    items = loaded.items;
+    state.items = loaded.items;
     if (loaded.corrupted) {
       showToast('Library file was corrupted — starting empty (backup: library.json.corrupt)');
     }
-    const measured = await measureMissingDimensions(items, (done, total) => {
+    const measured = await measureMissingDimensions(state.items, (done, total) => {
       showToast(`Preparing library — reading dimensions ${done}/${total}…`, true);
     });
     render();
     if (measured) persist();
-    const missingCount = items.filter((i) => i.missing).length;
+    const missingCount = state.items.filter((i) => i.missing).length;
     if (missingCount) {
       showToast(
         `${missingCount} file${missingCount === 1 ? '' : 's'} missing on disk — hover to remove`

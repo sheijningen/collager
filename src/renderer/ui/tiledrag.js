@@ -1,5 +1,3 @@
-'use strict';
-
 /* ---------------- drag-to-reorder tiles ----------------
  * Pointer-based (not HTML5 DnD, which is reserved for dropping files in).
  * A press only becomes a drag after moving 8px, so click-select and
@@ -7,10 +5,16 @@
  * drop target's place in the collage order, which is what persists.
  */
 
+import { reorderByHash, basename } from '../core/layout.js';
+import { state, tiles, collage, persist } from './state.js';
+import { render } from './collage.js';
+
 const DRAG_THRESHOLD = 8;
-let tileDrag = null; // {hash, pointerId, startX, startY, active, ghost, targetHash}
+/** {hash, pointerId, startX, startY, active, ghost, targetHash} while a press or drag is in flight */
+export let tileDrag = null;
 let suppressNextClick = false;
-let lastDragEndAt = 0;
+/** performance.now() of the last completed drag; a click right after it is not a double-click */
+export let lastDragEndAt = 0;
 
 collage.addEventListener('pointerdown', (e) => {
   if (tileDrag || e.button !== 0 || !e.isPrimary || e.target.closest('.btn-remove')) return;
@@ -43,7 +47,7 @@ window.addEventListener('pointermove', (e) => {
     tiles.get(tileDrag.hash)?.classList.add('dragging');
     const ghost = document.createElement('div');
     ghost.id = 'drag-ghost';
-    const item = items.find((i) => i.hash === tileDrag.hash);
+    const item = state.items.find((i) => i.hash === tileDrag.hash);
     ghost.textContent = item ? basename(item.path) : '';
     document.body.appendChild(ghost);
     tileDrag.ghost = ghost;
@@ -81,7 +85,7 @@ function endTileDrag(commit) {
     suppressNextClick = false;
   }, 0); // in case no click follows
   if (commit && d.targetHash) {
-    items = reorderByHash(items, d.hash, d.targetHash);
+    state.items = reorderByHash(state.items, d.hash, d.targetHash);
     render();
     persist();
   }

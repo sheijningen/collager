@@ -1,19 +1,47 @@
-'use strict';
-
 /* The collage itself: masonry rendering, tile lifecycle, viewport-based
  * media hydration, dimension measuring, and the library operations that
- * mutate `items` (add/remove/shuffle). */
+ * mutate the items (add/remove/shuffle). */
+
+import {
+  packItems,
+  clampColumns,
+  basename,
+  GAP,
+  MISSING_W,
+  MISSING_H,
+  MIN_COLUMNS,
+  MAX_COLUMNS,
+  DEFAULT_COLUMNS
+} from '../core/layout.js';
+import {
+  state,
+  selected,
+  tiles,
+  lastPositions,
+  scroller,
+  collage,
+  emptyState,
+  itemCount,
+  prefs,
+  showToast,
+  persist
+} from './state.js';
+import { handleSelectClick, renderList } from './panel.js';
+import { openLightbox } from './lightbox.js';
+import { lastDragEndAt } from './tiledrag.js';
 
 /* ---------------- columns setting ---------------- */
 
-let columns = prefs.int('columns', DEFAULT_COLUMNS, MIN_COLUMNS, MAX_COLUMNS);
+export let columns = prefs.int('columns', DEFAULT_COLUMNS, MIN_COLUMNS, MAX_COLUMNS);
+const columnCount = document.getElementById('col-count');
+columnCount.textContent = String(columns);
 
-function setColumns(n) {
+export function setColumns(n) {
   const next = clampColumns(n);
   if (next === columns) return;
   columns = next;
   prefs.set('columns', columns);
-  document.getElementById('col-count').textContent = String(columns);
+  columnCount.textContent = String(columns);
   render();
 }
 
@@ -26,7 +54,7 @@ function setColumns(n) {
 const HYDRATE_MARGIN = '800px'; // how far outside the viewport media stays loaded
 
 /* Tooltip for tiles whose file can't be read (shared with the file panel). */
-const MISSING_FILE_HINT = [
+export const MISSING_FILE_HINT = [
   'This file could not be loaded. Likely causes:',
   '• it was moved or renamed',
   '• it was deleted',
@@ -35,7 +63,7 @@ const MISSING_FILE_HINT = [
   'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
 ].join('\n');
 
-const observer = new IntersectionObserver(
+export const observer = new IntersectionObserver(
   (entries) => {
     for (const entry of entries) {
       if (entry.isIntersecting) hydrate(entry.target);
@@ -45,9 +73,9 @@ const observer = new IntersectionObserver(
   { root: scroller, rootMargin: `${HYDRATE_MARGIN} 0px` }
 );
 
-function hydrate(tile) {
+export function hydrate(tile) {
   if (tile.dataset.hydrated === '1') return;
-  const item = items.find((i) => i.hash === tile.dataset.hash);
+  const item = state.items.find((i) => i.hash === tile.dataset.hash);
   if (!item || item.missing) return;
   const url = item.url;
   let media;
@@ -79,7 +107,7 @@ function hydrate(tile) {
   tile.dataset.hydrated = '1';
 }
 
-function dehydrate(tile) {
+export function dehydrate(tile) {
   if (tile.dataset.hydrated !== '1') return;
   const media = tile.querySelector('img, video');
   if (media) {
@@ -97,9 +125,9 @@ function dehydrate(tile) {
 
 /* ---------------- rendering ---------------- */
 
-function render() {
+export function render() {
   const width = scroller.clientWidth - GAP * 2;
-  const { positions, height } = packItems(items, Math.max(width, 100), columns);
+  const { positions, height } = packItems(state.items, Math.max(width, 100), columns);
   collage.style.height = `${height + GAP}px`;
 
   const seen = new Set();
@@ -130,11 +158,12 @@ function render() {
   for (const hash of selected) {
     if (!seen.has(hash)) selected.delete(hash);
   }
-  if (selectionAnchor !== null && !seen.has(selectionAnchor)) selectionAnchor = null;
-  itemCount.textContent = items.length
-    ? `${items.length} item${items.length === 1 ? '' : 's'}`
-    : '';
-  emptyState.hidden = items.length > 0;
+  if (state.selectionAnchor !== null && !seen.has(state.selectionAnchor)) {
+    state.selectionAnchor = null;
+  }
+  const count = state.items.length;
+  itemCount.textContent = count ? `${count} item${count === 1 ? '' : 's'}` : '';
+  emptyState.hidden = count > 0;
   updateClearMissingBtn();
   renderList();
 }
@@ -142,8 +171,8 @@ function render() {
 /* only visible while something is actually missing */
 const clearMissingBtn = document.getElementById('btn-clear-missing');
 
-function updateClearMissingBtn() {
-  const n = items.filter((i) => i.missing).length;
+export function updateClearMissingBtn() {
+  const n = state.items.filter((i) => i.missing).length;
   clearMissingBtn.hidden = n === 0;
   clearMissingBtn.textContent = `⚠ Clear ${n} missing`;
 }
@@ -184,19 +213,20 @@ function createTile(item) {
 
 /* ---------------- library operations ---------------- */
 
-function removeItem(hash) {
-  const idx = items.findIndex((i) => i.hash === hash);
+export function removeItem(hash) {
+  const idx = state.items.findIndex((i) => i.hash === hash);
   if (idx === -1) return;
-  items.splice(idx, 1);
+  state.items.splice(idx, 1);
   selected.delete(hash);
   render();
   persist();
 }
 
-function shuffle() {
-  for (let i = items.length - 1; i > 0; i--) {
+export function shuffle() {
+  const list = state.items;
+  for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
+    [list[i], list[j]] = [list[j], list[i]];
   }
   render();
   persist();
@@ -228,7 +258,7 @@ function measureItem(item) {
 
 /* Fills in w/h for items that lack them (mutates the items). Returns whether
  * anything was measured, i.e. whether the caller should persist. */
-async function measureMissingDimensions(list, onProgress = null) {
+export async function measureMissingDimensions(list, onProgress = null) {
   const pending = list.filter((i) => !i.missing && (!i.w || !i.h));
   const CONCURRENCY = 8;
   let cursor = 0;
@@ -252,16 +282,18 @@ async function measureMissingDimensions(list, onProgress = null) {
  * library pre-insert and push the same hash twice. */
 let opQueue = Promise.resolve();
 
-function addPaths(paths) {
-  opQueue = opQueue
-    .catch(() => {})
-    .then(() =>
-      doAddPaths(paths).catch((err) => {
-        console.error('Failed to add files', err);
-        showToast('Could not add the dropped files');
-      })
-    );
+export function queueLibraryOperation(task) {
+  opQueue = opQueue.catch(() => {}).then(task);
   return opQueue;
+}
+
+export function addPaths(paths) {
+  return queueLibraryOperation(() =>
+    doAddPaths(paths).catch((err) => {
+      console.error('Failed to add files', err);
+      showToast('Could not add the dropped files');
+    })
+  );
 }
 
 // live progress while the main process hashes a dropped batch (the slow part
@@ -275,7 +307,7 @@ async function doAddPaths(paths) {
   showToast('Adding — scanning…', true);
   const { entries, skippedCount } = await window.api.probeFiles(paths);
 
-  const known = new Map(items.map((i) => [i.hash, i]));
+  const known = new Map(state.items.map((i) => [i.hash, i]));
   const fresh = [];
   let duplicates = 0;
   for (const entry of entries) {
@@ -304,7 +336,7 @@ async function doAddPaths(paths) {
   await measureMissingDimensions(fresh, (done, total) => {
     showToast(`Adding — reading dimensions ${done}/${total}…`, true);
   });
-  items.push(...fresh);
+  state.items.push(...fresh);
   render();
   persist();
 

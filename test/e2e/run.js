@@ -17,6 +17,7 @@ const mediaDir = path.join(workDir, 'media');
 fs.mkdirSync(mediaDir);
 app.setPath('userData', path.join(workDir, 'userdata'));
 
+process.env.COLLAGER_E2E = '1'; // main loads the page with ?e2e, which installs window.collagerTest
 require('../../src/main/main.js');
 
 /* ---------- fixture generation (no external tools needed for images) ---------- */
@@ -124,19 +125,20 @@ async function run() {
 
   try {
     const wc = BrowserWindow.getAllWindows()[0].webContents;
-    const js = (code) => wc.executeJavaScript(code);
-    await js('setColumns(2); setAutoScroll(false); void 0');
+    // every snippet sees the app's module exports as T (see app.js)
+    const js = (code) => wc.executeJavaScript(`{ const T = window.collagerTest; ${code} }`);
+    await js('T.setColumns(2); T.setAutoScroll(false); void 0');
 
     // -- adding + dedup ---------------------------------------------------
-    await js(`addPaths(${JSON.stringify(fixtures)})`);
+    await js(`T.addPaths(${JSON.stringify(fixtures)})`);
     await new Promise((r) => setTimeout(r, 1500));
-    check('drop adds all media once', (await js('items.length')) === expected);
+    check('drop adds all media once', (await js('T.state.items.length')) === expected);
     check(
       'duplicate content was skipped',
-      (await js(`items.filter(i => /wide(-copy)?\\.png$/.test(i.path)).length`)) === 1
+      (await js(`T.state.items.filter(i => /wide(-copy)?\\.png$/.test(i.path)).length`)) === 1
     );
-    await js(`addPaths(${JSON.stringify([fixtures[0]])})`);
-    check('re-adding is a no-op', (await js('items.length')) === expected);
+    await js(`T.addPaths(${JSON.stringify([fixtures[0]])})`);
+    check('re-adding is a no-op', (await js('T.state.items.length')) === expected);
 
     // -- dropping a directory adds its compatible files recursively ---------
     const dropDir = path.join(workDir, 'dirdrop');
@@ -144,27 +146,27 @@ async function run() {
     fs.writeFileSync(path.join(dropDir, 'extra1.png'), makePng(60, 40, [250, 250, 40]));
     fs.writeFileSync(path.join(dropDir, 'nested', 'extra2.png'), makePng(40, 60, [40, 250, 250]));
     fs.writeFileSync(path.join(dropDir, 'nested', 'notes.txt'), 'not media');
-    await js(`addPaths(${JSON.stringify([dropDir])})`);
+    await js(`T.addPaths(${JSON.stringify([dropDir])})`);
     await new Promise((r) => setTimeout(r, 800));
     check(
       'dropping a directory adds nested compatible files',
-      (await js('items.length')) === expected + 2
+      (await js('T.state.items.length')) === expected + 2
     );
     check(
       'incompatible files in the directory are skipped',
-      (await js(`items.some(i => i.path.endsWith('notes.txt'))`)) === false
+      (await js(`T.state.items.some(i => i.path.endsWith('notes.txt'))`)) === false
     );
     await js(`(() => {
-      const extras = items.filter(i => /extra[12]\\.png$/.test(i.path)).map(i => i.hash);
-      items = items.filter(i => !extras.includes(i.hash));
-      render();
-      return persist();
+      const extras = T.state.items.filter(i => /extra[12]\\.png$/.test(i.path)).map(i => i.hash);
+      T.state.items = T.state.items.filter(i => !extras.includes(i.hash));
+      T.render();
+      return T.persist();
     })()`); // restore the original fixture set for the checks below
 
     // -- layout ------------------------------------------------------------
     const layoutOk = await js(`(() => {
-      const it = items.find(i => i.path.endsWith('tall.png'));
-      const t = tiles.get(it.hash);
+      const it = T.state.items.find(i => i.path.endsWith('tall.png'));
+      const t = T.tiles.get(it.hash);
       const w = parseFloat(t.style.width), h = parseFloat(t.style.height);
       return it.w === 150 && it.h === 250 && Math.abs(h / w - 250 / 150) < 0.02;
     })()`);
@@ -175,65 +177,88 @@ async function run() {
     );
 
     // -- panel, selection, batch remove -------------------------------------
-    check('file panel lists every item', (await js('fileList.children.length')) === expected);
-    await js(`sortSelect.value = 'name'; sortSelect.dispatchEvent(new Event('change')); void 0`);
+    check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
+    await js(
+      `T.sortSelect.value = 'name'; T.sortSelect.dispatchEvent(new Event('change')); void 0`
+    );
     const names = await js(
-      `[...fileList.children].map(li => li.querySelector('.fname').textContent)`
+      `[...T.fileList.children].map(li => li.querySelector('.fname').textContent)`
     );
     check(
       'list sorts by name',
       JSON.stringify(names) === JSON.stringify(names.slice().sort((a, b) => a.localeCompare(b)))
     );
 
-    await js(`fileList.children[0].click()`);
+    await js(`T.fileList.children[0].click()`);
     await js(
-      `fileList.children[1].dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }))`
+      `T.fileList.children[1].dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }))`
     );
-    check('shift-click selects a range', (await js('selected.size')) === 2);
+    check('shift-click selects a range', (await js('T.selected.size')) === 2);
     check(
       'selection shows on tiles',
       (await js(`document.querySelectorAll('.tile.selected').length`)) === 2
     );
 
-    await js(`window.confirm = () => true; removeSelectedBtn.click(); void 0`);
+    // -- escape ladder: one layer per press --------------------------------------
+    const ladder = await js(`(async () => {
+      const escape = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      T.openLightbox(T.state.items[0]);
+      escape();
+      const lightboxOnly = T.lightbox.hidden && T.selected.size === 2;
+      T.helpOverlay.hidden = false;
+      escape();
+      const overlayOnly = T.helpOverlay.hidden && T.selected.size === 2;
+      escape();
+      const selectionCleared = T.selected.size === 0;
+      T.selected.add(T.state.items[0].hash); T.selected.add(T.state.items[1].hash); T.applySelection();
+      return { lightboxOnly, overlayOnly, selectionCleared };
+    })()`);
+    check('Escape closes the lightbox and keeps the selection', ladder.lightboxOnly);
+    check('Escape closes an overlay and keeps the selection', ladder.overlayOnly);
+    check('Escape then clears the selection', ladder.selectionCleared);
+
+    await js(`window.confirm = () => true; T.removeSelectedBtn.click(); void 0`);
     await new Promise((r) => setTimeout(r, 300));
-    check('batch remove removes the selection', (await js('items.length')) === expected - 2);
-    check('selection is empty after removal', (await js('selected.size')) === 0);
+    check(
+      'batch remove removes the selection',
+      (await js('T.state.items.length')) === expected - 2
+    );
+    check('selection is empty after removal', (await js('T.selected.size')) === 0);
 
     // -- drag-to-reorder -----------------------------------------------------
     const dragged = await js(`(async () => {
-      const before = items.map(i => i.hash);
-      const from = tiles.get(before[0]).getBoundingClientRect();
-      const to = tiles.get(before[1]).getBoundingClientRect();
+      const before = T.state.items.map(i => i.hash);
+      const from = T.tiles.get(before[0]).getBoundingClientRect();
+      const to = T.tiles.get(before[1]).getBoundingClientRect();
       const opts = (x, y) => ({ bubbles: true, clientX: x, clientY: y, button: 0, isPrimary: true });
       const fx = from.x + from.width / 2, fy = from.y + from.height / 2;
       const tx = to.x + to.width / 2, ty = to.y + to.height / 2;
-      tiles.get(before[0]).dispatchEvent(new PointerEvent('pointerdown', opts(fx, fy)));
+      T.tiles.get(before[0]).dispatchEvent(new PointerEvent('pointerdown', opts(fx, fy)));
       window.dispatchEvent(new PointerEvent('pointermove', opts(fx + 20, fy + 20)));
       window.dispatchEvent(new PointerEvent('pointermove', opts(tx, ty)));
       window.dispatchEvent(new PointerEvent('pointerup', opts(tx, ty)));
       await new Promise(r => setTimeout(r, 100));
-      const after = items.map(i => i.hash);
+      const after = T.state.items.map(i => i.hash);
       return { moved: after.indexOf(before[0]) === 1 && after.indexOf(before[1]) === 0,
-               nothingSelected: selected.size === 0 };
+               nothingSelected: T.selected.size === 0 };
     })()`);
     check('drag reorders tiles', dragged.moved);
     check('drag does not select', dragged.nothingSelected);
 
     const dragEdge = await js(`(async () => {
       const opts = (x, y) => ({ bubbles: true, clientX: x, clientY: y, button: 0, isPrimary: true });
-      const hash = items[0].hash;
-      const tile = () => tiles.get(hash);
+      const hash = T.state.items[0].hash;
+      const tile = () => T.tiles.get(hash);
       const r = tile().getBoundingClientRect();
       const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
 
       // the click following a completed drag is suppressed
-      const r2 = tiles.get(items[1].hash).getBoundingClientRect();
+      const r2 = T.tiles.get(T.state.items[1].hash).getBoundingClientRect();
       tile().dispatchEvent(new PointerEvent('pointerdown', opts(cx, cy)));
       window.dispatchEvent(new PointerEvent('pointermove', opts(r2.x + 10, r2.y + 10)));
       window.dispatchEvent(new PointerEvent('pointerup', opts(r2.x + 10, r2.y + 10)));
       tile().dispatchEvent(new MouseEvent('click', opts(r2.x + 10, r2.y + 10)));
-      const suppressed = selected.size === 0;
+      const suppressed = T.selected.size === 0;
       await new Promise(r => setTimeout(r, 50));
 
       // a sub-threshold press is still a normal click-select
@@ -242,16 +267,16 @@ async function run() {
       window.dispatchEvent(new PointerEvent('pointermove', opts(r3.x + 8, r3.y + 8)));
       window.dispatchEvent(new PointerEvent('pointerup', opts(r3.x + 8, r3.y + 8)));
       tile().dispatchEvent(new MouseEvent('click', opts(r3.x + 8, r3.y + 8)));
-      const clickStillSelects = selected.size === 1;
-      selected.clear(); applySelection();
+      const clickStillSelects = T.selected.size === 1;
+      T.selected.clear(); T.applySelection();
 
       // pointercancel aborts: order unchanged, no ghost left behind
-      const before = items.map(i => i.hash).join();
+      const before = T.state.items.map(i => i.hash).join();
       const r4 = tile().getBoundingClientRect();
       tile().dispatchEvent(new PointerEvent('pointerdown', opts(r4.x + 10, r4.y + 10)));
       window.dispatchEvent(new PointerEvent('pointermove', opts(r4.x + 60, r4.y + 60)));
       window.dispatchEvent(new PointerEvent('pointercancel', opts(r4.x + 60, r4.y + 60)));
-      const aborted = items.map(i => i.hash).join() === before
+      const aborted = T.state.items.map(i => i.hash).join() === before
         && !document.getElementById('drag-ghost');
       return { suppressed, clickStillSelects, aborted };
     })()`);
@@ -269,18 +294,18 @@ async function run() {
 
     // -- missing-file tooltip ------------------------------------------------
     const missingTip = await js(`(() => {
-      const item = items[0];
+      const item = T.state.items[0];
       item.missing = true;
-      const old = tiles.get(item.hash);
-      observer.unobserve(old); dehydrate(old); old.remove(); tiles.delete(item.hash);
-      render();
-      const tile = tiles.get(item.hash);
+      const old = T.tiles.get(item.hash);
+      T.observer.unobserve(old); T.dehydrate(old); old.remove(); T.tiles.delete(item.hash);
+      T.render();
+      const tile = T.tiles.get(item.hash);
       const tileHint = tile.classList.contains('missing') && tile.title.includes('external drive');
-      const li = listEntries.get(item.hash);
+      const li = T.listEntries.get(item.hash);
       const listHint = li.title.includes(item.path) && li.title.includes('moved or renamed');
       item.missing = false;
-      observer.unobserve(tile); tile.remove(); tiles.delete(item.hash);
-      render();
+      T.observer.unobserve(tile); tile.remove(); T.tiles.delete(item.hash);
+      T.render();
       return tileHint && listHint;
     })()`);
     check('missing files explain themselves in a tooltip', missingTip);
@@ -289,21 +314,21 @@ async function run() {
     const clearMissing = await js(`(async () => {
       const btn = document.getElementById('btn-clear-missing');
       const hiddenWhenNoneMissing = btn.hidden;
-      items[0].missing = true;
-      items[1].missing = true;
-      render();
+      T.state.items[0].missing = true;
+      T.state.items[1].missing = true;
+      T.render();
       const visible = !btn.hidden && btn.textContent.includes('2');
-      const liCoded = listEntries.get(items[0].hash).classList.contains('missing');
-      const before = items.length;
+      const liCoded = T.listEntries.get(T.state.items[0].hash).classList.contains('missing');
+      const before = T.state.items.length;
       window.confirm = () => false;
       btn.click();
-      const cancelKeeps = items.length === before;
+      const cancelKeeps = T.state.items.length === before;
       window.confirm = () => true;
       btn.click();
       await new Promise((r) => setTimeout(r, 100));
       return {
         hiddenWhenNoneMissing, visible, liCoded, cancelKeeps,
-        removed: items.length === before - 2 && !items.some((i) => i.missing),
+        removed: T.state.items.length === before - 2 && !T.state.items.some((i) => i.missing),
         hiddenAgain: btn.hidden
       };
     })()`);
@@ -321,19 +346,19 @@ async function run() {
     // -- clear all ----------------------------------------------------------
     await js(`document.getElementById('btn-clear').click(); void 0`);
     await new Promise((r) => setTimeout(r, 300));
-    check('clear-all empties the collage', (await js('items.length')) === 0);
+    check('clear-all empties the collage', (await js('T.state.items.length')) === 0);
     check('empty state is shown again', await js(`!document.getElementById('empty-state').hidden`));
 
     // -- keyboard shortcuts ---------------------------------------------------
     const speed = await js(`(() => {
       const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
-      setScrollSpeed(80);
+      T.setScrollSpeed(80);
       key('.');
-      const faster = scrollSpeed === 90;
+      const faster = T.scrollSpeed === 90;
       key(','); key(',');
-      const slower = scrollSpeed === 70;
-      const sliderSynced = parseInt(speedSlider.value, 10) === 70;
-      setScrollSpeed(80);
+      const slower = T.scrollSpeed === 70;
+      const sliderSynced = parseInt(T.speedSlider.value, 10) === 70;
+      T.setScrollSpeed(80);
       return { faster, slower, sliderSynced };
     })()`);
     check('"." raises the auto-scroll speed', speed.faster);
@@ -344,9 +369,9 @@ async function run() {
       await js(`(() => {
       const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
       key(' ');
-      const on = autoScroll;
+      const on = T.autoScroll;
       key(' ');
-      return on && !autoScroll;
+      return on && !T.autoScroll;
     })()`)
     );
 
@@ -354,29 +379,42 @@ async function run() {
       '-/+ change the column count',
       await js(`(() => {
       const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
-      const before = columns;
+      const before = T.columns;
       key('-');
-      const minus = columns === Math.max(MIN_COLUMNS, before - 1);
+      const minus = T.columns === Math.max(T.MIN_COLUMNS, before - 1);
       key('+');
-      return minus && columns === before;
+      return minus && T.columns === before;
+    })()`)
+    );
+
+    check(
+      'the column buttons step repeatedly',
+      await js(`(() => {
+      const before = T.columns;
+      T.setColumns(3);
+      document.getElementById('btn-col-plus').click();
+      document.getElementById('btn-col-plus').click();
+      const stepped = T.columns === 5;
+      T.setColumns(before);
+      return stepped;
     })()`)
     );
 
     // -- help & about overlays ------------------------------------------------
     await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }))`);
-    check('F1 opens the shortcuts overlay', await js('!helpOverlay.hidden'));
+    check('F1 opens the shortcuts overlay', await js('!T.helpOverlay.hidden'));
     check(
       'the overlay lists every binding',
-      await js(`shortcutList.querySelectorAll('tr').length === SHORTCUTS.length`)
+      await js(`T.shortcutList.querySelectorAll('tr').length === T.SHORTCUTS.length`)
     );
     await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
-    check('Escape closes the overlay', await js('helpOverlay.hidden'));
+    check('Escape closes the overlay', await js('T.helpOverlay.hidden'));
 
     await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))`);
     await new Promise((r) => setTimeout(r, 400));
     const pkg = require('../../package.json');
     const aboutOk = await js(`(() => ({
-      open: !aboutOverlay.hidden,
+      open: !T.aboutOverlay.hidden,
       name: document.getElementById('about-name').textContent,
       version: document.getElementById('about-version').textContent
     }))()`);
@@ -386,7 +424,7 @@ async function run() {
         aboutOk.name === ((pkg.build && pkg.build.productName) || pkg.name) &&
         aboutOk.version === `version ${pkg.version}`
     );
-    await js('closeOverlays(); void 0');
+    await js('T.closeOverlays(); void 0');
   } catch (err) {
     failures++;
     console.error('not ok - test crashed:', err);

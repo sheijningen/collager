@@ -1,50 +1,39 @@
-'use strict';
-
-/* Shared state and core DOM references for all renderer modules.
+/* Shared renderer state and the core DOM references.
  *
- * The renderer is split into plain scripts that share one global lexical
- * scope; load order (index.html): layout → selection → prefs → state →
- * collage → panel → tiledrag → lightbox → autoscroll → shortcuts → app.
- * Top-level
- * declarations here are visible to every later script (and functions
- * declared later are callable from here at runtime).
- */
+ * `state` holds the two fields other modules reassign (the library itself and
+ * the selection anchor); everything else here is a container that is mutated
+ * in place. Modules own their remaining state and export setters for what
+ * others may change. */
 
-const {
-  packItems,
-  sortItems,
-  clampColumns,
-  basename,
-  reorderByHash,
-  GAP,
-  MISSING_W,
-  MISSING_H,
-  MIN_COLUMNS,
-  MAX_COLUMNS,
-  DEFAULT_COLUMNS
-} = window.CollagerLayout;
-const { clickSelection } = window.CollagerSelection;
-const prefs = window.CollagerPrefs.createPrefs(window.localStorage);
+import { createPrefs } from '../core/prefs.js';
 
-/** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', w?:number, h?:number, missing?:boolean}[]} */
-let items = [];
+export const state = {
+  /** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', w?:number, h?:number, missing?:boolean}[]} the library, in collage order */
+  items: [],
+  /** hash the next shift-click range extends from, or null */
+  selectionAnchor: null
+};
+/** hashes of the selected items (shared by the collage and the file panel) */
+export const selected = new Set();
 /** hash -> tile element */
-const tiles = new Map();
+export const tiles = new Map();
 /** hash -> packed position {x, y, w, h} from the last render */
-const lastPositions = new Map();
+export const lastPositions = new Map();
 
-const scroller = document.getElementById('scroller');
-const collage = document.getElementById('collage');
-const emptyState = document.getElementById('empty-state');
-const itemCount = document.getElementById('item-count');
-const toastEl = document.getElementById('toast');
+export const scroller = document.getElementById('scroller');
+export const collage = document.getElementById('collage');
+export const emptyState = document.getElementById('empty-state');
+export const itemCount = document.getElementById('item-count');
+export const toastEl = document.getElementById('toast');
+
+export const prefs = createPrefs(window.localStorage);
 
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;
 /* sticky toasts stay up until the next showToast call replaces them —
  * used as a progress readout during long operations */
-function showToast(message, sticky = false) {
+export function showToast(message, sticky = false) {
   toastEl.textContent = message;
   toastEl.hidden = false;
   clearTimeout(toastTimer);
@@ -57,9 +46,9 @@ function showToast(message, sticky = false) {
 
 /* ---------------- persistence ---------------- */
 
-async function persist() {
+export async function persist() {
   try {
-    await window.api.saveLibrary(items);
+    await window.api.saveLibrary(state.items);
   } catch (err) {
     console.error('Failed to save library', err);
     showToast('Warning: could not save the collection to disk');

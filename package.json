@@ -14,7 +14,7 @@
   "author": "Stefan Alexander van Heijningen",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "packageManager": "pnpm@10.15.1",
   "scripts": {

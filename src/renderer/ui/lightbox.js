@@ -1,13 +1,12 @@
-'use strict';
-
 /* ---------------- lightbox ----------------
  * Double-click a tile to view it enlarged; videos get native controls (and
- * can be unmuted there). Esc or a backdrop click closes it. */
+ * can be unmuted there). A backdrop click closes it, as does Escape through
+ * the ladder in shortcuts.js. */
 
-const lightbox = document.getElementById('lightbox');
+export const lightbox = document.getElementById('lightbox');
 const lightboxContent = document.getElementById('lightbox-content');
 
-function openLightbox(item) {
+export function openLightbox(item) {
   lightboxContent.textContent = '';
   const url = item.url;
   let media;
@@ -26,7 +25,7 @@ function openLightbox(item) {
   lightbox.hidden = false;
 }
 
-function closeLightbox() {
+export function closeLightbox() {
   const video = lightboxContent.querySelector('video');
   if (video) {
     video.pause();
@@ -39,7 +38,4 @@ function closeLightbox() {
 
 lightbox.addEventListener('click', (e) => {
   if (e.target === lightbox || e.target === lightboxContent) closeLightbox();
-});
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
 });
