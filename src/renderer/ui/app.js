@@ -150,6 +150,7 @@ queueLibraryOperation(async function init() {
   try {
     const loaded = await window.api.loadLibrary();
     state.items = loaded.items;
+    state.libraryLoaded = true;
     reindexItems(); // the dimension pass below runs long before the first render
     if (loaded.problem) {
       // a blocked save lasts the whole session, so that warning must not time out
@@ -161,15 +162,24 @@ queueLibraryOperation(async function init() {
     });
     render();
     if (measured) persist();
+    const notes = [];
     const missingCount = state.items.filter((i) => i.missing).length;
     if (missingCount) {
-      showToast(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
+      notes.push(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
+    }
+    if (loaded.collapsed) {
+      notes.push(`${formatCount(loaded.collapsed, 'duplicate')} merged`);
+    }
+    if (notes.length) {
+      showToast(notes.join(' · '));
     } else if (measured) {
       showToast('Library ready'); // replaces the sticky progress toast
     }
   } catch (err) {
     console.error('Failed to load the library', err);
     render();
-    showToast('Could not load the saved library');
+    // saving stays off for the whole session (see persist), so the warning
+    // must not time out
+    showToast('Could not load the saved library. Saving is off to protect it.', true);
   }
 });

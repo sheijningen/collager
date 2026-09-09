@@ -1,6 +1,7 @@
 const fsp = require('fs').promises;
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { rehashStaleItems } = require('./scan');
 
 /* Parses a library file into its items. Every way the file can be unusable
  * throws, so the caller moves the file aside exactly when this does. Entries
@@ -65,16 +66,17 @@ function createLibraryStore(getDir) {
   }
 
   return {
-    /* Resolves to the items plus `problem`: null when the file loaded (or
-     * did not exist yet), otherwise `{ backup }` with the backup path, or
-     * null when the file could not be moved and stays in place, which also
-     * blocks saving. */
+    /* Resolves to the items, `sizeOnDisk` (the current byte size of every
+     * item whose file is present, from the one stat that also decides
+     * `missing`), and `problem`: null when the file loaded (or did not exist
+     * yet), otherwise `{ backup }` with the backup path, or null when the
+     * file could not be moved and stays in place, which also blocks saving. */
     async load() {
       let raw;
       try {
         raw = await fsp.readFile(libraryFile(), 'utf8');
       } catch {
-        return { items: [], problem: null }; // no library yet
+        return { items: [], sizeOnDisk: new Map(), problem: null }; // no library yet
       }
       let items;
       try {
@@ -82,19 +84,22 @@ function createLibraryStore(getDir) {
       } catch {
         const backup = await moveAside();
         saveBlockedBy = backup === null ? libraryFile() : null;
-        return { items: [], problem: { backup } };
+        return { items: [], sizeOnDisk: new Map(), problem: { backup } };
       }
       saveBlockedBy = null;
+      const sizeOnDisk = new Map();
       await Promise.all(
         items.map(async (item) => {
-          item.missing = await fsp.access(item.path).then(
-            () => false,
-            () => true
-          );
+          try {
+            sizeOnDisk.set(item, (await fsp.stat(item.path)).size);
+            item.missing = false;
+          } catch {
+            item.missing = true;
+          }
           item.url = pathToFileURL(item.path).href;
         })
       );
-      return { items, problem: null };
+      return { items, sizeOnDisk, problem: null };
     },
 
     save(items) {
@@ -103,10 +108,11 @@ function createLibraryStore(getDir) {
           new Error(`not saving: the library at ${saveBlockedBy} must stay as it is`)
         );
       }
-      const persisted = items.map(({ path: p, hash, type, w, h }) => ({
+      const persisted = items.map(({ path: p, hash, type, size, w, h }) => ({
         path: p,
         hash,
         type,
+        size,
         w,
         h
       }));
@@ -123,4 +129,22 @@ function createLibraryStore(getDir) {
   };
 }
 
-module.exports = { createLibraryStore, readLibraryItems };
+/* The startup load: reads the library from `store`, brings stale entries up
+ * to date and writes the result back when anything changed. A failed save
+ * must not fail the load, so it is logged and the pass simply runs again on
+ * the next start. Resolves to the items, the load `problem`, and how many
+ * entries collapsed into another. */
+async function loadAndRepairLibrary(store) {
+  const loaded = await store.load();
+  const { items, collapsed, changed } = await rehashStaleItems(loaded.items, loaded.sizeOnDisk);
+  if (changed) {
+    try {
+      await store.save(items);
+    } catch (err) {
+      console.error('Failed to save the repaired library', err);
+    }
+  }
+  return { items, problem: loaded.problem, collapsed };
+}
+
+module.exports = { createLibraryStore, readLibraryItems, loadAndRepairLibrary };
