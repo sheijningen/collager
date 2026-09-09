@@ -29,6 +29,7 @@ import {
 import { handleSelectClick, renderList } from './panel.js';
 import { openLightbox } from './lightbox.js';
 import { lastDragEndAt } from './tiledrag.js';
+import { startJob } from './status.js';
 
 /* ---------------- columns setting ---------------- */
 
@@ -297,15 +298,36 @@ export function addPaths(paths) {
 }
 
 // live progress while the main process hashes a dropped batch (the slow part
-// for video folders); the sticky toast is replaced by the summary at the end
+// for video folders). The job is attached only for the duration of the probe
+// call, so a last progress event that lands after it resolved cannot
+// overwrite the next phase.
+let probeJob = null;
 window.api.onProbeProgress(({ done, total }) => {
-  showToast(`Adding — hashing files ${done}/${total}…`, true);
+  if (probeJob) probeJob.update(`hashing files ${done}/${total}`);
 });
 
 async function doAddPaths(paths) {
   if (!paths.length) return;
-  showToast('Adding — scanning…', true);
-  const { entries, skippedCount } = await window.api.probeFiles(paths);
+  const job = startJob('Adding');
+  try {
+    await addFiles(paths, job);
+  } finally {
+    job.finish();
+  }
+}
+
+async function probeFilesWithProgress(paths, job) {
+  probeJob = job;
+  try {
+    return await window.api.probeFiles(paths);
+  } finally {
+    probeJob = null;
+  }
+}
+
+async function addFiles(paths, job) {
+  job.update('scanning');
+  const { entries, skippedCount } = await probeFilesWithProgress(paths, job);
 
   const known = new Map(state.items.map((i) => [i.hash, i]));
   const fresh = [];
@@ -334,7 +356,7 @@ async function doAddPaths(paths) {
   }
 
   await measureMissingDimensions(fresh, (done, total) => {
-    showToast(`Adding — reading dimensions ${done}/${total}…`, true);
+    job.update(`reading dimensions ${done}/${total}`);
   });
   state.items.push(...fresh);
   render();

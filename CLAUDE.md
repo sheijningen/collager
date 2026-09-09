@@ -15,7 +15,7 @@ and Windows. macOS is not a target; the `darwin` branches only keep the app quit
 src/main/            main process: window, IPC, menu, GPU fallback
 src/main/lib/        pure Node logic: scanning, hashing, library persistence
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs
-src/renderer/ui/     DOM modules, ES modules with app.js as the entry
+src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core
 test/e2e/            boots the real app and drives it
@@ -58,6 +58,9 @@ docs/                README media
   cannot insert the same hash twice.
 - **Escape order**: context menu, lightbox, help/about overlays, selection, fullscreen. One
   keydown handler in `shortcuts.js` walks that ladder and closes exactly one layer.
+- **Progress**: long-running work (preparing the library, adding a batch) reports through
+  `startJob` in `status.js`, one line per job in the status area stacked above the toast at the
+  bottom centre. Toasts are for one-off messages and never stay up.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
 - **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and

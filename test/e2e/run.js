@@ -133,12 +133,14 @@ async function run() {
     await js(`T.addPaths(${JSON.stringify(fixtures)})`);
     await new Promise((r) => setTimeout(r, 1500));
     check('drop adds all media once', (await js('T.state.items.length')) === expected);
+    check('the add job finished', (await js('T.runningJobCount()')) === 0);
     check(
       'duplicate content was skipped',
       (await js(`T.state.items.filter(i => /wide(-copy)?\\.png$/.test(i.path)).length`)) === 1
     );
     await js(`T.addPaths(${JSON.stringify([fixtures[0]])})`);
     check('re-adding is a no-op', (await js('T.state.items.length')) === expected);
+    check('a no-op add still finishes its job', (await js('T.runningJobCount()')) === 0);
 
     // -- dropping a directory adds its compatible files recursively ---------
     const dropDir = path.join(workDir, 'dirdrop');
@@ -399,6 +401,27 @@ async function run() {
       return stepped;
     })()`)
     );
+
+    // -- status area ---------------------------------------------------------------
+    const status = await js(`(() => {
+      const area = document.getElementById('status');
+      const hiddenAtRest = area.hidden && T.runningJobCount() === 0;
+      const first = T.startJob('First');
+      const second = T.startJob('Second');
+      second.update('step 2/5');
+      const twoLines = !area.hidden && area.children.length === 2
+        && area.children[1].textContent === 'Second: step 2/5';
+      first.finish();
+      const oneLeft = area.children.length === 1 && area.children[0].textContent === 'Second: step 2/5';
+      second.finish();
+      second.finish(); // finishing twice is harmless
+      return { hiddenAtRest, twoLines, oneLeft, hiddenAgain: area.hidden && T.runningJobCount() === 0 };
+    })()`);
+    check(
+      'the status area is hidden while nothing runs',
+      status.hiddenAtRest && status.hiddenAgain
+    );
+    check('each job owns its own line', status.twoLines && status.oneLeft);
 
     // -- help & about overlays ------------------------------------------------
     await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }))`);

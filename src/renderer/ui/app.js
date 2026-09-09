@@ -23,6 +23,8 @@ import * as autoscrollModule from './autoscroll.js';
 import * as shortcutsModule from './shortcuts.js';
 import * as toolbarModule from './toolbar.js';
 import * as fullscreenModule from './fullscreen.js';
+import * as statusModule from './status.js';
+import { startJob } from './status.js';
 
 /* ---------------- OS file drag & drop ---------------- */
 
@@ -125,7 +127,8 @@ if (new URLSearchParams(location.search).has('e2e')) {
     autoscrollModule,
     shortcutsModule,
     toolbarModule,
-    fullscreenModule
+    fullscreenModule,
+    statusModule
   ]);
 }
 
@@ -136,6 +139,7 @@ render(); // empty state and toolbar geometry before the library arrives
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
 queueLibraryOperation(async function init() {
+  const job = startJob('Preparing library');
   try {
     const loaded = await window.api.loadLibrary();
     state.items = loaded.items;
@@ -143,7 +147,7 @@ queueLibraryOperation(async function init() {
       showToast('Library file was corrupted — starting empty (backup: library.json.corrupt)');
     }
     const measured = await measureMissingDimensions(state.items, (done, total) => {
-      showToast(`Preparing library — reading dimensions ${done}/${total}…`, true);
+      job.update(`reading dimensions ${done}/${total}`);
     });
     render();
     if (measured) persist();
@@ -152,12 +156,12 @@ queueLibraryOperation(async function init() {
       showToast(
         `${missingCount} file${missingCount === 1 ? '' : 's'} missing on disk — hover to remove`
       );
-    } else if (measured) {
-      showToast('Library ready'); // replaces the sticky progress toast
     }
   } catch (err) {
     console.error('Failed to load the library', err);
     render();
     showToast('Could not load the saved library');
+  } finally {
+    job.finish();
   }
 });

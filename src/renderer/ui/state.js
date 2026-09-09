@@ -31,17 +31,15 @@ export const prefs = createPrefs(window.localStorage);
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;
-/* sticky toasts stay up until the next showToast call replaces them —
- * used as a progress readout during long operations */
-export function showToast(message, sticky = false) {
+/* A short-lived message. Progress of long-running work goes through
+ * startJob in status.js instead, so several jobs can report at once. */
+export function showToast(message) {
   toastEl.textContent = message;
   toastEl.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = sticky
-    ? null
-    : setTimeout(() => {
-        toastEl.hidden = true;
-      }, 2600);
+  toastTimer = setTimeout(() => {
+    toastEl.hidden = true;
+  }, 2600);
 }
 
 /* ---------------- persistence ---------------- */
