@@ -1,0 +1,158 @@
+name: Release
+
+# Pushing a version tag (v0.2.0) builds the installers and publishes a GitHub
+# Release with them. The tag must match the version in package.json.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve the version from the tag and check it against package.json
+        id: resolve
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          VERSION="${REF#refs/tags/v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid tag '$REF' (expected refs/tags/vX.Y.Z)"
+            exit 1
+          fi
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PKG_VERSION" != "$VERSION" ]]; then
+            echo "::error::Tag v$VERSION does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Refuse to overwrite an existing release
+        # A force-pushed tag re-fires this workflow; failing here keeps a
+        # published release immutable instead of failing after the builds.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.resolve.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists; refusing to overwrite"
+            exit 1
+          fi
+
+  checks:
+    name: lint, format and unit tests
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # reads the pnpm version from packageManager
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+
+  e2e:
+    needs: prepare
+    uses: ./.github/workflows/e2e.yml
+
+  build:
+    name: build ${{ matrix.name }}
+    needs: [prepare, checks, e2e]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            runner: ubuntu-latest
+            script: dist:linux
+            glob: dist/*.AppImage
+          - name: windows
+            runner: windows-latest
+            script: dist:win
+            glob: dist/*.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # reads the pnpm version from packageManager
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ${{ matrix.script }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish GitHub Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+          pattern: installer-*
+      - name: Check that both installers arrived and compute SHA256SUMS
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd artifacts
+          ls -la
+          # electron-builder spells the architecture per target (x86_64 for
+          # AppImage, x64 for NSIS), so match on the fixed parts only
+          missing=0
+          for pattern in "Collager-${VERSION}-linux-*.AppImage" "Collager-${VERSION}-windows-*-setup.exe"; do
+            if ! compgen -G "$pattern" >/dev/null; then
+              echo "::error::Missing expected artifact: $pattern"
+              missing=1
+            fi
+          done
+          if [[ "$missing" != 0 ]]; then
+            exit 1
+          fi
+          sha256sum Collager-* | LC_ALL=C sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+      - name: Create the GitHub Release and upload the installers
+        # created as a draft so a failed asset upload never leaves a public
+        # release with files missing; it goes live only once everything is up
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --title "Collager ${TAG#v}" \
+            --generate-notes \
+            --draft \
+            artifacts/Collager-* artifacts/SHA256SUMS
+          gh release edit "$TAG" --repo "$REPO" --draft=false

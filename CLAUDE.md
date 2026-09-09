@@ -79,3 +79,10 @@ docs/                README media
 electron-builder config is the `build` field in `package.json`: AppImage and NSIS, only
 `src/**` bundled, icon from `build/icon.png`. `desktopName` plus `syncDesktopName` keeps the
 Linux desktop entry matched to the running window.
+
+Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json`. The
+release workflow runs lint, format, unit and e2e tests, builds both installers, and publishes
+a GitHub Release with them, a `SHA256SUMS` file and auto-generated notes. The installer file
+names come from the `artifactName` fields; the publish job matches them on everything except
+the architecture part (electron-builder writes `x86_64` for AppImage and `x64` for NSIS), and
+the README spells out the names the x64 runners produce. Change all three together.

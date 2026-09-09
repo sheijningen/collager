@@ -1,6 +1,6 @@
 {
   "name": "collager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Media collage viewer for images (PNG/JPEG/WebP), GIFs and videos (MP4/WebM)",
   "private": true,
   "homepage": "https://github.com/sheijningen/collager",
@@ -53,11 +53,13 @@
       "target": "AppImage",
       "category": "Graphics",
       "icon": "build/icon.png",
-      "syncDesktopName": true
+      "syncDesktopName": true,
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-windows-${arch}-setup.${ext}"
     }
   }
 }
