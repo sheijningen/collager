@@ -22,6 +22,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             xvfb ffmpeg libgtk-3-0t64 libnss3 libasound2t64 libgbm1 libxss1 libatk-bridge2.0-0t64
+      - name: Download the Electron binary
+        # pnpm skips Electron's postinstall; running it here puts the binary (and
+        # its sandbox helper) in place before the next step touches it
+        run: node node_modules/electron/install.js
       - name: Make Chromium's setuid sandbox helper usable
         # Ubuntu 24.04 restricts unprivileged user namespaces, so Chromium falls
         # back to its setuid helper, which must be root-owned with mode 4755
