@@ -97,7 +97,7 @@ async function run() {
       } catch {
         return false;
       }
-      return library.length === count;
+      return Array.isArray(library) && library.length === count;
     }, 5000);
     return matched ? library : null;
   }

@@ -56,9 +56,13 @@ docs/                README media
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
-- **Persistence**: `library.json` in `userData`, saves serialized and atomic (temp file plus
-  rename), a corrupt file is copied to `library.json.corrupt` and the app starts empty. Only
-  path, hash, type and dimensions are stored; URL and missing flag are derived at load.
+- **Persistence**: `library.json` in `userData` is an array of items, saves serialized and
+  atomic (temp file plus rename). An unreadable file is moved to `library.json.corrupt` (a
+  timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
+  When the move fails the file stays in place and saving is refused so it is not overwritten.
+  There is no schema version: a file the current code cannot read counts as unreadable. Only
+  path, hash, type and dimensions are stored per item; URL and missing flag are derived at load,
+  and an entry without a hash makes the file unreadable.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
@@ -92,10 +96,12 @@ docs/                README media
   never cleans up. `pnpm test:e2e panel drag` runs only the named cases, in file order. The
   harness sets `COLLAGER_E2E=1`;
   main then loads the page with `?e2e` and `app.js` exposes every module export on
-  `window.collagerTest`, which the snippets reach as `T`. Needs a display:
-  `xvfb-run -a pnpm test:e2e` on headless machines.
-- `ELECTRON_RUN_AS_NODE` must be unset (VS Code terminals export it, which makes
-  `require('electron')` return a path). Use `env -u ELECTRON_RUN_AS_NODE`.
+  `window.collagerTest`, which the snippets reach as `T`.
+- Run the e2e suite locally as `env -u ELECTRON_RUN_AS_NODE pnpm test:e2e`, straight on the
+  desktop: the app window opens and closes on the current display during the run, which is
+  fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes
+  `require('electron')` return a path. `xvfb-run -a` is only for headless machines and CI, and
+  is not installed on development machines.
 - The CI e2e job makes Chromium's setuid sandbox helper root-owned because Ubuntu 24.04
   runners restrict unprivileged user namespaces.
 
