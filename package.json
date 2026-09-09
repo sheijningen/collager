@@ -1,0 +1,63 @@
+{
+  "name": "collager",
+  "version": "0.1.0",
+  "description": "Media collage viewer for images (PNG/JPEG/WebP), GIFs and videos (MP4/WebM)",
+  "private": true,
+  "homepage": "https://github.com/sheijningen/collager",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sheijningen/collager.git"
+  },
+  "bugs": "https://github.com/sheijningen/collager/issues",
+  "main": "src/main/main.js",
+  "desktopName": "collager.desktop",
+  "author": "Stefan Alexander van Heijningen",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/main/*.test.js\" \"test/renderer/*.test.js\"",
+    "test:e2e": "electron test/e2e/run.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dist:linux": "electron-builder --linux AppImage",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.8.1",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "electron-winstaller"
+    ]
+  },
+  "build": {
+    "appId": "dev.svh.collager",
+    "productName": "Collager",
+    "files": [
+      "src/**"
+    ],
+    "electronLanguages": [
+      "en-US"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Graphics",
+      "icon": "build/icon.png",
+      "syncDesktopName": true
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    }
+  }
+}

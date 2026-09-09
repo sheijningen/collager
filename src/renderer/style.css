@@ -1,0 +1,655 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #111114;
+  --bg-tile: #1d1d23;
+  --fg: #e8e8ec;
+  --fg-dim: #85858f;
+  --accent: #4f8cff;
+  --danger: #e5484d;
+  --toolbar-h: 48px;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  overflow: hidden;
+}
+
+/* ---------- toolbar ---------- */
+
+#toolbar {
+  height: var(--toolbar-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 44px 0 14px; /* right padding clears the floating toolbar toggle */
+  border-bottom: 1px solid #26262e;
+  user-select: none;
+}
+
+body.toolbar-collapsed #toolbar {
+  display: none;
+}
+
+body.toolbar-collapsed #workspace {
+  height: 100%;
+}
+
+#btn-toolbar-toggle {
+  position: fixed;
+  top: 9px;
+  right: 10px;
+  z-index: 60;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #33333d;
+  border-radius: 6px;
+  background: rgba(29, 29, 35, 0.75);
+  color: var(--fg-dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#btn-toolbar-toggle:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+  opacity: 1;
+}
+
+/* collapsed: become a clearly visible tab hanging from the top edge, kept on
+ * the right like the expanded button (offset left of the scrollbar gutter) */
+body.toolbar-collapsed #btn-toolbar-toggle {
+  top: 0;
+  right: 20px;
+  width: 56px;
+  height: 22px;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  background: #26262e;
+  color: var(--fg);
+  opacity: 0.85;
+}
+
+body.toolbar-collapsed #btn-toolbar-toggle:hover {
+  opacity: 1;
+  height: 26px;
+}
+
+#app-title {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+  cursor: pointer; /* opens the about overlay */
+}
+
+#toolbar button {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  background: var(--bg-tile);
+  color: var(--fg);
+  border: 1px solid #33333d;
+  border-radius: 6px;
+  padding: 0 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#toolbar button:hover {
+  border-color: var(--accent);
+}
+
+/* icon-only buttons are uniform squares */
+#btn-panel,
+#btn-fullscreen,
+#btn-help,
+#btn-col-minus,
+#btn-col-plus {
+  width: 32px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+#col-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+#col-count {
+  color: var(--fg);
+  min-width: 12px;
+  text-align: center;
+}
+
+#scroll-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+#scroll-control label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap; /* "keep awake" must not wrap to two lines */
+}
+
+#scroll-control input[type='range'] {
+  width: 90px;
+  accent-color: var(--accent);
+}
+
+#scroll-control input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+#btn-autoscroll.active,
+#btn-fullscreen.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#toolbar #btn-clear-missing,
+#toolbar #btn-clear-missing:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+#toolbar #btn-clear-missing:hover {
+  background: rgba(229, 72, 77, 0.15);
+}
+
+#item-count {
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+#toolbar-hint {
+  margin-left: auto;
+  color: var(--fg-dim);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#item-count {
+  white-space: nowrap;
+}
+
+/* ---------- workspace / panel ---------- */
+
+#workspace {
+  display: flex;
+  height: calc(100% - var(--toolbar-h));
+}
+
+#panel {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #26262e;
+  background: #141418;
+}
+
+#panel.collapsed {
+  display: none;
+}
+
+#panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #26262e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#sort-select {
+  background: var(--bg-tile);
+  color: var(--fg);
+  border: 1px solid #33333d;
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+#file-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  padding: 4px 0;
+  user-select: none;
+}
+
+#file-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#file-list li:hover {
+  background: #1e1e26;
+}
+
+/* before .selected, so a selected missing entry still reads as selected */
+#file-list li.missing {
+  background: rgba(229, 72, 77, 0.1);
+}
+
+#file-list li.missing:hover {
+  background: rgba(229, 72, 77, 0.18);
+}
+
+#file-list li.selected {
+  background: rgba(79, 140, 255, 0.22);
+}
+
+#file-list li.missing .fname {
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+#file-list li.missing .badge {
+  background: #5c1e22;
+  color: #ff9b9e;
+}
+
+#file-list .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#file-list .badge {
+  flex-shrink: 0;
+  width: 30px;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 2px 0;
+}
+
+.badge.image {
+  background: #1e3a5f;
+  color: #8bc0ff;
+}
+.badge.gif {
+  background: #3d2a5c;
+  color: #c9a6ff;
+}
+.badge.video {
+  background: #5c3a1e;
+  color: #ffc38b;
+}
+
+#panel-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid #26262e;
+}
+
+#panel-footer button {
+  background: var(--bg-tile);
+  color: var(--fg);
+  border: 1px solid #33333d;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#panel-footer button:not(:disabled):hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+#panel-footer button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#panel-hint {
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+
+/* ---------- collage ---------- */
+
+#scroller {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* reserve the scrollbar gutter: render() measures clientWidth before the
+   * new height can flip scrollbar presence, so the width must not depend on it */
+  scrollbar-gutter: stable;
+}
+
+#collage {
+  position: relative;
+}
+
+.tile {
+  position: absolute;
+  background: var(--bg-tile);
+  overflow: hidden;
+  border-radius: 3px;
+  user-select: none; /* placeholder labels must not drag-select mid-reorder */
+  touch-action: none; /* let pointer-drag win over touch scrolling */
+}
+
+.tile img,
+.tile video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+.tile[data-hydrated='1'] .placeholder-label {
+  display: none;
+}
+
+.tile .placeholder-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  text-align: center;
+  word-break: break-all;
+  pointer-events: none;
+}
+
+.tile.missing {
+  outline: 1px dashed var(--danger);
+}
+
+.tile.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.tile.dragging {
+  opacity: 0.35;
+}
+
+.tile.drop-target {
+  outline: 3px dashed var(--accent);
+  outline-offset: -3px;
+}
+
+#drag-ghost {
+  position: fixed;
+  z-index: 400;
+  pointer-events: none;
+  background: #26262e;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--fg);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile.missing .placeholder-label {
+  color: var(--danger);
+}
+
+.tile .btn-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.tile:hover .btn-remove {
+  opacity: 1;
+}
+
+.tile .btn-remove:hover {
+  background: var(--danger);
+}
+
+/* ---------- empty state ---------- */
+
+#empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--fg-dim);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+#empty-state .sub {
+  font-size: 13px;
+}
+
+/* ---------- drag & drop overlay ---------- */
+
+#drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(79, 140, 255, 0.12);
+  border: 3px dashed var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--accent);
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* ---------- lightbox ---------- */
+
+#lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  cursor: zoom-out;
+}
+
+#lightbox-content img,
+#lightbox-content video {
+  max-width: 96vw;
+  max-height: 94vh;
+  display: block;
+  cursor: default;
+}
+
+/* ---------- help & about overlays ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150; /* above the lightbox, below the context menu */
+}
+
+.overlay-card {
+  background: var(--bg-tile);
+  border: 1px solid #33333d;
+  border-radius: 10px;
+  padding: 22px 26px;
+  min-width: 340px;
+  max-width: 560px;
+  max-height: 86vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.overlay-card h2 {
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+
+#shortcut-list {
+  border-collapse: collapse;
+}
+
+#shortcut-list td {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+#shortcut-list td:first-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+kbd {
+  background: #26262e;
+  border: 1px solid #3a3a46;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+#about-version {
+  color: var(--fg-dim);
+  font-size: 13px;
+  margin: -8px 0 12px;
+}
+
+#about-desc {
+  font-size: 13px;
+  max-width: 420px;
+}
+
+#about-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+#about-meta dt {
+  color: var(--fg-dim);
+}
+
+/* ---------- context menu ---------- */
+
+#ctx-menu {
+  position: fixed;
+  z-index: 300;
+  min-width: 180px;
+  max-width: 380px;
+  background: #26262e;
+  border: 1px solid #3a3a46;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#ctx-path {
+  padding: 6px 8px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--fg);
+  word-break: break-all;
+  user-select: text;
+  border-bottom: 1px solid #3a3a46;
+  margin-bottom: 4px;
+}
+
+#ctx-menu button {
+  background: none;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#ctx-menu button:hover {
+  background: rgba(79, 140, 255, 0.22);
+}
+
+/* ---------- toast ---------- */
+
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #26262e;
+  color: var(--fg);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 200;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+}
+
+[hidden] {
+  display: none !important;
+}
