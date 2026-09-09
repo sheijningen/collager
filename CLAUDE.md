@@ -23,9 +23,9 @@ docs/                README media
 ```
 
 - The script order in `index.html` is load-bearing: layout, selection, prefs, state, collage,
-  panel, tiledrag, lightbox, autoscroll, shortcuts, app. Earlier declarations are visible to
-  later scripts; functions declared later are callable at runtime. eslint cannot check
-  cross-file identifiers in `ui/` (`no-undef` is off there), so verify them by hand.
+  panel, tiledrag, lightbox, exportimage, autoscroll, shortcuts, app. Earlier declarations are
+  visible to later scripts; functions declared later are callable at runtime. eslint cannot
+  check cross-file identifiers in `ui/` (`no-undef` is off there), so verify them by hand.
 - `core/` modules are UMD-style (`window.Collager*` in the renderer, `module.exports` under
   Node) and must stay free of DOM access.
 - The renderer is isolated (`contextIsolation`, no `nodeIntegration`, CSP in `index.html`).
@@ -42,6 +42,11 @@ docs/                README media
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
+- **Image export**: the collage is drawn onto one canvas at its current layout and saved as PNG
+  or JPEG. Media on screen is drawn as shown (videos and GIFs keep their current frame); the
+  rest is loaded off screen, videos at their first frame. Oversized collages scale down as a
+  whole to stay within canvas limits. The encoded image streams to the main process in chunks,
+  and the writer only accepts the path the native save dialog returned.
 - **Persistence**: `library.json` in `userData`, saves serialized and atomic (temp file plus
   rename), a corrupt file is copied to `library.json.corrupt` and the app starts empty. Only
   path, hash, type and dimensions are stored; URL and missing flag are derived at load.

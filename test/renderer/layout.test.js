@@ -6,6 +6,9 @@ const {
   clampColumns,
   basename,
   reorderByHash,
+  fitExportScale,
+  MAX_EXPORT_SIDE,
+  MAX_EXPORT_AREA,
   GAP,
   MISSING_W,
   MISSING_H,
@@ -167,4 +170,28 @@ test('sortItems: added mode keeps collage order', () => {
     sortItems(list, 'added').map((i) => i.path),
     ['/c.png', '/a.png', '/b.png']
   );
+});
+
+test('fitExportScale: images within the limits keep their size', () => {
+  assert.equal(fitExportScale(1800, 5000), 1);
+  assert.equal(fitExportScale(MAX_EXPORT_SIDE, 100), 1);
+});
+
+test('fitExportScale: the longest side is brought down to the side limit', () => {
+  const scale = fitExportScale(1000, 40000);
+  assert.ok(scale < 1);
+  assert.equal(Math.round(40000 * scale), MAX_EXPORT_SIDE);
+});
+
+test('fitExportScale: the area limit wins when both sides are allowed', () => {
+  const side = 10000; // under the side limit, but 100M pixels
+  const scale = fitExportScale(side, side);
+  assert.ok(scale < 1);
+  assert.ok(Math.abs(side * scale * (side * scale) - MAX_EXPORT_AREA) < side);
+});
+
+test('fitExportScale: custom limits and degenerate sizes', () => {
+  assert.equal(fitExportScale(200, 100, 100, 1e9), 0.5);
+  assert.equal(fitExportScale(0, 100), 1);
+  assert.equal(fitExportScale(100, NaN), 1);
 });

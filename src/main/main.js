@@ -4,6 +4,7 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { MEDIA_EXTS, probeFiles } = require('./lib/scan');
 const { createLibraryStore } = require('./lib/library');
+const { createExportWriter } = require('./lib/exportwrite');
 
 const library = createLibraryStore(() => app.getPath('userData'));
 
@@ -108,6 +109,42 @@ ipcMain.handle('is-fullscreen', (event) => {
 ipcMain.on('reveal-file', (_event, filePath) => {
   if (typeof filePath === 'string') shell.showItemInFolder(filePath);
 });
+
+/* Image export: the renderer asks for a destination through the native save
+ * dialog, renders, then streams the encoded bytes. The writer only accepts
+ * the path the dialog returned, so the renderer never names a file itself. */
+const exportWriter = createExportWriter();
+
+ipcMain.handle('pick-export-path', async (event, defaultName) => {
+  const validName =
+    typeof defaultName === 'string' &&
+    defaultName.length > 0 &&
+    defaultName === path.basename(defaultName) &&
+    !defaultName.includes('\0');
+  if (!validName) throw new Error('invalid export file name');
+  const win = BrowserWindow.fromWebContents(event.sender);
+  let pictures;
+  try {
+    pictures = app.getPath('pictures');
+  } catch {
+    pictures = app.getPath('home');
+  }
+  const result = await dialog.showSaveDialog(win, {
+    title: 'Export collage as image',
+    defaultPath: path.join(pictures, defaultName),
+    filters: [
+      { name: 'PNG image', extensions: ['png'] },
+      { name: 'JPEG image', extensions: ['jpg', 'jpeg'] }
+    ]
+  });
+  return exportWriter.approve(result.canceled ? null : result.filePath);
+});
+
+ipcMain.handle('write-export-chunk', (_event, filePath, bytes, last) =>
+  exportWriter.writeChunk(filePath, bytes, Boolean(last))
+);
+
+ipcMain.handle('abort-export-write', () => exportWriter.abort());
 
 ipcMain.handle('pick-files', async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);

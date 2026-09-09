@@ -97,9 +97,17 @@ function dehydrate(tile) {
 
 /* ---------------- rendering ---------------- */
 
+/* The layout as it stands: every item packed for the current collage width
+ * and column count. Shared by the DOM render and the image export so both
+ * place tiles identically. */
+function packCurrentLayout() {
+  const width = Math.max(scroller.clientWidth - GAP * 2, 100);
+  const { positions, height } = packItems(items, width, columns);
+  return { positions, width, height };
+}
+
 function render() {
-  const width = scroller.clientWidth - GAP * 2;
-  const { positions, height } = packItems(items, Math.max(width, 100), columns);
+  const { positions, height } = packCurrentLayout();
   collage.style.height = `${height + GAP}px`;
 
   const seen = new Set();

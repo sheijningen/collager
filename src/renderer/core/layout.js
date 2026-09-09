@@ -10,6 +10,10 @@
   const MIN_COLUMNS = 1;
   const MAX_COLUMNS = 8;
   const DEFAULT_COLUMNS = 3;
+  // Chromium refuses canvases beyond these; the area cap also bounds the
+  // export's memory (4 bytes per pixel, so 64M pixels is 256 MiB)
+  const MAX_EXPORT_SIDE = 16384;
+  const MAX_EXPORT_AREA = 64 * 1024 * 1024;
 
   function clampColumns(n) {
     if (!Number.isFinite(n)) return DEFAULT_COLUMNS;
@@ -43,6 +47,16 @@
       colHeights[col] += h + GAP;
     }
     return { positions, height: Math.max(0, Math.max(0, ...colHeights) - GAP) };
+  }
+
+  /* Uniform scale (at most 1) that fits a width x height image within the
+   * canvas side and area limits, so a very tall collage exports smaller
+   * instead of failing. */
+  function fitExportScale(width, height, maxSide = MAX_EXPORT_SIDE, maxArea = MAX_EXPORT_AREA) {
+    if (!(width > 0) || !(height > 0)) return 1;
+    const bySide = maxSide / Math.max(width, height);
+    const byArea = Math.sqrt(maxArea / (width * height));
+    return Math.min(1, bySide, byArea);
   }
 
   function basename(p) {
@@ -81,6 +95,9 @@
   exports.MIN_COLUMNS = MIN_COLUMNS;
   exports.MAX_COLUMNS = MAX_COLUMNS;
   exports.DEFAULT_COLUMNS = DEFAULT_COLUMNS;
+  exports.MAX_EXPORT_SIDE = MAX_EXPORT_SIDE;
+  exports.MAX_EXPORT_AREA = MAX_EXPORT_AREA;
+  exports.fitExportScale = fitExportScale;
   exports.clampColumns = clampColumns;
   exports.packItems = packItems;
   exports.basename = basename;

@@ -38,6 +38,10 @@ pnpm dist:win     # NSIS installer (run on Windows, or via wine)
 - **Reorder**: drag a tile onto another tile to move it there. The order
   persists and is what shuffle randomizes.
 - **Shuffle**: the 🔀 button re-shuffles and re-packs the collage.
+- **Export**: the 🖼 Export button saves the collage as it is laid out right
+  now to a PNG or JPEG image. Videos on screen contribute their current frame,
+  videos further away their first. Very tall collages are scaled down to fit
+  the image size limits.
 - **Clear all**: the 🗑 button removes every item, after confirmation.
 - **Columns**: the − / + control sets how many columns the collage uses (1 to 8).
 - **File panel**: the ☰ button toggles a sidebar listing every file, sortable
@@ -72,6 +76,7 @@ Press **?** (or F1) in the app for this list.
 | `Space`     | Start / stop auto-scroll                               |
 | `,` / `.`   | Auto-scroll slower / faster                            |
 | `S`         | Shuffle the collage                                    |
+| `E`         | Export the collage as an image                         |
 | `A`         | Add media files                                        |
 | `P`         | Show / hide the file panel                             |
 | `T`         | Show / hide the toolbar                                |

@@ -4,10 +4,9 @@
  *
  * The renderer is split into plain scripts that share one global lexical
  * scope; load order (index.html): layout → selection → prefs → state →
- * collage → panel → tiledrag → lightbox → autoscroll → shortcuts → app.
- * Top-level
- * declarations here are visible to every later script (and functions
- * declared later are callable from here at runtime).
+ * collage → panel → tiledrag → lightbox → exportimage → autoscroll →
+ * shortcuts → app. Top-level declarations here are visible to every later
+ * script (and functions declared later are callable from here at runtime).
  */
 
 const {
@@ -21,7 +20,8 @@ const {
   MISSING_H,
   MIN_COLUMNS,
   MAX_COLUMNS,
-  DEFAULT_COLUMNS
+  DEFAULT_COLUMNS,
+  fitExportScale
 } = window.CollagerLayout;
 const { clickSelection } = window.CollagerSelection;
 const prefs = window.CollagerPrefs.createPrefs(window.localStorage);

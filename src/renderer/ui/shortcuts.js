@@ -17,6 +17,7 @@ const SHORTCUTS = [
   ['Space', 'Start / stop auto-scroll'],
   [', / .', 'Auto-scroll slower / faster'],
   ['S', 'Shuffle the collage'],
+  ['E', 'Export the collage as an image'],
   ['A', 'Add media files'],
   ['P', 'Show / hide the file panel'],
   ['T', 'Show / hide the toolbar'],
@@ -156,6 +157,9 @@ window.addEventListener('keydown', (e) => {
       break;
     case 's':
       if (!e.repeat && items.length) shuffle();
+      break;
+    case 'e':
+      if (!e.repeat) exportCollage();
       break;
     case 'a':
       if (!e.repeat) document.getElementById('btn-add').click();

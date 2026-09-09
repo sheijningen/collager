@@ -174,6 +174,38 @@ async function run() {
       (await js(`document.querySelectorAll('.tile').length`)) === expected
     );
 
+    // -- image export -----------------------------------------------------------
+    const exported = await js(`(async () => {
+      const layout = packCurrentLayout();
+      const { blob, width, height } = await renderCollageImage({ mime: 'image/png' });
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+      // decode the result and probe the middle of the solid red fixture tile
+      const bitmap = await createImageBitmap(blob);
+      const probe = document.createElement('canvas');
+      probe.width = bitmap.width;
+      probe.height = bitmap.height;
+      const ctx = probe.getContext('2d');
+      ctx.drawImage(bitmap, 0, 0);
+      // either name of the deduplicated pair may be the one that was kept
+      const pos = layout.positions.find((p) => /wide(-copy)?\\.png$/.test(p.item.path));
+      const [r, g, b] = ctx.getImageData(
+        Math.round(pos.x + GAP + pos.w / 2), Math.round(pos.y + GAP + pos.h / 2), 1, 1).data;
+      return {
+        png,
+        redTile: r > 150 && g < 80 && b < 80,
+        sizeMatches: width === layout.width + GAP * 2 && height === layout.height + GAP * 2
+      };
+    })()`);
+    check('export renders the collage to a PNG', exported.png);
+    check('exported image has the layout size', exported.sizeMatches);
+    check('tiles are drawn at their layout positions', exported.redTile);
+    const guarded = await js(
+      `window.api.writeExportChunk('${path.join(workDir, 'never.png').replace(/\\/g, '\\\\')}', new Uint8Array([1]), true).then(() => 'wrote', () => 'refused')`
+    );
+    check('writing without the save dialog is refused', guarded === 'refused');
+    check('no file was written', !fs.existsSync(path.join(workDir, 'never.png')));
+
     // -- panel, selection, batch remove -------------------------------------
     check('file panel lists every item', (await js('fileList.children.length')) === expected);
     await js(`sortSelect.value = 'name'; sortSelect.dispatchEvent(new Event('change')); void 0`);
