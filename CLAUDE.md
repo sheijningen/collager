@@ -42,9 +42,15 @@ docs/                README media
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
-- **Persistence**: `library.json` in `userData`, saves serialized and atomic (temp file plus
-  rename), a corrupt file is copied to `library.json.corrupt` and the app starts empty. Only
-  path, hash, type and dimensions are stored; URL and missing flag are derived at load.
+- **Persistence**: `library.json` in `userData` holds `{ version, items }`, saves serialized and
+  atomic (temp file plus rename). An unreadable file is moved to `library.json.corrupt` (a
+  timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
+  A file written by a newer app is left in place with its own message. Whenever the file stays
+  in place (newer version, or the move failed), saving is refused so it is not overwritten.
+  Format changes bump `LIBRARY_VERSION` and add a migration step (the module refuses to load
+  without one); a bare array is the version 0 file. Only path, hash, type and dimensions are
+  stored per item; URL and missing flag are derived at load, and an entry without a hash makes
+  the file unreadable.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.

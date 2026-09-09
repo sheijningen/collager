@@ -122,15 +122,27 @@ window.api.onGpuFallback(() => {
 
 /* ---------------- startup ---------------- */
 
+/* Toast for a library file that could not be loaded. A file from a newer app
+ * is intact, needs that app, and is left in place with saving off. An
+ * unreadable file was moved aside, or, when even that failed, saving is off
+ * so it is not overwritten in place. */
+function describeLibraryProblem({ reason, backup }) {
+  if (reason === 'newer-version') {
+    return 'This collection was saved by a newer Collager, which is needed to open it. It was left in place and saving is off so it stays intact.';
+  }
+  const where = backup
+    ? `It was kept as ${basename(backup)}.`
+    : 'It could not be moved aside, so saving is off to protect it.';
+  return `The library file was unreadable, starting empty. ${where}`;
+}
+
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
 opQueue = opQueue.then(async function init() {
   try {
     const loaded = await window.api.loadLibrary();
     items = loaded.items;
-    if (loaded.corrupted) {
-      showToast('Library file was corrupted — starting empty (backup: library.json.corrupt)');
-    }
+    if (loaded.problem) showToast(describeLibraryProblem(loaded.problem));
     const measured = await measureMissingDimensions(items, (done, total) => {
       showToast(`Preparing library — reading dimensions ${done}/${total}…`, true);
     });

@@ -264,7 +264,9 @@ async function run() {
     const lib = JSON.parse(fs.readFileSync(path.join(workDir, 'userdata', 'library.json'), 'utf8'));
     check(
       'library persisted with dimensions',
-      lib.length === expected - 2 && lib.every((i) => i.w > 0 && i.h > 0)
+      lib.version === 1 &&
+        lib.items.length === expected - 2 &&
+        lib.items.every((i) => i.w > 0 && i.h > 0)
     );
 
     // -- missing-file tooltip ------------------------------------------------
