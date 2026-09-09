@@ -12,8 +12,9 @@ and Windows. macOS is not a target; the `darwin` branches only keep the app quit
 ## Layout
 
 ```
-src/main/            main process: window, IPC, menu, GPU fallback
-src/main/lib/        pure Node logic: scanning, hashing, library persistence
+src/main/            main process: window, menu, GPU fallback, IPC registration
+src/main/ipc/        IPC handlers grouped by concern: library, files, window
+src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs
 src/renderer/ui/     DOM modules, classic scripts sharing one global scope
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core
@@ -30,7 +31,10 @@ docs/                README media
   Node) and must stay free of DOM access.
 - The renderer is isolated (`contextIsolation`, no `nodeIntegration`, CSP in `index.html`).
   Main-process capabilities are exposed only through an IPC channel plus a `window.api` entry
-  in the preload script.
+  in the preload script. Handlers live in `src/main/ipc/`, one module per concern with a
+  `register*Ipc` function that `main.js` calls once. A path the renderer sends back to be handed
+  to the shell must pass the checks in `lib/mediapath.js` first (a supported media extension plus
+  an existing regular file, or an existing folder for the reveal of a missing entry).
 
 ## Design decisions
 

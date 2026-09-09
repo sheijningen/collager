@@ -362,6 +362,14 @@ async function run() {
     })()`)
     );
 
+    // -- window channels ----------------------------------------------------------
+    check(
+      'is-fullscreen answers over IPC',
+      typeof (await js('window.api.isFullscreen()')) === 'boolean'
+    );
+    await js('window.api.setKeepAwake(true); window.api.setKeepAwake(false); void 0');
+    check('keep-awake channel is registered', (await js('1 + 1')) === 2);
+
     // -- help & about overlays ------------------------------------------------
     await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }))`);
     check('F1 opens the shortcuts overlay', await js('!helpOverlay.hidden'));

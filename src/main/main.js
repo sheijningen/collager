@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { pathToFileURL } = require('url');
-const { MEDIA_EXTS, probeFiles } = require('./lib/scan');
 const { createLibraryStore } = require('./lib/library');
+const { registerLibraryIpc } = require('./ipc/library');
+const { registerFilesIpc } = require('./ipc/files');
+const { registerWindowIpc } = require('./ipc/window');
 
 const library = createLibraryStore(() => app.getPath('userData'));
 
@@ -54,70 +55,11 @@ app.on('child-process-gone', (_event, details) => {
   }
 });
 
-ipcMain.handle('probe-files', async (event, inputPaths) => {
-  const { entries, skippedCount } = await probeFiles(inputPaths, 4, (done, total) => {
-    if (!event.sender.isDestroyed()) event.sender.send('probe-progress', { done, total });
-  });
-  for (const entry of entries) entry.url = pathToFileURL(entry.path).href;
-  return { entries, skippedCount };
-});
-
-ipcMain.handle('load-library', () => library.load());
-
-/* About data for the renderer. Resolved relative to this file, not
- * getAppPath(), which points at test/e2e under the e2e harness. */
-ipcMain.handle('get-app-info', () => {
-  const pkg = require(path.join(__dirname, '..', '..', 'package.json'));
-  return {
-    name: (pkg.build && pkg.build.productName) || pkg.name,
-    version: pkg.version,
-    description: pkg.description,
-    author: typeof pkg.author === 'object' ? pkg.author.name : pkg.author,
-    license: pkg.license,
-    electron: process.versions.electron,
-    chromium: process.versions.chrome,
-    node: process.versions.node,
-    platform: `${process.platform} (${process.arch})`
-  };
-});
-
-ipcMain.handle('save-library', (_event, items) => library.save(items));
-
-/* Keeps the display (and thus the system) awake while the collage
- * auto-scrolls; released the moment auto-scroll stops or the toggle is off. */
-let powerBlockerId = null;
-ipcMain.on('keep-awake', (_event, on) => {
-  if (on && powerBlockerId === null) {
-    powerBlockerId = powerSaveBlocker.start('prevent-display-sleep');
-  } else if (!on && powerBlockerId !== null) {
-    powerSaveBlocker.stop(powerBlockerId);
-    powerBlockerId = null;
-  }
-});
-
-ipcMain.on('toggle-fullscreen', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (win) win.setFullScreen(!win.isFullScreen());
-});
-
-ipcMain.handle('is-fullscreen', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  return win ? win.isFullScreen() : false;
-});
-
-ipcMain.on('reveal-file', (_event, filePath) => {
-  if (typeof filePath === 'string') shell.showItemInFolder(filePath);
-});
-
-ipcMain.handle('pick-files', async (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const result = await dialog.showOpenDialog(win, {
-    title: 'Add media',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'Media', extensions: Object.keys(MEDIA_EXTS).map((ext) => ext.slice(1)) }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
+/* Every channel the preload script exposes is registered here; the handlers
+ * live in src/main/ipc, grouped by what they touch. */
+registerLibraryIpc(library);
+registerFilesIpc();
+registerWindowIpc();
 
 function createWindow() {
   const win = new BrowserWindow({
