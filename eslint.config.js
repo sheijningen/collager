@@ -23,27 +23,13 @@ module.exports = [
     }
   },
 
-  // core modules are UMD-style: browser globals plus module.exports for Node
+  // the renderer is ES modules with explicit imports, so every identifier is
+  // checkable per file
   {
-    files: ['src/renderer/core/*.js'],
+    files: ['src/renderer/**/*.js'],
     languageOptions: {
-      sourceType: 'script',
-      globals: { ...globals.browser, ...globals.commonjs }
-    }
-  },
-
-  // ui modules are classic scripts sharing one global scope (see index.html);
-  // identifiers defined in one file are used in others, which per-file
-  // analysis cannot see — so cross-file lookups can't be checked here
-  {
-    files: ['src/renderer/ui/*.js'],
-    languageOptions: {
-      sourceType: 'script',
+      sourceType: 'module',
       globals: { ...globals.browser }
-    },
-    rules: {
-      'no-undef': 'off',
-      'no-unused-vars': 'off'
     }
   }
 ];

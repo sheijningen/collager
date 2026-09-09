@@ -143,7 +143,10 @@ function createWindow() {
   if (gpuFallback) {
     win.webContents.on('did-finish-load', () => win.webContents.send('gpu-fallback'));
   }
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  // the e2e harness drives the renderer through a hook app.js only installs
+  // when the page is loaded with ?e2e
+  const query = process.env.COLLAGER_E2E === '1' ? { e2e: '1' } : {};
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'), { query });
 }
 
 app.whenReady().then(() => {
