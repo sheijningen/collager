@@ -55,29 +55,27 @@ jobs:
             exit 1
           fi
 
-  checks:
-    name: lint, format and unit tests
+  # the same checks that run on every push and pull request, reused as-is
+  lint:
+    name: lint
     needs: prepare
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4 # reads the pnpm version from packageManager
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm format:check
-      - run: pnpm test
-
+    uses: ./.github/workflows/lint.yml
+  format:
+    name: format
+    needs: prepare
+    uses: ./.github/workflows/format.yml
+  unit:
+    name: unit tests
+    needs: prepare
+    uses: ./.github/workflows/test.yml
   e2e:
+    name: e2e tests
     needs: prepare
     uses: ./.github/workflows/e2e.yml
 
   build:
     name: build ${{ matrix.name }}
-    needs: [prepare, checks, e2e]
+    needs: [prepare, lint, format, unit, e2e]
     strategy:
       fail-fast: false
       matrix:
