@@ -1,108 +1,56 @@
-/* End-to-end test: boots the real app with a throwaway profile, injects
- * generated media fixtures, and exercises adding, dedup, layout, the file
- * panel, selection, batch remove, clear-all and persistence.
+/* End-to-end harness: boots the real app with a throwaway profile, generates
+ * media fixtures, then runs the cases in ./cases against it. Every case
+ * starts from an empty library, so any subset runs on its own:
  *
- * Run with:  pnpm test:e2e   (requires a display; ffmpeg optional —
- * without it the video fixture is skipped.)
+ *   pnpm test:e2e               all cases
+ *   pnpm test:e2e panel drag    only the named cases
+ *
+ * Needs a display; ffmpeg is optional (without it the video fixture is
+ * skipped). Each case exports { name, run(ctx) } and reports through
+ * ctx.check; see the ctx fields below.
  */
-const { app, BrowserWindow, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const zlib = require('zlib');
-const { spawnSync } = require('child_process');
+const { makePng, makeFixtures } = require('./fixtures');
+
+/* ---------- cases ---------- */
+
+const casesDir = path.join(__dirname, 'cases');
+const allCases = fs
+  .readdirSync(casesDir)
+  .filter((file) => file.endsWith('.js'))
+  .sort()
+  .map((file) => require(path.join(casesDir, file)));
+
+/* Case names from the command line; flags (anything starting with -) belong
+ * to Electron and are ignored. Cases always run in file order. */
+function selectCases(args) {
+  const names = args.filter((arg) => !arg.startsWith('-'));
+  if (!names.length) return allCases;
+  const unknown = names.filter((name) => !allCases.some((c) => c.name === name));
+  if (unknown.length) {
+    console.error(`unknown case(s): ${unknown.join(', ')}`);
+    console.error(`available: ${allCases.map((c) => c.name).join(', ')}`);
+    return null;
+  }
+  return allCases.filter((c) => names.includes(c.name));
+}
+
+// validate before the app boots, so a typo fails at once
+const selectedCases = selectCases(process.argv.slice(2));
+if (!selectedCases) app.exit(2);
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-e2e-'));
 const mediaDir = path.join(workDir, 'media');
 fs.mkdirSync(mediaDir);
 app.setPath('userData', path.join(workDir, 'userdata'));
-
 process.env.COLLAGER_E2E = '1'; // main loads the page with ?e2e, which installs window.collagerTest
+
 require('../../src/main/main.js');
 
-/* ---------- fixture generation (no external tools needed for images) ---------- */
-
-const crcTable = (() => {
-  const t = new Int32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c;
-  }
-  return t;
-})();
-
-function crc32(buf) {
-  let c = ~0;
-  for (const b of buf) c = (c >>> 8) ^ crcTable[(c ^ b) & 0xff];
-  return ~c >>> 0;
-}
-
-function pngChunk(type, data) {
-  const head = Buffer.alloc(4);
-  head.writeUInt32BE(data.length);
-  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-  const tail = Buffer.alloc(4);
-  tail.writeUInt32BE(crc32(body));
-  return Buffer.concat([head, body, tail]);
-}
-
-function makePng(w, h, [r, g, b]) {
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // color type: RGB
-  const raw = Buffer.alloc(h * (1 + w * 3));
-  for (let y = 0; y < h; y++) {
-    const off = y * (1 + w * 3);
-    for (let x = 0; x < w; x++) {
-      raw[off + 1 + x * 3] = r;
-      raw[off + 2 + x * 3] = g;
-      raw[off + 3 + x * 3] = b;
-    }
-  }
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', zlib.deflateSync(raw)),
-    pngChunk('IEND', Buffer.alloc(0))
-  ]);
-}
-
-// canonical 1x1 GIF
-const GIF_1PX = Buffer.from(
-  'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==',
-  'base64'
-);
-
-function makeFixtures() {
-  fs.writeFileSync(path.join(mediaDir, 'wide.png'), makePng(320, 180, [200, 40, 40]));
-  fs.writeFileSync(path.join(mediaDir, 'tall.png'), makePng(150, 250, [40, 200, 40]));
-  fs.writeFileSync(path.join(mediaDir, 'square.png'), makePng(200, 200, [40, 40, 200]));
-  fs.writeFileSync(path.join(mediaDir, 'tiny.gif'), GIF_1PX);
-  // duplicate content under a different name
-  fs.writeFileSync(path.join(mediaDir, 'wide-copy.png'), makePng(320, 180, [200, 40, 40]));
-
-  let hasVideo = false;
-  const ffmpeg = spawnSync('ffmpeg', [
-    '-loglevel',
-    'error',
-    '-f',
-    'lavfi',
-    '-i',
-    'testsrc=duration=1:size=160x90:rate=10',
-    '-pix_fmt',
-    'yuv420p',
-    '-y',
-    path.join(mediaDir, 'clip.mp4')
-  ]);
-  if (ffmpeg.status === 0) hasVideo = true;
-  else console.log('# ffmpeg not available — skipping video fixture');
-  return hasVideo;
-}
-
-/* ---------- tiny check harness ---------- */
+/* ---------- check harness ---------- */
 
 let failures = 0;
 let counter = 0;
@@ -112,337 +60,103 @@ function check(name, ok, info = '') {
   console.log(`${ok ? 'ok' : 'not ok'} ${counter} - ${name}${info ? ` (${info})` : ''}`);
 }
 
-/* ---------- the test ---------- */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* Polls until `probe` resolves truthy. Resolves to whether it did within
+ * `timeoutMs`, so a case can turn the outcome into a check instead of
+ * crashing. */
+async function waitFor(probe, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await probe()) return true;
+    await sleep(50);
+  }
+  return false;
+}
 
 app.whenReady().then(() => {
   setTimeout(run, 2000);
 });
 
 async function run() {
-  const hasVideo = makeFixtures();
+  const hasVideo = makeFixtures(mediaDir);
   const expected = hasVideo ? 5 : 4; // wide, tall, square, gif (+video), copy deduped
   const fixtures = fs.readdirSync(mediaDir).map((f) => path.join(mediaDir, f));
 
-  try {
-    const wc = BrowserWindow.getAllWindows()[0].webContents;
-    // every snippet sees the app's module exports as T (see app.js)
-    const js = (code) => wc.executeJavaScript(`{ const T = window.collagerTest; ${code} }`);
-    await js('T.setColumns(2); T.setAutoScroll(false); void 0');
+  const wc = BrowserWindow.getAllWindows()[0].webContents;
+  // every snippet sees the app's module exports as T (see app.js)
+  const js = (code) => wc.executeJavaScript(`{ const T = window.collagerTest; ${code} }`);
 
-    // -- adding + dedup ---------------------------------------------------
-    await js(`T.addPaths(${JSON.stringify(fixtures)})`);
-    await new Promise((r) => setTimeout(r, 1500));
-    check('drop adds all media once', (await js('T.state.items.length')) === expected);
-    check(
-      'duplicate content was skipped',
-      (await js(`T.state.items.filter(i => /wide(-copy)?\\.png$/.test(i.path)).length`)) === 1
-    );
-    await js(`T.addPaths(${JSON.stringify([fixtures[0]])})`);
-    check('re-adding is a no-op', (await js('T.state.items.length')) === expected);
+  /* Reads the persisted library once it holds `count` items, or null. */
+  const libraryFile = path.join(workDir, 'userdata', 'library.json');
+  async function readLibraryWhen(count) {
+    let library = null;
+    const matched = await waitFor(() => {
+      try {
+        library = JSON.parse(fs.readFileSync(libraryFile, 'utf8'));
+      } catch {
+        return false;
+      }
+      return library.length === count;
+    }, 5000);
+    return matched ? library : null;
+  }
 
-    // -- dropping a directory adds its compatible files recursively ---------
-    const dropDir = path.join(workDir, 'dirdrop');
-    fs.mkdirSync(path.join(dropDir, 'nested'), { recursive: true });
-    fs.writeFileSync(path.join(dropDir, 'extra1.png'), makePng(60, 40, [250, 250, 40]));
-    fs.writeFileSync(path.join(dropDir, 'nested', 'extra2.png'), makePng(40, 60, [40, 250, 250]));
-    fs.writeFileSync(path.join(dropDir, 'nested', 'notes.txt'), 'not media');
-    await js(`T.addPaths(${JSON.stringify([dropDir])})`);
-    await new Promise((r) => setTimeout(r, 800));
-    check(
-      'dropping a directory adds nested compatible files',
-      (await js('T.state.items.length')) === expected + 2
-    );
-    check(
-      'incompatible files in the directory are skipped',
-      (await js(`T.state.items.some(i => i.path.endsWith('notes.txt'))`)) === false
-    );
-    await js(`(() => {
-      const extras = T.state.items.filter(i => /extra[12]\\.png$/.test(i.path)).map(i => i.hash);
-      T.state.items = T.state.items.filter(i => !extras.includes(i.hash));
-      T.render();
-      return T.persist();
-    })()`); // restore the original fixture set for the checks below
+  /* Shared by every case. Cases need not clean up: resetApp runs first. */
+  const ctx = {
+    js,
+    check,
+    sleep,
+    waitFor,
+    readLibraryWhen,
+    workDir,
+    fixtures,
+    expected,
+    makePng,
+    /* adds every fixture and waits until the collage holds at least that
+     * many items (an exact count stays a case's own check) */
+    async loadFixtures() {
+      await js(`T.addPaths(${JSON.stringify(fixtures)})`);
+      const loaded = await waitFor(async () => (await js('T.state.items.length')) >= expected);
+      if (!loaded) throw new Error('fixtures did not load');
+    }
+  };
 
-    // -- layout ------------------------------------------------------------
-    const layoutOk = await js(`(() => {
-      const it = T.state.items.find(i => i.path.endsWith('tall.png'));
-      const t = T.tiles.get(it.hash);
-      const w = parseFloat(t.style.width), h = parseFloat(t.style.height);
-      return it.w === 150 && it.h === 250 && Math.abs(h / w - 250 / 150) < 0.02;
-    })()`);
-    check('dimensions measured and aspect ratio preserved in layout', layoutOk);
-    check(
-      'all tiles laid out',
-      (await js(`document.querySelectorAll('.tile').length`)) === expected
-    );
-
-    // -- panel, selection, batch remove -------------------------------------
-    check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
-    await js(
-      `T.sortSelect.value = 'name'; T.sortSelect.dispatchEvent(new Event('change')); void 0`
-    );
-    const names = await js(
-      `[...T.fileList.children].map(li => li.querySelector('.fname').textContent)`
-    );
-    check(
-      'list sorts by name',
-      JSON.stringify(names) === JSON.stringify(names.slice().sort((a, b) => a.localeCompare(b)))
-    );
-
-    await js(`T.fileList.children[0].click()`);
-    await js(
-      `T.fileList.children[1].dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }))`
-    );
-    check('shift-click selects a range', (await js('T.selected.size')) === 2);
-    check(
-      'selection shows on tiles',
-      (await js(`document.querySelectorAll('.tile.selected').length`)) === 2
-    );
-
-    // -- escape ladder: one layer per press --------------------------------------
-    const ladder = await js(`(async () => {
-      const escape = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-      T.openLightbox(T.state.items[0]);
-      escape();
-      const lightboxOnly = T.lightbox.hidden && T.selected.size === 2;
-      T.helpOverlay.hidden = false;
-      escape();
-      const overlayOnly = T.helpOverlay.hidden && T.selected.size === 2;
-      escape();
-      const selectionCleared = T.selected.size === 0;
-      T.selected.add(T.state.items[0].hash); T.selected.add(T.state.items[1].hash); T.applySelection();
-      return { lightboxOnly, overlayOnly, selectionCleared };
-    })()`);
-    check('Escape closes the lightbox and keeps the selection', ladder.lightboxOnly);
-    check('Escape closes an overlay and keeps the selection', ladder.overlayOnly);
-    check('Escape then clears the selection', ladder.selectionCleared);
-
-    await js(`window.confirm = () => true; T.removeSelectedBtn.click(); void 0`);
-    await new Promise((r) => setTimeout(r, 300));
-    check(
-      'batch remove removes the selection',
-      (await js('T.state.items.length')) === expected - 2
-    );
-    check('selection is empty after removal', (await js('T.selected.size')) === 0);
-
-    // -- drag-to-reorder -----------------------------------------------------
-    const dragged = await js(`(async () => {
-      const before = T.state.items.map(i => i.hash);
-      const from = T.tiles.get(before[0]).getBoundingClientRect();
-      const to = T.tiles.get(before[1]).getBoundingClientRect();
-      const opts = (x, y) => ({ bubbles: true, clientX: x, clientY: y, button: 0, isPrimary: true });
-      const fx = from.x + from.width / 2, fy = from.y + from.height / 2;
-      const tx = to.x + to.width / 2, ty = to.y + to.height / 2;
-      T.tiles.get(before[0]).dispatchEvent(new PointerEvent('pointerdown', opts(fx, fy)));
-      window.dispatchEvent(new PointerEvent('pointermove', opts(fx + 20, fy + 20)));
-      window.dispatchEvent(new PointerEvent('pointermove', opts(tx, ty)));
-      window.dispatchEvent(new PointerEvent('pointerup', opts(tx, ty)));
-      await new Promise(r => setTimeout(r, 100));
-      const after = T.state.items.map(i => i.hash);
-      return { moved: after.indexOf(before[0]) === 1 && after.indexOf(before[1]) === 0,
-               nothingSelected: T.selected.size === 0 };
-    })()`);
-    check('drag reorders tiles', dragged.moved);
-    check('drag does not select', dragged.nothingSelected);
-
-    const dragEdge = await js(`(async () => {
-      const opts = (x, y) => ({ bubbles: true, clientX: x, clientY: y, button: 0, isPrimary: true });
-      const hash = T.state.items[0].hash;
-      const tile = () => T.tiles.get(hash);
-      const r = tile().getBoundingClientRect();
-      const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-
-      // the click following a completed drag is suppressed
-      const r2 = T.tiles.get(T.state.items[1].hash).getBoundingClientRect();
-      tile().dispatchEvent(new PointerEvent('pointerdown', opts(cx, cy)));
-      window.dispatchEvent(new PointerEvent('pointermove', opts(r2.x + 10, r2.y + 10)));
-      window.dispatchEvent(new PointerEvent('pointerup', opts(r2.x + 10, r2.y + 10)));
-      tile().dispatchEvent(new MouseEvent('click', opts(r2.x + 10, r2.y + 10)));
-      const suppressed = T.selected.size === 0;
-      await new Promise(r => setTimeout(r, 50));
-
-      // a sub-threshold press is still a normal click-select
-      const r3 = tile().getBoundingClientRect();
-      tile().dispatchEvent(new PointerEvent('pointerdown', opts(r3.x + 5, r3.y + 5)));
-      window.dispatchEvent(new PointerEvent('pointermove', opts(r3.x + 8, r3.y + 8)));
-      window.dispatchEvent(new PointerEvent('pointerup', opts(r3.x + 8, r3.y + 8)));
-      tile().dispatchEvent(new MouseEvent('click', opts(r3.x + 8, r3.y + 8)));
-      const clickStillSelects = T.selected.size === 1;
-      T.selected.clear(); T.applySelection();
-
-      // pointercancel aborts: order unchanged, no ghost left behind
-      const before = T.state.items.map(i => i.hash).join();
-      const r4 = tile().getBoundingClientRect();
-      tile().dispatchEvent(new PointerEvent('pointerdown', opts(r4.x + 10, r4.y + 10)));
-      window.dispatchEvent(new PointerEvent('pointermove', opts(r4.x + 60, r4.y + 60)));
-      window.dispatchEvent(new PointerEvent('pointercancel', opts(r4.x + 60, r4.y + 60)));
-      const aborted = T.state.items.map(i => i.hash).join() === before
-        && !document.getElementById('drag-ghost');
-      return { suppressed, clickStillSelects, aborted };
-    })()`);
-    check('click after drag is suppressed', dragEdge.suppressed);
-    check('sub-threshold press still click-selects', dragEdge.clickStillSelects);
-    check('pointercancel aborts cleanly (no ghost, order kept)', dragEdge.aborted);
-
-    // -- persistence --------------------------------------------------------
-    await new Promise((r) => setTimeout(r, 300));
-    const lib = JSON.parse(fs.readFileSync(path.join(workDir, 'userdata', 'library.json'), 'utf8'));
-    check(
-      'library persisted with dimensions',
-      lib.length === expected - 2 && lib.every((i) => i.w > 0 && i.h > 0)
-    );
-
-    // -- missing-file tooltip ------------------------------------------------
-    const missingTip = await js(`(() => {
-      const item = T.state.items[0];
-      item.missing = true;
-      const old = T.tiles.get(item.hash);
-      T.observer.unobserve(old); T.dehydrate(old); old.remove(); T.tiles.delete(item.hash);
-      T.render();
-      const tile = T.tiles.get(item.hash);
-      const tileHint = tile.classList.contains('missing') && tile.title.includes('external drive');
-      const li = T.listEntries.get(item.hash);
-      const listHint = li.title.includes(item.path) && li.title.includes('moved or renamed');
-      item.missing = false;
-      T.observer.unobserve(tile); tile.remove(); T.tiles.delete(item.hash);
-      T.render();
-      return tileHint && listHint;
-    })()`);
-    check('missing files explain themselves in a tooltip', missingTip);
-
-    // -- clear-missing button -------------------------------------------------
-    const clearMissing = await js(`(async () => {
-      const btn = document.getElementById('btn-clear-missing');
-      const hiddenWhenNoneMissing = btn.hidden;
-      T.state.items[0].missing = true;
-      T.state.items[1].missing = true;
-      T.render();
-      const visible = !btn.hidden && btn.textContent.includes('2');
-      const liCoded = T.listEntries.get(T.state.items[0].hash).classList.contains('missing');
-      const before = T.state.items.length;
-      window.confirm = () => false;
-      btn.click();
-      const cancelKeeps = T.state.items.length === before;
+  /* Puts the app back to a known state: empty library, no selection, nothing
+   * open, auto-scroll off, two columns, collage order, default speed, panel
+   * and toolbar shown, not fullscreen, scrolled to the top, and confirm()
+   * answering yes. */
+  async function resetApp() {
+    await js(`(async () => {
       window.confirm = () => true;
-      btn.click();
-      await new Promise((r) => setTimeout(r, 100));
-      return {
-        hiddenWhenNoneMissing, visible, liCoded, cancelKeeps,
-        removed: T.state.items.length === before - 2 && !T.state.items.some((i) => i.missing),
-        hiddenAgain: btn.hidden
-      };
-    })()`);
-    check(
-      'clear-missing button only shows while something is missing',
-      clearMissing.hiddenWhenNoneMissing && clearMissing.visible
-    );
-    check('missing entries are color-coded in the panel', clearMissing.liCoded);
-    check('cancelling the confirmation keeps everything', clearMissing.cancelKeeps);
-    check(
-      'confirming removes exactly the missing items',
-      clearMissing.removed && clearMissing.hiddenAgain
-    );
-
-    // -- clear all ----------------------------------------------------------
-    await js(`document.getElementById('btn-clear').click(); void 0`);
-    await new Promise((r) => setTimeout(r, 300));
-    check('clear-all empties the collage', (await js('T.state.items.length')) === 0);
-    check('empty state is shown again', await js(`!document.getElementById('empty-state').hidden`));
-
-    // -- keyboard shortcuts ---------------------------------------------------
-    const speed = await js(`(() => {
-      const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
+      T.closeCtxMenu();
+      T.closeLightbox();
+      T.closeOverlays();
+      T.setAutoScroll(false);
+      T.setColumns(2);
       T.setScrollSpeed(80);
-      key('.');
-      const faster = T.scrollSpeed === 90;
-      key(','); key(',');
-      const slower = T.scrollSpeed === 70;
-      const sliderSynced = parseInt(T.speedSlider.value, 10) === 70;
-      T.setScrollSpeed(80);
-      return { faster, slower, sliderSynced };
+      T.setPanelOpen(true);
+      T.setToolbarOpen(true);
+      if (T.isFullscreen) window.api.toggleFullscreen();
+      T.sortSelect.value = 'added';
+      T.sortSelect.dispatchEvent(new Event('change'));
+      T.state.items = [];
+      T.selected.clear();
+      T.state.selectionAnchor = null;
+      T.render();
+      T.scroller.scrollTop = 0;
+      await T.persist();
     })()`);
-    check('"." raises the auto-scroll speed', speed.faster);
-    check('"," lowers it and the slider follows', speed.slower && speed.sliderSynced);
+  }
 
-    check(
-      'Space toggles auto-scroll',
-      await js(`(() => {
-      const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
-      key(' ');
-      const on = T.autoScroll;
-      key(' ');
-      return on && !T.autoScroll;
-    })()`)
-    );
-
-    check(
-      '-/+ change the column count',
-      await js(`(() => {
-      const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
-      const before = T.columns;
-      key('-');
-      const minus = T.columns === Math.max(T.MIN_COLUMNS, before - 1);
-      key('+');
-      return minus && T.columns === before;
-    })()`)
-    );
-
-    check(
-      'the column buttons step repeatedly',
-      await js(`(() => {
-      const before = T.columns;
-      T.setColumns(3);
-      document.getElementById('btn-col-plus').click();
-      document.getElementById('btn-col-plus').click();
-      const stepped = T.columns === 5;
-      T.setColumns(before);
-      return stepped;
-    })()`)
-    );
-
-    // -- window channels ----------------------------------------------------------
-    check(
-      'is-fullscreen answers over IPC',
-      typeof (await js('window.api.isFullscreen()')) === 'boolean'
-    );
-    /* send() has no reply, but a later invoke() from the same renderer is
-     * delivered after it, so once isFullscreen resolves the blocker has been
-     * handled. Blocker ids count up from 0 in this fresh process. */
-    const anyBlockerStarted = () =>
-      Array.from({ length: 32 }, (_, id) => id).some((id) => powerSaveBlocker.isStarted(id));
-    await js('window.api.setKeepAwake(true); window.api.isFullscreen()');
-    check('keep-awake starts a power save blocker', anyBlockerStarted());
-    await js('window.api.setKeepAwake(false); window.api.isFullscreen()');
-    check('keep-awake off releases the blocker', !anyBlockerStarted());
-
-    // -- help & about overlays ------------------------------------------------
-    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }))`);
-    check('F1 opens the shortcuts overlay', await js('!T.helpOverlay.hidden'));
-    check(
-      'the overlay lists every binding',
-      await js(`T.shortcutList.querySelectorAll('tr').length === T.SHORTCUTS.length`)
-    );
-    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
-    check('Escape closes the overlay', await js('T.helpOverlay.hidden'));
-
-    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))`);
-    await new Promise((r) => setTimeout(r, 400));
-    const pkg = require('../../package.json');
-    const aboutOk = await js(`(() => ({
-      open: !T.aboutOverlay.hidden,
-      name: document.getElementById('about-name').textContent,
-      version: document.getElementById('about-version').textContent
-    }))()`);
-    check(
-      'about shows package.json metadata',
-      aboutOk.open &&
-        aboutOk.name === ((pkg.build && pkg.build.productName) || pkg.name) &&
-        aboutOk.version === `version ${pkg.version}`
-    );
-    await js('T.closeOverlays(); void 0');
-  } catch (err) {
-    failures++;
-    console.error('not ok - test crashed:', err);
+  for (const testCase of selectedCases) {
+    console.log(`# case: ${testCase.name}`);
+    try {
+      await resetApp();
+      await testCase.run(ctx);
+    } catch (err) {
+      check(`case ${testCase.name} runs to the end`, false, String(err));
+    }
   }
 
   console.log(`# ${counter - failures}/${counter} checks passed`);
