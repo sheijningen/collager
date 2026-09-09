@@ -17,12 +17,14 @@ module.exports = {
   }) {
     await loadFixtures();
     check('drop adds all media once', (await js('T.state.items.length')) === expected);
+    check('the add job finished', (await js('T.countRunningJobs()')) === 0);
     check(
       'duplicate content was skipped',
       (await js(`T.state.items.filter(i => /wide(-copy)?\\.png$/.test(i.path)).length`)) === 1
     );
     await js(`T.addPaths(${JSON.stringify([fixtures[0]])})`);
     check('re-adding is a no-op', (await js('T.state.items.length')) === expected);
+    check('a no-op add still finishes its job', (await js('T.countRunningJobs()')) === 0);
 
     // dropping a directory adds its compatible files recursively
     const dropDir = path.join(workDir, 'dirdrop');

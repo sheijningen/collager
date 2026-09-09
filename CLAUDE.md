@@ -17,7 +17,7 @@ src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
                      menu placement, count text, file list key
-src/renderer/ui/     DOM modules, ES modules with app.js as the entry
+src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
                      test/main/helpers.js holds what the main tests share
@@ -96,6 +96,10 @@ docs/                README media
   layer.
 - **File panel list**: rebuilt only when what it shows changes (sort mode, and each entry's
   hash, path, type and missing state in order); other renders leave its DOM alone.
+- **Progress**: long-running work (preparing the library, adding a batch) reports through
+  `startJob` in `status.js`, one line per job in the status area stacked above the toast at the
+  bottom centre. Toasts carry one-off messages; a sticky toast is reserved for a warning about
+  a condition that lasts the session, such as a blocked save, and progress never goes through it.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
 - **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and

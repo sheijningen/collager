@@ -47,8 +47,10 @@ export function countMissing() {
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;
-/* A sticky toast stays up until the next showToast call replaces it, so a
- * progress readout is never hidden by the timer. */
+/* A sticky toast has no timer and stays up until another toast replaces it.
+ * It is reserved for a warning about a condition that lasts the session (a
+ * blocked save). Progress of long-running work goes through startJob in
+ * status.js, so several jobs can report at once without touching the toast. */
 export function showToast(message, sticky = false) {
   toastEl.textContent = message;
   toastEl.hidden = false;

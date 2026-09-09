@@ -144,10 +144,13 @@ async function run() {
   /* Puts the app back to a known state: empty library, no selection, nothing
    * open, auto-scroll off, two columns, collage order, default speed, panel
    * and toolbar shown, not fullscreen, the starting window size, scrolled to
-   * the top, and confirm() answering yes. */
+   * the top, and confirm() answering yes. Library work still in flight from
+   * the previous case (a startup dimension pass, an add) finishes first, so it
+   * cannot push into the emptied library or leave its job line behind. */
   async function resetApp() {
     win.setSize(baseWidth, baseHeight);
     await js(`(async () => {
+      await T.queueLibraryOperation(() => {});
       window.confirm = () => true;
       T.closeDropdown();
       T.closeCtxMenu();
