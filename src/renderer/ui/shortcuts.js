@@ -27,7 +27,7 @@ const SHORTCUTS = [
   ['I', 'About Collager'],
   ['? / F1', 'Show this help'],
   ['Double-click', 'Open a tile in the lightbox'],
-  ['Right-click (file list)', 'Copy path / show in folder']
+  ['Right-click', 'Item menu: open, copy path (or still image), show in folder, remove']
 ];
 
 for (const [keys, action] of SHORTCUTS) {

@@ -173,6 +173,10 @@ function createTile(item) {
   tile.appendChild(remove);
 
   tile.addEventListener('click', (e) => handleSelectClick(item.hash, e, 'tile'));
+  tile.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openCtxMenu(item, e.clientX, e.clientY);
+  });
   tile.addEventListener('dblclick', () => {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox

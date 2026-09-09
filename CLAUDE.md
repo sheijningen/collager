@@ -23,7 +23,7 @@ docs/                README media
 ```
 
 - The script order in `index.html` is load-bearing: layout, selection, prefs, state, collage,
-  panel, tiledrag, lightbox, autoscroll, shortcuts, app. Earlier declarations are visible to
+  panel, ctxmenu, tiledrag, lightbox, autoscroll, shortcuts, app. Earlier declarations are visible to
   later scripts; functions declared later are callable at runtime. eslint cannot check
   cross-file identifiers in `ui/` (`no-undef` is off there), so verify them by hand.
 - `core/` modules are UMD-style (`window.Collager*` in the renderer, `module.exports` under

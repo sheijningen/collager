@@ -630,8 +630,21 @@ kbd {
   cursor: pointer;
 }
 
-#ctx-menu button:hover {
+#ctx-menu button:not(:disabled):hover {
   background: rgba(79, 140, 255, 0.22);
+}
+
+#ctx-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#ctx-menu button.danger {
+  color: var(--danger);
+}
+
+#ctx-menu button.danger:not(:disabled):hover {
+  background: rgba(229, 72, 77, 0.18);
 }
 
 /* ---------- toast ---------- */

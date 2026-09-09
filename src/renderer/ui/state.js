@@ -4,10 +4,9 @@
  *
  * The renderer is split into plain scripts that share one global lexical
  * scope; load order (index.html): layout → selection → prefs → state →
- * collage → panel → tiledrag → lightbox → autoscroll → shortcuts → app.
- * Top-level
- * declarations here are visible to every later script (and functions
- * declared later are callable from here at runtime).
+ * collage → panel → ctxmenu → tiledrag → lightbox → autoscroll → shortcuts →
+ * app. Top-level declarations here are visible to every later script (and
+ * functions declared later are callable from here at runtime).
  */
 
 const {

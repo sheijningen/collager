@@ -154,6 +154,92 @@ async function run() {
       'incompatible files in the directory are skipped',
       (await js(`items.some(i => i.path.endsWith('notes.txt'))`)) === false
     );
+    // -- context menu on tiles ------------------------------------------------
+    const tileMenu = await js(`(async () => {
+      const item = items.find((i) => /extra1\\.png$/.test(i.path));
+      const tile = tiles.get(item.hash);
+      const r = tile.getBoundingClientRect();
+      tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+        clientX: r.x + 10, clientY: r.y + 10 }));
+      const opened = !ctxMenu.hidden && ctxPath.textContent === item.path;
+      const copyImageShown = !ctxCopyImageBtn.hidden;
+      const enabled = !ctxOpenBtn.disabled && !ctxRevealBtn.disabled;
+      const singleLabel = ctxRemoveBtn.textContent === 'Remove from collage';
+      closeCtxMenu();
+
+      // no bitmap copy for animated media
+      const gif = items.find((i) => i.type === 'gif');
+      const gifTile = tiles.get(gif.hash);
+      const gr = gifTile.getBoundingClientRect();
+      gifTile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+        clientX: gr.x + 5, clientY: gr.y + 5 }));
+      const copyImageHiddenForGif = ctxCopyImageBtn.hidden;
+      closeCtxMenu();
+
+      // a multi-selection containing the item makes remove take the selection
+      selected.clear(); selected.add(item.hash); selected.add(items[0].hash); applySelection();
+      tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+        clientX: r.x + 10, clientY: r.y + 10 }));
+      const selectionLabel = ctxRemoveBtn.textContent === 'Remove 2 selected';
+      closeCtxMenu();
+      selected.clear(); applySelection();
+
+      // missing items keep only the actions that don't need the file
+      item.missing = true;
+      tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+        clientX: r.x + 10, clientY: r.y + 10 }));
+      const missingDisabled = ctxOpenBtn.disabled && ctxOpenExternalBtn.disabled
+        && ctxRevealBtn.disabled && ctxCopyImageBtn.disabled
+        && !document.getElementById('ctx-copy').disabled;
+      closeCtxMenu();
+      item.missing = false;
+
+      // remove through the menu takes exactly the clicked item
+      const before = items.length;
+      tile.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+        clientX: r.x + 10, clientY: r.y + 10 }));
+      ctxRemoveBtn.click();
+      await new Promise((r2) => setTimeout(r2, 100));
+      const removed = items.length === before - 1 && !items.some((i) => i.hash === item.hash)
+        && ctxMenu.hidden;
+      return { opened, copyImageShown, copyImageHiddenForGif,
+        enabled, singleLabel, selectionLabel, missingDisabled, removed };
+    })()`);
+    check('right-click on a tile opens the item menu', tileMenu.opened && tileMenu.enabled);
+    check(
+      'copy image is offered for still images only',
+      tileMenu.copyImageShown && tileMenu.copyImageHiddenForGif
+    );
+
+    // the scroll event of auto-scroll's last tick is delivered after a real
+    // right-click opened the menu and must not close it; a synthetic
+    // contextmenu event cannot reproduce that ordering, so send real input
+    const topTile = await js(`(async () => {
+      scroller.scrollTop = 0;
+      setAutoScroll(true);
+      await new Promise((r2) => requestAnimationFrame(() => requestAnimationFrame(r2)));
+      const first = [...lastPositions.values()].sort((a, b) => a.y - b.y)[0];
+      const r = tiles.get(first.item.hash).getBoundingClientRect();
+      return { x: Math.round(r.x + 10), y: Math.round(r.y + 10) };
+    })()`);
+    for (const type of ['mouseDown', 'mouseUp']) {
+      wc.sendInputEvent({ type, button: 'right', x: topTile.x, y: topTile.y, clickCount: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 250));
+    check(
+      'the menu survives auto-scroll running',
+      await js(`(() => {
+        const open = !ctxMenu.hidden;
+        closeCtxMenu();
+        setAutoScroll(false);
+        scroller.scrollTop = 0;
+        return open;
+      })()`)
+    );
+    check('remove label follows the selection', tileMenu.singleLabel && tileMenu.selectionLabel);
+    check('missing items disable the file-based actions', tileMenu.missingDisabled);
+    check('remove from the menu removes the clicked item', tileMenu.removed);
+
     await js(`(() => {
       const extras = items.filter(i => /extra[12]\\.png$/.test(i.path)).map(i => i.hash);
       items = items.filter(i => !extras.includes(i.hash));

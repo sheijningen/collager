@@ -44,7 +44,10 @@ pnpm dist:win     # NSIS installer (run on Windows, or via wine)
   by collage order, name, path or type. Clicking an entry scrolls to it;
   clicking a tile highlights its entry. Ctrl-click toggles, Shift-click selects
   a range, **Remove (N)** or Delete removes the selection, Escape clears it.
-  Right-click an entry to copy its path or show it in the file manager.
+- **Item menu**: right-click a tile or a panel entry to open it in the
+  lightbox or in the system's default app, copy its path (or, for still
+  images, the image itself), show it in the file manager, or remove it. When
+  the item is part of a multi-selection, remove takes the whole selection.
 - **Auto-scroll**: the ▶ Auto button scrolls the collage continuously. The
   slider sets the speed (10 to 600 px/s); **restart** jumps back to the top at
   the end, **shuffle** re-shuffles on each restart, **keep awake** stops the

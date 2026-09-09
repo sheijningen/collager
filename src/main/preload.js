@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   pickFiles: () => ipcRenderer.invoke('pick-files'),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   revealFile: (filePath) => ipcRenderer.send('reveal-file', filePath),
+  openExternally: (filePath) => ipcRenderer.invoke('open-externally', filePath),
   toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
   setKeepAwake: (on) => ipcRenderer.send('keep-awake', on),
   isFullscreen: () => ipcRenderer.invoke('is-fullscreen'),

@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const { pathToFileURL } = require('url');
-const { MEDIA_EXTS, probeFiles } = require('./lib/scan');
+const { MEDIA_EXTS, probeFiles, typeForPath } = require('./lib/scan');
 const { createLibraryStore } = require('./lib/library');
 
 const library = createLibraryStore(() => app.getPath('userData'));
@@ -107,6 +108,20 @@ ipcMain.handle('is-fullscreen', (event) => {
 
 ipcMain.on('reveal-file', (_event, filePath) => {
   if (typeof filePath === 'string') shell.showItemInFolder(filePath);
+});
+
+/* Opens a media file in the system's default application for its type.
+ * openPath runs whatever the desktop associates with the file, so only
+ * existing files with a supported media extension are accepted here.
+ * Resolves to an empty string on success, otherwise the reason. */
+ipcMain.handle('open-externally', async (_event, filePath) => {
+  if (typeof filePath !== 'string' || !typeForPath(filePath)) return 'not a media file';
+  try {
+    if (!(await fsp.stat(filePath)).isFile()) return 'not a file';
+  } catch {
+    return 'file not found';
+  }
+  return shell.openPath(filePath);
 });
 
 ipcMain.handle('pick-files', async (event) => {
