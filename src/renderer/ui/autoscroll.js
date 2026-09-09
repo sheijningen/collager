@@ -9,7 +9,7 @@ import { advanceAutoScroll } from '../core/autoscroll.js';
 import { scroller, prefs } from './state.js';
 import { shuffle } from './collage.js';
 import { lightbox } from './lightbox.js';
-import { ctxMenu } from './panel.js';
+import { ctxAnchoredTo } from './ctxmenu.js';
 import { anyOverlayOpen } from './shortcuts.js';
 import { tileDrag } from './tiledrag.js';
 
@@ -49,10 +49,16 @@ export function setAutoScrollPosition(top) {
 function autoScrollTick(ts) {
   if (!autoScroll) return;
   scrollRaf = requestAnimationFrame(autoScrollTick);
-  // hold position while the lightbox, context menu or a modal overlay is
-  // open or a tile drag is in flight (scrolling under them would dismiss the
-  // menu instantly / desync the drop target from the cursor)
-  if (!lightbox.hidden || !ctxMenu.hidden || anyOverlayOpen() || (tileDrag && tileDrag.active)) {
+  // hold position while the lightbox or a modal overlay is open, a tile's
+  // menu is up (scrolling would dismiss it instantly; a panel entry's menu
+  // sits still and lets the collage run on) or a tile drag is in flight
+  // (scrolling desyncs the drop target from the cursor)
+  if (
+    !lightbox.hidden ||
+    ctxAnchoredTo('tile') ||
+    anyOverlayOpen() ||
+    (tileDrag && tileDrag.active)
+  ) {
     lastTick = ts;
     return;
   }

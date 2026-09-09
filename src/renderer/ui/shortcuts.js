@@ -10,7 +10,8 @@ import { targetConsumesKey } from '../core/keys.js';
 import { state, selected, showToast } from './state.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
-import { panelOpen, setPanelOpen, ctxMenu, closeCtxMenu, applySelection } from './panel.js';
+import { panelOpen, setPanelOpen, applySelection } from './panel.js';
+import { ctxMenu, closeCtxMenu } from './ctxmenu.js';
 import { toolbarOpen, setToolbarOpen } from './toolbar.js';
 import { openDropdownId, closeDropdown } from './dropdown.js';
 import { lightbox, closeLightbox } from './lightbox.js';
@@ -35,8 +36,8 @@ export const SHORTCUTS = [
   ['Esc', 'Close overlays / clear the selection / exit fullscreen'],
   ['I', 'About Collager'],
   ['? / F1', 'Show this help'],
-  ['Double-click', 'Open a tile in the lightbox'],
-  ['Right-click (file list)', 'Copy path / show in folder']
+  ['Double-click', 'Maximize a tile'],
+  ['Right-click', 'Item menu: maximize, open, copy path or image, show in folder, remove']
 ];
 
 for (const [keys, action] of SHORTCUTS) {

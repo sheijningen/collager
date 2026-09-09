@@ -10,7 +10,7 @@ module.exports = {
     // open context menu stays anchored to its entry; a rebuild closes it
     const memo = await js(`(() => {
       const li = T.fileList.children[0];
-      T.openCtxMenu(T.state.items[0], 10, 10);
+      T.openCtxMenu(T.state.items[0], 10, 10, 'list');
       T.setColumns(T.columns + 1);
       T.render();
       return { sameNode: T.fileList.children[0] === li, menuOpen: !T.ctxMenu.hidden };
@@ -38,6 +38,29 @@ module.exports = {
       'selection shows on tiles',
       (await js(`document.querySelectorAll('.tile.selected').length`)) === 2
     );
+
+    // the same selection can be built from the tiles, and shows in the list
+    const fromTiles = await js(`(() => {
+      const click = (hash, mods) =>
+        T.tiles.get(hash).dispatchEvent(new MouseEvent('click', { bubbles: true, ...mods }));
+      const [first, second] = T.state.items;
+      click(first.hash, {});
+      const one = T.selected.size === 1 && T.selected.has(first.hash);
+      click(second.hash, { ctrlKey: true });
+      const two = T.selected.size === 2 && T.selected.has(first.hash);
+      const listed = document.querySelectorAll('#file-list li.selected').length;
+      click(second.hash, { ctrlKey: true });
+      const untoggled = T.selected.size === 1 && T.selected.has(first.hash);
+      click(second.hash, {});
+      const plainReplaces = T.selected.size === 1 && T.selected.has(second.hash);
+      return { one, two, listed, untoggled, plainReplaces };
+    })()`);
+    check('clicking a tile selects it alone', fromTiles.one && fromTiles.plainReplaces);
+    check('ctrl-click on a tile adds and removes it', fromTiles.two && fromTiles.untoggled);
+    check('a tile selection shows in the file panel', fromTiles.listed === 2);
+
+    await js(`T.selected.clear(); T.selected.add(T.state.items[0].hash);
+      T.selected.add(T.state.items[1].hash); T.applySelection();`);
 
     // escape ladder: one layer per press
     const ladder = await js(`(async () => {

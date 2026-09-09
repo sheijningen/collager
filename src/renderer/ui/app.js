@@ -20,6 +20,7 @@ import {
   queueLibraryOperation
 } from './collage.js';
 import * as panelModule from './panel.js';
+import * as ctxmenuModule from './ctxmenu.js';
 import * as tiledragModule from './tiledrag.js';
 import * as lightboxModule from './lightbox.js';
 import * as autoscrollModule from './autoscroll.js';
@@ -120,6 +121,7 @@ if (new URLSearchParams(location.search).has('e2e')) {
     stateModule,
     collageModule,
     panelModule,
+    ctxmenuModule,
     tiledragModule,
     lightboxModule,
     autoscrollModule,
