@@ -3,6 +3,7 @@
  * here is what wires their event handlers up. */
 
 import * as layout from '../core/layout.js';
+import { formatCount } from '../core/text.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
 import { state, selected, showToast, persist } from './state.js';
@@ -60,23 +61,23 @@ document.getElementById('btn-col-plus').addEventListener('click', () => setColum
 document.getElementById('btn-clear').addEventListener('click', () => {
   const n = state.items.length;
   if (!n) return;
-  if (!confirm(`Remove all ${n} item${n === 1 ? '' : 's'} from the collage?`)) return;
+  if (!confirm(`Remove all ${formatCount(n, 'item')} from the collage?`)) return;
   state.items = [];
   selected.clear();
   state.selectionAnchor = null;
   render();
   persist();
-  showToast(`Cleared ${n} item${n === 1 ? '' : 's'}`);
+  showToast(`Cleared ${formatCount(n, 'item')}`);
 });
 document.getElementById('btn-clear-missing').addEventListener('click', () => {
   const n = state.items.filter((i) => i.missing).length;
   if (!n) return;
-  if (!confirm(`Remove all ${n} missing file${n === 1 ? '' : 's'} from the collage?`)) return;
+  if (!confirm(`Remove all ${formatCount(n, 'missing file')} from the collage?`)) return;
   state.items = state.items.filter((i) => !i.missing);
   // render() prunes the selection of anything that no longer exists
   render();
   persist();
-  showToast(`Removed ${n} missing file${n === 1 ? '' : 's'}`);
+  showToast(`Removed ${formatCount(n, 'missing file')}`);
 });
 
 /* ---------------- window resize ---------------- */
@@ -149,9 +150,7 @@ queueLibraryOperation(async function init() {
     if (measured) persist();
     const missingCount = state.items.filter((i) => i.missing).length;
     if (missingCount) {
-      showToast(
-        `${missingCount} file${missingCount === 1 ? '' : 's'} missing on disk — hover to remove`
-      );
+      showToast(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
     } else if (measured) {
       showToast('Library ready'); // replaces the sticky progress toast
     }

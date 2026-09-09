@@ -7,6 +7,8 @@
 
 import { sortItems, basename } from '../core/layout.js';
 import { clickSelection } from '../core/selection.js';
+import { clampMenuPosition } from '../core/menuposition.js';
+import { formatCount } from '../core/text.js';
 import {
   state,
   selected,
@@ -114,13 +116,13 @@ export function scrollCollageTo(hash) {
 export function removeSelected() {
   if (!selected.size) return;
   const n = selected.size;
-  if (!confirm(`Remove ${n} selected item${n === 1 ? '' : 's'} from the collage?`)) return;
+  if (!confirm(`Remove ${formatCount(n, 'selected item')} from the collage?`)) return;
   state.items = state.items.filter((i) => !selected.has(i.hash));
   selected.clear();
   state.selectionAnchor = null;
   render();
   persist();
-  showToast(`Removed ${n} item${n === 1 ? '' : 's'}`);
+  showToast(`Removed ${formatCount(n, 'item')}`);
 }
 
 export function setPanelOpen(open) {
@@ -162,8 +164,16 @@ export function openCtxMenu(item, x, y) {
   ctxMenu.style.top = '0px';
   ctxMenu.hidden = false;
   const rect = ctxMenu.getBoundingClientRect();
-  ctxMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
-  ctxMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  const { left, top } = clampMenuPosition({
+    x,
+    y,
+    width: rect.width,
+    height: rect.height,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight
+  });
+  ctxMenu.style.left = `${left}px`;
+  ctxMenu.style.top = `${top}px`;
 }
 
 export function closeCtxMenu() {

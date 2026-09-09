@@ -13,6 +13,7 @@ import {
   MAX_COLUMNS,
   DEFAULT_COLUMNS
 } from '../core/layout.js';
+import { formatCount } from '../core/text.js';
 import {
   state,
   selected,
@@ -162,7 +163,7 @@ export function render() {
     state.selectionAnchor = null;
   }
   const count = state.items.length;
-  itemCount.textContent = count ? `${count} item${count === 1 ? '' : 's'}` : '';
+  itemCount.textContent = count ? formatCount(count, 'item') : '';
   emptyState.hidden = count > 0;
   updateClearMissingBtn();
   renderList();
@@ -342,7 +343,7 @@ async function doAddPaths(paths) {
 
   const parts = [];
   if (fresh.length) parts.push(`added ${fresh.length}`);
-  if (duplicates) parts.push(`${duplicates} duplicate${duplicates === 1 ? '' : 's'} skipped`);
+  if (duplicates) parts.push(`${formatCount(duplicates, 'duplicate')} skipped`);
   if (skippedCount) parts.push(`${skippedCount} unsupported skipped`);
   showToast(parts.length ? parts.join(' · ') : 'Nothing to add');
 }

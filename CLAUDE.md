@@ -15,7 +15,8 @@ and Windows. macOS is not a target; the `darwin` branches only keep the app quit
 src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
-src/renderer/core/   pure logic, no DOM: layout, selection, prefs
+src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
+                     menu placement, count text
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core
@@ -34,7 +35,9 @@ docs/                README media
   another: anything order-sensitive (the Escape ladder) lives in a single handler. Explicit
   imports mean eslint checks every identifier.
 - `core/` modules are pure ES modules with no DOM access. `src/renderer/package.json` declares
-  `type: module`, so Node loads them the same way and the unit tests `require()` them.
+  `type: module`, so Node loads them the same way and the unit tests `require()` them. Logic that
+  can be stated without the DOM (a decision, a computation, a text) goes there with a unit test;
+  the `ui/` module keeps only the DOM reads and writes around it.
 - The renderer is isolated (`contextIsolation`, no `nodeIntegration`, CSP in `index.html`).
   Main-process capabilities are exposed only through an IPC channel plus a `window.api` entry
   in the preload script. Handlers live in `src/main/ipc/`, one module per concern with a

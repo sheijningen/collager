@@ -5,6 +5,7 @@
  * and the actual bindings can't drift apart.
  */
 
+import { targetConsumesKey } from '../core/keys.js';
 import { state, selected, showToast } from './state.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
@@ -98,34 +99,6 @@ document.getElementById('btn-help').addEventListener('click', () => {
   helpOverlay.hidden = !helpOverlay.hidden;
 });
 document.getElementById('app-title').addEventListener('click', openAbout);
-
-/* Whether the focused element needs this key for itself (typing in a text
- * field, Space on a button/checkbox, arrows on the speed slider) — global
- * shortcuts must never steal those. */
-function targetConsumesKey(target, key) {
-  if (!target || !target.tagName) return false;
-  const tag = target.tagName;
-  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
-  if (tag === 'BUTTON') return key === ' ' || key === 'Enter';
-  if (tag === 'INPUT') {
-    const type = target.type;
-    if (type === 'checkbox' || type === 'radio') return key === ' ';
-    if (type === 'range') {
-      return [
-        'ArrowLeft',
-        'ArrowRight',
-        'ArrowUp',
-        'ArrowDown',
-        'Home',
-        'End',
-        'PageUp',
-        'PageDown'
-      ].includes(key);
-    }
-    return true; // text-like inputs consume everything
-  }
-  return false;
-}
 
 /* Escape closes exactly one layer, top-most first: context menu, lightbox,
  * help/about overlay, selection, fullscreen. One handler owns the ladder so
