@@ -14,6 +14,7 @@ import { tileDrag } from './tiledrag.js';
 
 export const autoScrollBtn = document.getElementById('btn-autoscroll');
 export const speedSlider = document.getElementById('scroll-speed');
+const speedValue = document.getElementById('scroll-speed-value');
 const loopCheckbox = document.getElementById('scroll-loop');
 const shuffleCheckbox = document.getElementById('scroll-shuffle');
 const awakeCheckbox = document.getElementById('scroll-awake');
@@ -102,11 +103,16 @@ autoScrollBtn.addEventListener('click', () => setAutoScroll(!autoScroll));
  * saved pref can never disagree */
 export function setScrollSpeed(value) {
   scrollSpeed = Math.max(Number(speedSlider.min), Math.min(Number(speedSlider.max), value));
-  speedSlider.value = String(scrollSpeed);
+  showScrollSpeed();
   prefs.set('scrollSpeed', scrollSpeed);
 }
 
-speedSlider.value = String(scrollSpeed);
+function showScrollSpeed() {
+  speedSlider.value = String(scrollSpeed);
+  speedValue.textContent = `${scrollSpeed} px/s`;
+}
+
+showScrollSpeed();
 speedSlider.addEventListener('input', () => {
   setScrollSpeed(parseInt(speedSlider.value, 10));
 });

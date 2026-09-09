@@ -56,8 +56,12 @@ docs/                README media
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.
-- **Escape order**: context menu, lightbox, help/about overlays, selection, fullscreen. One
-  keydown handler in `shortcuts.js` walks that ladder and closes exactly one layer.
+- **Toolbar**: primary actions stay as buttons; the rest sits in dropdowns under a toolbar
+  button (`ui/dropdown.js`, one open at a time, not modal). The bar wraps onto a second row
+  rather than overflow, and media queries drop the hint and counters first.
+- **Escape order**: toolbar dropdown, context menu, lightbox, help/about overlays, selection,
+  fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
+  layer.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
 - **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and

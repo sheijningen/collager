@@ -170,11 +170,15 @@ export function render() {
 
 /* only visible while something is actually missing */
 const clearMissingBtn = document.getElementById('btn-clear-missing');
+const missingBadge = document.getElementById('missing-badge');
 
 export function updateClearMissingBtn() {
   const n = state.items.filter((i) => i.missing).length;
   clearMissingBtn.hidden = n === 0;
   clearMissingBtn.textContent = `⚠ Clear ${n} missing`;
+  // the button sits in the Collage menu, so the menu button carries the warning
+  missingBadge.hidden = n === 0;
+  if (n) missingBadge.title = `${n} file${n === 1 ? '' : 's'} missing`;
 }
 
 function createTile(item) {

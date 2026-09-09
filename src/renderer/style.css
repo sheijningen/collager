@@ -27,24 +27,31 @@ body {
   overflow: hidden;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---------- toolbar ---------- */
 
+/* controls wrap onto a second row rather than overflow past the window edge;
+ * the dropdowns keep that rare */
 #toolbar {
-  height: var(--toolbar-h);
+  flex-shrink: 0;
+  min-height: var(--toolbar-h);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 0 44px 0 14px; /* right padding clears the floating toolbar toggle */
+  gap: 6px 12px;
+  /* the right padding clears the floating toolbar toggle; CSS cannot tell the
+   * rows apart, so a wrapped second row keeps the same clearance */
+  padding: 6px 44px 6px 14px;
   border-bottom: 1px solid #26262e;
   user-select: none;
 }
 
 body.toolbar-collapsed #toolbar {
   display: none;
-}
-
-body.toolbar-collapsed #workspace {
-  height: 100%;
 }
 
 #btn-toolbar-toggle {
@@ -138,46 +145,55 @@ body.toolbar-collapsed #btn-toolbar-toggle:hover {
   text-align: center;
 }
 
+/* the auto-scroll toggle and its settings menu form one split button */
 #scroll-control {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  align-items: stretch;
+}
+
+#scroll-control #btn-autoscroll {
+  border-radius: 6px 0 0 6px;
+}
+
+#scroll-control #btn-scroll-menu {
+  width: 26px;
+  padding: 0;
+  margin-left: -1px; /* the halves share one border line */
+  border-radius: 0 6px 6px 0;
+}
+
+/* the highlighted half paints its accent border over the shared line */
+#scroll-control button:hover,
+#scroll-control button.open,
+#scroll-control button.active {
+  position: relative;
+  z-index: 1;
+}
+
+.caret {
+  font-size: 11px;
+  margin-left: 5px;
   color: var(--fg-dim);
-  font-size: 13px;
 }
 
-#scroll-control label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap; /* "keep awake" must not wrap to two lines */
+#btn-scroll-menu .caret {
+  margin-left: 0;
 }
 
-#scroll-control input[type='range'] {
-  width: 90px;
-  accent-color: var(--accent);
+#toolbar .menu-btn.open {
+  border-color: var(--accent);
+  background: #26262e;
 }
 
-#scroll-control input[type='checkbox'] {
-  accent-color: var(--accent);
+#missing-badge {
+  color: var(--danger);
+  margin-left: 6px;
 }
 
 #btn-autoscroll.active,
 #btn-fullscreen.active {
   border-color: var(--accent);
   color: var(--accent);
-}
-
-#toolbar #btn-clear-missing,
-#toolbar #btn-clear-missing:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-#toolbar #btn-clear-missing:hover {
-  background: rgba(229, 72, 77, 0.15);
 }
 
 #item-count {
@@ -198,11 +214,129 @@ body.toolbar-collapsed #btn-toolbar-toggle:hover {
   white-space: nowrap;
 }
 
+/* narrower windows drop the decorations first, then the counters */
+@media (max-width: 1000px) {
+  #toolbar {
+    column-gap: 8px;
+  }
+
+  #toolbar-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  #item-count,
+  .col-label {
+    display: none;
+  }
+}
+
+/* ---------- toolbar dropdowns ---------- */
+
+.dropdown {
+  position: fixed;
+  z-index: 350; /* above the context menu, below the drag ghost: the Escape order */
+  outline: none; /* the popup itself takes focus on open; only its controls show a ring */
+  min-width: 200px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  background: #26262e;
+  border: 1px solid #3a3a46;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  user-select: none;
+}
+
+.dropdown:focus-visible {
+  border-color: var(--accent); /* a keyboard-opened popup shows where focus went */
+}
+
+.dropdown hr {
+  border: none;
+  border-top: 1px solid #3a3a46;
+  margin: 4px 0;
+}
+
+.dropdown button {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdown button:hover,
+.dropdown button:focus-visible {
+  background: rgba(79, 140, 255, 0.22);
+  outline: none;
+}
+
+.dropdown button.danger {
+  color: var(--danger);
+}
+
+.dropdown button.danger:hover,
+.dropdown button.danger:focus-visible {
+  background: rgba(229, 72, 77, 0.15);
+}
+
+.menu-key {
+  margin-left: auto;
+  padding-left: 18px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+.dropdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdown-row:hover {
+  background: rgba(79, 140, 255, 0.12);
+}
+
+.dropdown-row input[type='range'] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--accent);
+}
+
+.dropdown-row input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+#scroll-speed-value {
+  min-width: 58px;
+  text-align: right;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- workspace / panel ---------- */
 
 #workspace {
   display: flex;
-  height: calc(100% - var(--toolbar-h));
+  flex: 1;
+  min-height: 0;
 }
 
 #panel {

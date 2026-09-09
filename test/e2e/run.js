@@ -124,7 +124,8 @@ async function run() {
   const fixtures = fs.readdirSync(mediaDir).map((f) => path.join(mediaDir, f));
 
   try {
-    const wc = BrowserWindow.getAllWindows()[0].webContents;
+    const win = BrowserWindow.getAllWindows()[0];
+    const wc = win.webContents;
     // every snippet sees the app's module exports as T (see app.js)
     const js = (code) => wc.executeJavaScript(`{ const T = window.collagerTest; ${code} }`);
     await js('T.setColumns(2); T.setAutoScroll(false); void 0');
@@ -291,6 +292,140 @@ async function run() {
       'library persisted with dimensions',
       lib.length === expected - 2 && lib.every((i) => i.w > 0 && i.h > 0)
     );
+
+    // -- toolbar dropdowns ----------------------------------------------------
+    const menu = await js(`(() => {
+      const trigger = document.getElementById('btn-collage-menu');
+      const popup = document.getElementById('collage-menu');
+      trigger.click();
+      const anchor = trigger.getBoundingClientRect();
+      const rect = popup.getBoundingClientRect();
+      const opened = !popup.hidden && T.openDropdownId() === 'collage-menu';
+      const anchored = rect.top >= anchor.bottom && Math.abs(rect.left - anchor.left) < 1;
+      const onScreen = rect.right <= window.innerWidth && rect.left >= 0;
+      const expanded = trigger.getAttribute('aria-expanded') === 'true';
+      const popupFocused = document.activeElement === popup;
+      trigger.click();
+      const toggledOff = popup.hidden && T.openDropdownId() === null;
+      const focusReturned = document.activeElement === trigger;
+      trigger.click();
+      // focus events only fire while the window has OS focus, which a test run
+      // cannot assume, so deliver what Tab would produce
+      document.getElementById('btn-clear').dispatchEvent(new FocusEvent('focusout', {
+        bubbles: true, relatedTarget: document.getElementById('btn-toolbar-toggle')
+      }));
+      const tabOutCloses = popup.hidden;
+      trigger.click();
+      document.getElementById('scroller').dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true })
+      );
+      const outsideCloses = popup.hidden;
+      trigger.click();
+      const order = T.state.items.map((i) => i.hash).join();
+      // a fixed draw makes the Fisher-Yates pass rotate the list, so the
+      // order provably changes even with two items left
+      const random = Math.random;
+      Math.random = () => 0;
+      document.getElementById('btn-shuffle').click();
+      Math.random = random;
+      const itemCloses = popup.hidden && trigger.getAttribute('aria-expanded') === 'false';
+      const shuffled = T.state.items.map((i) => i.hash).join() !== order;
+      return {
+        opened, anchored, onScreen, expanded, popupFocused, toggledOff, focusReturned,
+        tabOutCloses, outsideCloses, itemCloses, shuffled
+      };
+    })()`);
+    check('the Collage menu opens under its button', menu.opened && menu.anchored && menu.onScreen);
+    check('the open menu is announced and focused', menu.expanded && menu.popupFocused);
+    check('the menu button toggles the menu', menu.toggledOff && menu.focusReturned);
+    check('moving focus out of the menu closes it', menu.tabOutCloses);
+    check('a click outside closes the menu', menu.outsideCloses);
+    check('choosing an item runs it and closes the menu', menu.itemCloses && menu.shuffled);
+
+    const scrollMenu = await js(`(() => {
+      const first = T.state.items[0].hash;
+      T.selected.add(first);
+      T.applySelection();
+      document.getElementById('btn-scroll-menu').click();
+      const openedSecond = T.openDropdownId() === 'scroll-menu';
+      const sliderShown = T.speedSlider.offsetParent !== null;
+      T.setScrollSpeed(120);
+      const readout = document.getElementById('scroll-speed-value').textContent === '120 px/s';
+      T.setScrollSpeed(80);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      const escapeClosesMenuFirst = T.openDropdownId() === null && T.selected.has(first);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      const escapeThenClears = T.selected.size === 0;
+      document.getElementById('btn-scroll-menu').click();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }));
+      const helpClosesMenu = T.openDropdownId() === null && !T.helpOverlay.hidden;
+      T.closeOverlays();
+      return { openedSecond, sliderShown, readout, escapeClosesMenuFirst, escapeThenClears, helpClosesMenu };
+    })()`);
+    check(
+      'the auto-scroll settings open in their own menu',
+      scrollMenu.openedSecond && scrollMenu.sliderShown
+    );
+    check('the speed readout follows the setter', scrollMenu.readout);
+    check(
+      'Escape closes the menu before touching the selection',
+      scrollMenu.escapeClosesMenuFirst && scrollMenu.escapeThenClears
+    );
+    check('opening the help overlay closes the menu', scrollMenu.helpClosesMenu);
+
+    // -- narrow window ----------------------------------------------------------
+    const [wideW, wideH] = win.getSize();
+    win.setSize(560, 600);
+    await new Promise((r) => setTimeout(r, 500));
+    const narrow = await js(`(() => {
+      const toolbar = document.getElementById('toolbar');
+      const bar = toolbar.getBoundingClientRect();
+      const shown = [...toolbar.children].filter((el) => getComputedStyle(el).display !== 'none');
+      const inside = shown.every((el) => {
+        const r = el.getBoundingClientRect();
+        return r.left >= 0 && r.right <= window.innerWidth + 0.5;
+      });
+      const wrapped = bar.height > 48;
+      const scrollerRect = document.getElementById('scroller').getBoundingClientRect();
+      const workspaceFits = scrollerRect.top >= bar.bottom - 0.5 && scrollerRect.bottom <= window.innerHeight + 0.5;
+      const decorationsDropped = !shown.includes(document.getElementById('toolbar-hint')) &&
+        !shown.includes(document.getElementById('item-count'));
+      return { width: window.innerWidth, inside, wrapped, workspaceFits, decorationsDropped };
+    })()`);
+    check(
+      'a narrow window keeps every toolbar control inside it',
+      narrow.width <= 560 && narrow.inside
+    );
+    check(
+      'the toolbar wrapped and the collage fills the rest of the window',
+      narrow.wrapped && narrow.workspaceFits
+    );
+    check('the hint and item count make way first', narrow.decorationsDropped);
+    win.setSize(900, 120); // shorter than the settings popup, so it must scroll
+    await new Promise((r) => setTimeout(r, 500));
+    const short = await js(`(() => {
+      const trigger = document.getElementById('btn-scroll-menu');
+      trigger.click();
+      const popup = document.getElementById('scroll-menu');
+      const rect = popup.getBoundingClientRect();
+      const scrollable = popup.scrollHeight > popup.clientHeight;
+      popup.scrollTop = popup.scrollHeight;
+      const awake = document.getElementById('scroll-awake').getBoundingClientRect();
+      const lastRowReachable =
+        scrollable && awake.top >= rect.top - 0.5 && awake.bottom <= rect.bottom + 0.5;
+      T.closeDropdown();
+      return {
+        height: window.innerHeight,
+        onScreen: rect.top >= 0 && rect.bottom <= window.innerHeight,
+        lastRowReachable
+      };
+    })()`);
+    check(
+      'a short window keeps the settings popup on screen',
+      short.height <= 120 && short.onScreen && short.lastRowReachable
+    );
+    win.setSize(wideW, wideH);
+    await new Promise((r) => setTimeout(r, 500));
 
     // -- missing-file tooltip ------------------------------------------------
     const missingTip = await js(`(() => {

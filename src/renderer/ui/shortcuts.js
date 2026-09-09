@@ -1,7 +1,8 @@
 /* ---------------- keyboard shortcuts, help & about overlays ----------------
  * One place owns every global key binding that isn't already claimed by a
  * more specific handler (F11 in fullscreen.js, Delete in panel.js), and the
- * Escape ladder. The help overlay is generated from SHORTCUTS so the page
+ * Escape ladder. Toolbar dropdowns are not modal, so the shortcuts stay live
+ * while one is open. The help overlay is generated from SHORTCUTS so the page
  * and the actual bindings can't drift apart.
  */
 
@@ -10,6 +11,7 @@ import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autosc
 import { columns, setColumns, shuffle } from './collage.js';
 import { panelOpen, setPanelOpen, ctxMenu, closeCtxMenu, applySelection } from './panel.js';
 import { toolbarOpen, setToolbarOpen } from './toolbar.js';
+import { openDropdownId, closeDropdown } from './dropdown.js';
 import { lightbox, closeLightbox } from './lightbox.js';
 import { isFullscreen } from './fullscreen.js';
 
@@ -52,6 +54,11 @@ export function anyOverlayOpen() {
   return !helpOverlay.hidden || !aboutOverlay.hidden;
 }
 
+function openHelp() {
+  closeDropdown(); // overlays are modal; a popup left open would sit on top
+  helpOverlay.hidden = false;
+}
+
 export function closeOverlays() {
   helpOverlay.hidden = true;
   aboutOverlay.hidden = true;
@@ -61,6 +68,7 @@ export function closeOverlays() {
 let aboutLoaded = false;
 export async function openAbout() {
   closeOverlays();
+  closeDropdown();
   if (!aboutLoaded) {
     const info = await window.api.getAppInfo();
     document.getElementById('about-name').textContent = info.name;
@@ -95,7 +103,8 @@ for (const overlay of [helpOverlay, aboutOverlay]) {
 }
 
 document.getElementById('btn-help').addEventListener('click', () => {
-  helpOverlay.hidden = !helpOverlay.hidden;
+  if (helpOverlay.hidden) openHelp();
+  else helpOverlay.hidden = true;
 });
 document.getElementById('app-title').addEventListener('click', openAbout);
 
@@ -127,10 +136,15 @@ function targetConsumesKey(target, key) {
   return false;
 }
 
-/* Escape closes exactly one layer, top-most first: context menu, lightbox,
- * help/about overlay, selection, fullscreen. One handler owns the ladder so
- * the order cannot depend on which module registered its listener first. */
+/* Escape closes exactly one layer, top-most first: toolbar dropdown, context
+ * menu, lightbox, help/about overlay, selection, fullscreen. One handler owns
+ * the ladder so the order cannot depend on which module registered its
+ * listener first. */
 function handleEscape() {
+  if (openDropdownId()) {
+    closeDropdown();
+    return;
+  }
   if (!ctxMenu.hidden) {
     closeCtxMenu();
     return;
@@ -174,7 +188,7 @@ window.addEventListener('keydown', (e) => {
     case '?':
     case 'F1':
       e.preventDefault();
-      helpOverlay.hidden = false;
+      openHelp();
       break;
     case 'i':
       if (!e.repeat) openAbout();
