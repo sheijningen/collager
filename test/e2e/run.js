@@ -5,7 +5,7 @@
  * Run with:  pnpm test:e2e   (requires a display; ffmpeg optional —
  * without it the video fixture is skipped.)
  */
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -367,8 +367,15 @@ async function run() {
       'is-fullscreen answers over IPC',
       typeof (await js('window.api.isFullscreen()')) === 'boolean'
     );
-    await js('window.api.setKeepAwake(true); window.api.setKeepAwake(false); void 0');
-    check('keep-awake channel is registered', (await js('1 + 1')) === 2);
+    /* send() has no reply, but a later invoke() from the same renderer is
+     * delivered after it, so once isFullscreen resolves the blocker has been
+     * handled. Blocker ids count up from 0 in this fresh process. */
+    const anyBlockerStarted = () =>
+      Array.from({ length: 32 }, (_, id) => id).some((id) => powerSaveBlocker.isStarted(id));
+    await js('window.api.setKeepAwake(true); window.api.isFullscreen()');
+    check('keep-awake starts a power save blocker', anyBlockerStarted());
+    await js('window.api.setKeepAwake(false); window.api.isFullscreen()');
+    check('keep-awake off releases the blocker', !anyBlockerStarted());
 
     // -- help & about overlays ------------------------------------------------
     await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }))`);
