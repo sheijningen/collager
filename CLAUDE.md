@@ -16,19 +16,25 @@ src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs
-src/renderer/ui/     DOM modules, classic scripts sharing one global scope
+src/renderer/ui/     DOM modules, ES modules with app.js as the entry
+src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core
 test/e2e/            boots the real app and drives it
 build/               icon (SVG source, PNG export for electron-builder)
 docs/                README media
 ```
 
-- The script order in `index.html` is load-bearing: layout, selection, prefs, state, collage,
-  panel, tiledrag, lightbox, autoscroll, shortcuts, app. Earlier declarations are visible to
-  later scripts; functions declared later are callable at runtime. eslint cannot check
-  cross-file identifiers in `ui/` (`no-undef` is off there), so verify them by hand.
-- `core/` modules are UMD-style (`window.Collager*` in the renderer, `module.exports` under
-  Node) and must stay free of DOM access.
+- The renderer is ES modules. `ui/app.js` is the entry (`index.html` loads only it) and imports
+  every other module, which is what wires their handlers up. Shared mutable state lives in
+  `ui/state.js`: `state.items`, `state.selectionAnchor` and the `selected` set; other modules
+  own their state and export setters for what others may change. Module top levels touch only
+  their own DOM and `state.js`; cross-module calls happen inside functions and handlers, which
+  keeps the import cycles between ui modules harmless. Module evaluation order also decides the
+  order in which window listeners register, so nothing may rely on one listener running before
+  another: anything order-sensitive (the Escape ladder) lives in a single handler. Explicit
+  imports mean eslint checks every identifier.
+- `core/` modules are pure ES modules with no DOM access. `src/renderer/package.json` declares
+  `type: module`, so Node loads them the same way and the unit tests `require()` them.
 - The renderer is isolated (`contextIsolation`, no `nodeIntegration`, CSP in `index.html`).
   Main-process capabilities are exposed only through an IPC channel plus a `window.api` entry
   in the preload script. Handlers live in `src/main/ipc/`, one module per concern with a
@@ -54,7 +60,8 @@ docs/                README media
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.
-- **Escape order**: context menu, lightbox, help/about overlays, selection, fullscreen.
+- **Escape order**: context menu, lightbox, help/about overlays, selection, fullscreen. One
+  keydown handler in `shortcuts.js` walks that ladder and closes exactly one layer.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
 - **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and
@@ -72,7 +79,9 @@ docs/                README media
 - `pnpm test`: unit tests with `node:test`, no display needed.
 - `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code
   (video only when ffmpeg is installed) and drives the renderer via `executeJavaScript`.
-  Needs a display: `xvfb-run -a pnpm test:e2e` on headless machines.
+  The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e` and `app.js` exposes
+  every module export on `window.collagerTest`, which the snippets reach as `T`. Needs a
+  display: `xvfb-run -a pnpm test:e2e` on headless machines.
 - `ELECTRON_RUN_AS_NODE` must be unset (VS Code terminals export it, which makes
   `require('electron')` return a path). Use `env -u ELECTRON_RUN_AS_NODE`.
 - The CI e2e job makes Chromium's setuid sandbox helper root-owned because Ubuntu 24.04

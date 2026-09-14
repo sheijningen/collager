@@ -1,5 +1,3 @@
-'use strict';
-
 /* ---------------- auto-scroll ----------------
  * Smoothly scrolls the collage at a configurable speed (px/s). At the end it
  * either stops, or — if "restart" is on — jumps back to the top, optionally
@@ -7,14 +5,21 @@
  * as the new position instead of being fought.
  */
 
-const autoScrollBtn = document.getElementById('btn-autoscroll');
-const speedSlider = document.getElementById('scroll-speed');
+import { scroller, prefs } from './state.js';
+import { shuffle } from './collage.js';
+import { lightbox } from './lightbox.js';
+import { ctxMenu } from './panel.js';
+import { anyOverlayOpen } from './shortcuts.js';
+import { tileDrag } from './tiledrag.js';
+
+export const autoScrollBtn = document.getElementById('btn-autoscroll');
+export const speedSlider = document.getElementById('scroll-speed');
 const loopCheckbox = document.getElementById('scroll-loop');
 const shuffleCheckbox = document.getElementById('scroll-shuffle');
 const awakeCheckbox = document.getElementById('scroll-awake');
 
-let autoScroll = false;
-let scrollSpeed = prefs.int('scrollSpeed', 80, 10, 600);
+export let autoScroll = false;
+export let scrollSpeed = prefs.int('scrollSpeed', 80, 10, 600);
 let restartAtEnd = prefs.bool('scrollRestart', true);
 let shuffleOnRestart = prefs.bool('scrollShuffle', false);
 let keepAwake = prefs.bool('keepAwake', true);
@@ -27,6 +32,12 @@ function syncKeepAwake() {
 let scrollRaf = null;
 let lastTick = null;
 let virtualTop = 0; // fractional scroll position (scrollTop rounds to ints)
+
+/* Hands the tick a position set from elsewhere (scroll-to-item), so it does
+ * not get read back as a manual scroll and fought. */
+export function setAutoScrollPosition(top) {
+  virtualTop = top;
+}
 
 function autoScrollTick(ts) {
   if (!autoScroll) return;
@@ -69,7 +80,7 @@ function autoScrollTick(ts) {
   }
 }
 
-function setAutoScroll(on) {
+export function setAutoScroll(on) {
   if (on === autoScroll) return;
   autoScroll = on;
   autoScrollBtn.classList.toggle('active', on);
@@ -89,7 +100,7 @@ autoScrollBtn.addEventListener('click', () => setAutoScroll(!autoScroll));
 
 /* single setter for the speed, so the slider, the ,/. shortcuts and the
  * saved pref can never disagree */
-function setScrollSpeed(value) {
+export function setScrollSpeed(value) {
   scrollSpeed = Math.max(Number(speedSlider.min), Math.min(Number(speedSlider.max), value));
   speedSlider.value = String(scrollSpeed);
   prefs.set('scrollSpeed', scrollSpeed);
