@@ -10,6 +10,7 @@ const {
   isSampledHash,
   readExactly,
   rehashStaleItems,
+  runWithConcurrency,
   typeForPath,
   probeFiles,
   SAMPLE_BYTES
@@ -135,6 +136,46 @@ test('hashFile: identical content hashes equal, different content differs', asyn
 
 test('hashFile rejects for unreadable files', async () => {
   await assert.rejects(fullHashOf(path.join(os.tmpdir(), 'collager-nope.png')));
+});
+
+test('runWithConcurrency: bounds the calls in flight, visits every index, reports each completion', async () => {
+  const list = Array.from({ length: 10 }, (_, index) => `item-${index}`);
+  const seen = [];
+  const progress = [];
+  let inFlight = 0;
+  let mostInFlight = 0;
+  await runWithConcurrency(
+    list,
+    3,
+    async (element, index) => {
+      inFlight++;
+      mostInFlight = Math.max(mostInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      seen.push([element, index]);
+      inFlight--;
+    },
+    (done, total) => progress.push([done, total])
+  );
+  assert.equal(mostInFlight, 3);
+  assert.deepEqual(
+    seen.sort((a, b) => a[1] - b[1]),
+    list.map((element, index) => [element, index])
+  );
+  assert.deepEqual(
+    progress,
+    list.map((_, index) => [index + 1, 10])
+  );
+});
+
+test('runWithConcurrency: an empty list runs nothing and reports nothing', async () => {
+  let calls = 0;
+  await runWithConcurrency(
+    [],
+    4,
+    async () => calls++,
+    () => calls++
+  );
+  assert.equal(calls, 0);
 });
 
 test('probeFiles: hashes concurrently, keeps discovery order, types entries', async (t) => {
