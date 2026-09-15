@@ -1,6 +1,7 @@
 const { ipcMain } = require('electron');
 const { pathToFileURL } = require('url');
 const { probeFiles } = require('../lib/scan');
+const { loadAndRepairLibrary } = require('../lib/library');
 
 /* The library channels: scanning and hashing dropped paths, loading and
  * saving the persisted collection. */
@@ -13,7 +14,7 @@ function registerLibraryIpc(library) {
     return { entries, skippedCount };
   });
 
-  ipcMain.handle('load-library', () => library.load());
+  ipcMain.handle('load-library', () => loadAndRepairLibrary(library));
 
   ipcMain.handle('save-library', (_event, items) => library.save(items));
 }

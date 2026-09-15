@@ -119,6 +119,17 @@ async function run() {
       await js(`T.addPaths(${JSON.stringify(fixtures)})`);
       const loaded = await waitFor(async () => (await js('T.state.items.length')) >= expected);
       if (!loaded) throw new Error('fixtures did not load');
+    },
+    /* writes `library` as the saved library and restarts the renderer, so a
+     * case observes the startup path: the repair pass in the main process
+     * and init in the renderer. Resolves once init has taken the result. */
+    async restartWith(library) {
+      fs.writeFileSync(libraryFile, JSON.stringify(library));
+      const finished = new Promise((resolve) => wc.once('did-finish-load', resolve));
+      wc.reload();
+      await finished;
+      const ready = await waitFor(() => js('T.state.libraryLoaded'));
+      if (!ready) throw new Error('the renderer did not finish loading the library');
     }
   };
 

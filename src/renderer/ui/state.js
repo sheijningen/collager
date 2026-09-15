@@ -1,15 +1,17 @@
 /* Shared renderer state and the core DOM references.
  *
- * `state` holds the two fields other modules reassign (the library itself and
- * the selection anchor); everything else here is a container that is mutated
- * in place. Modules own their remaining state and export setters for what
+ * `state` holds the fields other modules reassign (the library itself, whether
+ * it has loaded, and the selection anchor); everything else here is a
+ * container that is mutated in place. Modules own their remaining state and export setters for what
  * others may change. */
 
 import { createPrefs } from '../core/prefs.js';
 
 export const state = {
-  /** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', w?:number, h?:number, missing?:boolean}[]} the library, in collage order */
+  /** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', size?:number, w?:number, h?:number, missing?:boolean}[]} the library, in collage order */
   items: [],
+  /** set once the saved library has been loaded into `items` */
+  libraryLoaded: false,
   /** hash the next shift-click range extends from, or null */
   selectionAnchor: null
 };
@@ -56,7 +58,11 @@ export function showToast(message, sticky = false) {
 
 /* ---------------- persistence ---------------- */
 
+/* Refuses to write until the saved library is in `state.items`: an action
+ * taken during startup, or after a failed load, would otherwise save the
+ * empty list over the file. */
 export async function persist() {
+  if (!state.libraryLoaded) return;
   try {
     await window.api.saveLibrary(state.items);
   } catch (err) {

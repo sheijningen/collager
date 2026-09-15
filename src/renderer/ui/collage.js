@@ -303,7 +303,7 @@ export function addPaths(paths) {
 // live progress while the main process hashes a dropped batch (the slow part
 // for video folders); the sticky toast is replaced by the summary at the end
 window.api.onProbeProgress(({ done, total }) => {
-  showToast(`Adding — hashing files ${done}/${total}…`, true);
+  showToast(`Adding — reading files ${done}/${total}…`, true);
 });
 
 async function doAddPaths(paths) {
@@ -321,6 +321,7 @@ async function doAddPaths(paths) {
       if (existing.missing) {
         existing.path = entry.path;
         existing.url = entry.url;
+        existing.size = entry.size;
         existing.missing = false;
         const tile = tiles.get(existing.hash);
         if (tile) {

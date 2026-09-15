@@ -3,7 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createLibraryStore, readLibraryItems } = require('../../src/main/lib/library.js');
+const {
+  createLibraryStore,
+  readLibraryItems,
+  loadAndRepairLibrary
+} = require('../../src/main/lib/library.js');
 
 function tmpStore(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-lib-'));
@@ -22,7 +26,7 @@ const entry = (hash, overrides = {}) => ({
 
 test('load with no library file returns empty with no problem', async (t) => {
   const { store } = tmpStore(t);
-  assert.deepEqual(await store.load(), { items: [], problem: null });
+  assert.deepEqual(await store.load(), { items: [], sizeOnDisk: new Map(), problem: null });
 });
 
 test('save/load round-trip persists only the durable fields', async (t) => {
@@ -30,10 +34,19 @@ test('save/load round-trip persists only the durable fields', async (t) => {
   const realFile = path.join(dir, 'exists.png');
   fs.writeFileSync(realFile, 'x');
   await store.save([
-    { path: realFile, hash: 'h1', type: 'image', w: 10, h: 20, url: 'file://stale', missing: true },
-    { path: path.join(dir, 'gone.mp4'), hash: 'h2', type: 'video', w: 640, h: 480 }
+    {
+      path: realFile,
+      hash: 'h1',
+      type: 'image',
+      size: 1,
+      w: 10,
+      h: 20,
+      url: 'file://stale',
+      missing: true
+    },
+    { path: path.join(dir, 'gone.mp4'), hash: 'h2', type: 'video', size: 900, w: 640, h: 480 }
   ]);
-  const { items, problem } = await store.load();
+  const { items, sizeOnDisk, problem } = await store.load();
   assert.equal(problem, null);
   assert.equal(items.length, 2);
   assert.deepEqual(
@@ -43,10 +56,16 @@ test('save/load round-trip persists only the durable fields', async (t) => {
       { hash: 'h2', missing: true }
     ]
   );
+  assert.deepEqual([...sizeOnDisk], [[items[0], 1]], 'only the present file is measured');
   assert.ok(items[0].url.startsWith('file://'), 'url is recomputed from path');
   const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
   assert.equal(onDisk[0].url, undefined, 'volatile fields are not persisted');
   assert.equal(onDisk[0].missing, undefined);
+  assert.deepEqual(
+    onDisk.map((e) => e.size),
+    [1, 900],
+    'the size the hash was taken over survives a round trip'
+  );
 });
 
 test('unreadable content is moved aside and reported as unreadable', async (t) => {
@@ -129,6 +148,80 @@ test('entries need a path and a hash; a repeated hash keeps its first entry', ()
       ['b', '/media/b.png']
     ]
   );
+  assert.equal(items[0].size, undefined, 'a size is optional on read');
+});
+
+test('loadAndRepairLibrary brings stale entries up to date and saves them', async (t) => {
+  const { dir, store } = tmpStore(t);
+  const pic = path.join(dir, 'pic.png');
+  const clip = path.join(dir, 'clip.mp4');
+  fs.writeFileSync(pic, 'picture bytes');
+  fs.writeFileSync(clip, 'video bytes');
+  fs.writeFileSync(
+    path.join(dir, 'library.json'),
+    JSON.stringify([
+      { path: pic, hash: 'kept', type: 'image' },
+      { path: clip, hash: 'full-content-hash', type: 'video' },
+      { path: path.join(dir, 'gone.png'), hash: 'away', type: 'image', size: 3 }
+    ])
+  );
+  const { items, problem, collapsed } = await loadAndRepairLibrary(store);
+  assert.equal(problem, null);
+  assert.equal(collapsed, 0);
+  assert.deepEqual(
+    items.map((i) => [i.hash, i.size, i.missing]),
+    [
+      ['kept', 13, false],
+      [items[1].hash, 11, false],
+      ['away', 3, true]
+    ]
+  );
+  assert.match(items[1].hash, /^sampled-/);
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
+  assert.deepEqual(
+    onDisk.map((e) => [e.hash, e.size]),
+    items.map((i) => [i.hash, i.size]),
+    'the repaired entries are saved'
+  );
+});
+
+test('loadAndRepairLibrary leaves an up-to-date library file alone', async (t) => {
+  const { dir, store } = tmpStore(t);
+  const pic = path.join(dir, 'pic.png');
+  fs.writeFileSync(pic, 'picture bytes');
+  const saves = [];
+  const counting = {
+    load: () => store.load(),
+    save: (items) => {
+      saves.push(items);
+      return store.save(items);
+    }
+  };
+  await store.save([{ path: pic, hash: 'current', type: 'image', size: 13 }]);
+  const { items, collapsed } = await loadAndRepairLibrary(counting);
+  assert.equal(items[0].hash, 'current');
+  assert.equal(collapsed, 0);
+  assert.deepEqual(saves, [], 'nothing changed, so nothing is written');
+});
+
+test('loadAndRepairLibrary still resolves when the save fails', async (t) => {
+  const { dir } = tmpStore(t);
+  const pic = path.join(dir, 'pic.png');
+  fs.writeFileSync(pic, 'picture bytes');
+  const item = { path: pic, hash: 'kept', type: 'image', missing: false };
+  const failing = {
+    load: async () => ({ items: [item], sizeOnDisk: new Map([[item, 13]]), problem: null }),
+    save: () => Promise.reject(new Error('disk full'))
+  };
+  const errors = [];
+  const original = console.error;
+  console.error = (...args) => errors.push(args);
+  t.after(() => {
+    console.error = original;
+  });
+  const { items } = await loadAndRepairLibrary(failing);
+  assert.deepEqual(items, [{ path: pic, hash: 'kept', type: 'image', size: 13, missing: false }]);
+  assert.equal(errors.length, 1, 'the failure is logged, not thrown');
 });
 
 test('malformed entries in a file are moved aside, never thrown', async (t) => {

@@ -51,18 +51,33 @@ docs/                README media
 - **Layout**: masonry with a user-chosen column count (1 to 8, default 3). Items are scaled to
   the column width, aspect ratio preserved, never cropped, placed in the shortest column.
 - **Identity**: file contents are hashed with SHA-256. The hash is the item identity everywhere
-  and makes the same media under two names one item.
+  and makes the same media under two names one item. Videos are hashed over their size plus
+  1 MiB samples at the start, middle and end (whole file when smaller), and such hashes carry a
+  `sampled-` prefix. Two distinct videos with the same size and samples would count as one
+  item; for real media that is accepted for the speed. A sample that runs out before it is full
+  means the file shrank mid-hash, which fails the hash rather than producing a short one. The
+  byte size the hash was taken over is stored with it, and every present item is stat'd at load:
+  an entry whose size moved (a copy still running when its folder was dropped) or whose video
+  hash predates the sampled scheme is rehashed, and two entries that land on one hash merge.
+  Hashing is invisible to the user: no toast or other copy mentions it, and its only visible
+  effects are duplicates being skipped on add or merged at startup.
+  A video entry that was already missing keeps its unprefixed hash and can no longer be repaired
+  by re-adding the file: the copy comes back as a new item and the missing tile stays until it is
+  removed by hand.
 - **Resource limiting**: tiles are placeholders until within 800px of the viewport; the
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
 - **Persistence**: `library.json` in `userData` is an array of items, saves serialized and
-  atomic (temp file plus rename). An unreadable file is moved to `library.json.corrupt` (a
+  atomic (temp file plus rename). The renderer refuses to save until the saved library has been
+  loaded into its state, so nothing done during startup or after a failed load can overwrite the
+  file with an empty list. An unreadable file is moved to `library.json.corrupt` (a
   timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
   When the move fails the file stays in place and saving is refused so it is not overwritten.
   There is no schema version: a file the current code cannot read counts as unreadable. Only
-  path, hash, type and dimensions are stored per item; URL and missing flag are derived at load,
-  and an entry without a hash makes the file unreadable.
+  path, hash, size, type and dimensions are stored per item; URL and missing flag are derived at
+  load, and an entry without a hash makes the file unreadable. A size is optional on read, so an
+  entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
@@ -93,7 +108,9 @@ docs/                README media
   case the harness resets the app (empty library, nothing open or selected, default columns,
   speed, sort and panels, `confirm()` answering yes), so a case loads what it needs
   (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
-  never cleans up. `pnpm test:e2e panel drag` runs only the named cases, in file order. The
+  never cleans up. A case that needs the startup path seeds a saved library and restarts the
+  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named
+  cases, in file order. The
   harness sets `COLLAGER_E2E=1`;
   main then loads the page with `?e2e` and `app.js` exposes every module export on
   `window.collagerTest`, which the snippets reach as `T`.
