@@ -5,6 +5,7 @@
  * as the new position instead of being fought.
  */
 
+import { advanceAutoScroll } from '../core/autoscroll.js';
 import { scroller, prefs } from './state.js';
 import { shuffle } from './collage.js';
 import { lightbox } from './lightbox.js';
@@ -53,23 +54,21 @@ function autoScrollTick(ts) {
     lastTick = ts;
     return;
   }
-  // clamp the step: rAF is throttled for hidden windows, and an unbounded
-  // delta after restoring a minimized window would leap to the end at once
-  const dt = Math.min((ts - lastTick) / 1000, 0.1);
+  const elapsedSeconds = (ts - lastTick) / 1000;
   lastTick = ts;
 
-  // if the user scrolled manually, continue from where they are
-  if (Math.abs(scroller.scrollTop - virtualTop) > 2) {
-    virtualTop = scroller.scrollTop;
-  }
-
-  const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-  if (maxScroll <= 0) return; // nothing to scroll yet
-
-  virtualTop = Math.min(virtualTop + scrollSpeed * dt, maxScroll);
+  const { top, atEnd, scrollable } = advanceAutoScroll({
+    virtualTop,
+    scrollTop: scroller.scrollTop,
+    maxScroll: scroller.scrollHeight - scroller.clientHeight,
+    speed: scrollSpeed,
+    elapsedSeconds
+  });
+  virtualTop = top;
+  if (!scrollable) return; // nothing to scroll yet
   scroller.scrollTop = virtualTop;
 
-  if (virtualTop >= maxScroll - 0.5) {
+  if (atEnd) {
     if (restartAtEnd) {
       if (shuffleOnRestart) shuffle();
       virtualTop = 0;
