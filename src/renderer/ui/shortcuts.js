@@ -60,7 +60,7 @@ export function closeOverlays() {
 
 /* about: filled from package.json metadata (via the main process) once */
 let aboutLoaded = false;
-export async function openAbout() {
+async function openAbout() {
   closeOverlays();
   if (!aboutLoaded) {
     const info = await window.api.getAppInfo();

@@ -1,6 +1,6 @@
 /* Pure placement for a fixed-position popup such as the context menu. */
 
-export const MENU_VIEWPORT_MARGIN = 8; // px kept between the menu and the viewport edge
+const MENU_VIEWPORT_MARGIN = 8; // px kept between the menu and the viewport edge
 
 /**
  * Where to put a menu opened at a pointer position so it stays fully inside

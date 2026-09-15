@@ -25,7 +25,7 @@ import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
 import { anyOverlayOpen } from './shortcuts.js';
 
-export const panel = document.getElementById('panel');
+const panel = document.getElementById('panel');
 export const fileList = document.getElementById('file-list');
 export const sortSelect = document.getElementById('sort-select');
 export const removeSelectedBtn = document.getElementById('btn-remove-selected');
@@ -107,12 +107,12 @@ export function applySelection() {
   updateRemoveSelectedBtn();
 }
 
-export function updateRemoveSelectedBtn() {
+function updateRemoveSelectedBtn() {
   removeSelectedBtn.textContent = `Remove (${selected.size})`;
   removeSelectedBtn.disabled = selected.size === 0;
 }
 
-export function scrollCollageTo(hash) {
+function scrollCollageTo(hash) {
   const pos = lastPositions.get(hash);
   if (!pos) return;
   const top = Math.max(0, pos.y - 40);
@@ -123,7 +123,7 @@ export function scrollCollageTo(hash) {
   scroller.scrollTo({ top, behavior: autoScroll ? 'auto' : 'smooth' });
 }
 
-export function removeSelected() {
+function removeSelected() {
   if (!selected.size) return;
   const n = selected.size;
   if (!confirm(`Remove ${formatCount(n, 'selected item')} from the collage?`)) return;
@@ -162,7 +162,7 @@ window.addEventListener('keydown', (e) => {
 /* ---------------- context menu (right-click on a panel entry) ---------------- */
 
 export const ctxMenu = document.getElementById('ctx-menu');
-export const ctxPath = document.getElementById('ctx-path');
+const ctxPath = document.getElementById('ctx-path');
 let ctxItem = null;
 
 export function openCtxMenu(item, x, y) {

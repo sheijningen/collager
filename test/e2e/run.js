@@ -106,7 +106,6 @@ async function run() {
   const ctx = {
     js,
     check,
-    sleep,
     waitFor,
     readLibraryWhen,
     workDir,

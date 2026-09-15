@@ -245,7 +245,6 @@ module.exports = {
   readExactly,
   hashFile,
   hashFileSampled,
-  hashMedia,
   isSampledHash,
   runWithConcurrency,
   collectMediaPaths,

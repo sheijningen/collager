@@ -76,7 +76,7 @@ export const observer = new IntersectionObserver(
   { root: scroller, rootMargin: `${HYDRATE_MARGIN} 0px` }
 );
 
-export function hydrate(tile) {
+function hydrate(tile) {
   if (tile.dataset.hydrated === '1') return;
   const item = itemsByHash.get(tile.dataset.hash);
   if (!item || item.missing) return;
@@ -175,7 +175,7 @@ export function render() {
 /* only visible while something is actually missing */
 const clearMissingBtn = document.getElementById('btn-clear-missing');
 
-export function updateClearMissingBtn() {
+function updateClearMissingBtn() {
   const n = state.items.filter((i) => i.missing).length;
   clearMissingBtn.hidden = n === 0;
   clearMissingBtn.textContent = `⚠ Clear ${n} missing`;
@@ -217,7 +217,7 @@ function createTile(item) {
 
 /* ---------------- library operations ---------------- */
 
-export function removeItem(hash) {
+function removeItem(hash) {
   const idx = state.items.findIndex((i) => i.hash === hash);
   if (idx === -1) return;
   state.items.splice(idx, 1);
