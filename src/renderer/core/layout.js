@@ -8,9 +8,9 @@ export const MIN_COLUMNS = 1;
 export const MAX_COLUMNS = 8;
 export const DEFAULT_COLUMNS = 3;
 
-export function clampColumns(n) {
-  if (!Number.isFinite(n)) return DEFAULT_COLUMNS;
-  return Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, Math.trunc(n)));
+export function clampColumns(count) {
+  if (!Number.isFinite(count)) return DEFAULT_COLUMNS;
+  return Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, Math.trunc(count)));
 }
 
 /* Masonry: a fixed number of equal-width columns. Every item is scaled to
@@ -24,26 +24,26 @@ export function packItems(list, containerWidth, columns) {
   for (const item of list) {
     const nativeW = item.missing ? MISSING_W : item.w || MISSING_W;
     const nativeH = item.missing ? MISSING_H : item.h || MISSING_H;
-    const h = Math.max(1, Math.round(nativeH * (colWidth / nativeW)));
+    const tileHeight = Math.max(1, Math.round(nativeH * (colWidth / nativeW)));
 
     let col = 0;
-    for (let i = 1; i < columns; i++) {
-      if (colHeights[i] < colHeights[col]) col = i;
+    for (let candidate = 1; candidate < columns; candidate++) {
+      if (colHeights[candidate] < colHeights[col]) col = candidate;
     }
     positions.push({
       item,
       x: col * (colWidth + GAP),
       y: colHeights[col],
       w: colWidth,
-      h
+      h: tileHeight
     });
-    colHeights[col] += h + GAP;
+    colHeights[col] += tileHeight + GAP;
   }
   return { positions, height: Math.max(0, Math.max(0, ...colHeights) - GAP) };
 }
 
-export function basename(p) {
-  return p.split(/[\\/]/).pop();
+export function basename(filePath) {
+  return filePath.split(/[\\/]/).pop();
 }
 
 /* Reorder for drag & drop: the moved item takes the target's place —
@@ -51,8 +51,8 @@ export function basename(p) {
  * (the usual list-reorder feel). Returns a new array. */
 export function reorderByHash(list, fromHash, toHash) {
   const arr = list.slice();
-  const from = arr.findIndex((i) => i.hash === fromHash);
-  const to = arr.findIndex((i) => i.hash === toHash);
+  const from = arr.findIndex((item) => item.hash === fromHash);
+  const to = arr.findIndex((item) => item.hash === toHash);
   if (from === -1 || to === -1 || from === to) return arr;
   const [moved] = arr.splice(from, 1);
   arr.splice(to, 0, moved);
@@ -63,11 +63,14 @@ export function reorderByHash(list, fromHash, toHash) {
  * order, which is the collage order. */
 export function sortItems(items, mode) {
   const arr = items.slice();
-  const byName = (a, b) =>
-    basename(a.path).localeCompare(basename(b.path), undefined, { sensitivity: 'base' });
+  const byName = (first, second) =>
+    basename(first.path).localeCompare(basename(second.path), undefined, { sensitivity: 'base' });
   if (mode === 'name') arr.sort(byName);
   else if (mode === 'path')
-    arr.sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base' }));
-  else if (mode === 'type') arr.sort((a, b) => a.type.localeCompare(b.type) || byName(a, b));
+    arr.sort((first, second) =>
+      first.path.localeCompare(second.path, undefined, { sensitivity: 'base' })
+    );
+  else if (mode === 'type')
+    arr.sort((first, second) => first.type.localeCompare(second.type) || byName(first, second));
   return arr;
 }

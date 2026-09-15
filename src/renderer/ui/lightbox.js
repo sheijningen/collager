@@ -36,6 +36,6 @@ export function closeLightbox() {
   lightbox.hidden = true;
 }
 
-lightbox.addEventListener('click', (e) => {
-  if (e.target === lightbox || e.target === lightboxContent) closeLightbox();
+lightbox.addEventListener('click', (event) => {
+  if (event.target === lightbox || event.target === lightboxContent) closeLightbox();
 });

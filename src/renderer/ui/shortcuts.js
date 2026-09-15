@@ -90,8 +90,8 @@ async function openAbout() {
 }
 
 for (const overlay of [helpOverlay, aboutOverlay]) {
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.hidden = true;
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) overlay.hidden = true;
   });
 }
 
@@ -127,35 +127,35 @@ function handleEscape() {
   if (isFullscreen) window.api.toggleFullscreen();
 }
 
-window.addEventListener('keydown', (e) => {
-  if (e.ctrlKey || e.altKey || e.metaKey) return;
-  if (e.key === 'Escape') {
+window.addEventListener('keydown', (event) => {
+  if (event.ctrlKey || event.altKey || event.metaKey) return;
+  if (event.key === 'Escape') {
     handleEscape();
     return;
   }
-  if (targetConsumesKey(e.target, e.key)) return;
+  if (targetConsumesKey(event.target, event.key)) return;
 
   // overlays are modal: their toggles close them, all else is inert
   if (anyOverlayOpen()) {
-    if (['?', 'F1', 'i'].includes(e.key)) closeOverlays();
+    if (['?', 'F1', 'i'].includes(event.key)) closeOverlays();
     return;
   }
   // the lightbox and the context menu are modal too; Escape left above, so
   // every remaining key is inert while either is open
   if (!lightbox.hidden || !ctxMenu.hidden) return;
 
-  switch (e.key) {
+  switch (event.key) {
     case '?':
     case 'F1':
-      e.preventDefault();
+      event.preventDefault();
       helpOverlay.hidden = false;
       break;
     case 'i':
-      if (!e.repeat) openAbout();
+      if (!event.repeat) openAbout();
       break;
     case ' ':
-      e.preventDefault(); // Space must not also page-scroll the collage
-      if (!e.repeat) setAutoScroll(!autoScroll);
+      event.preventDefault(); // Space must not also page-scroll the collage
+      if (!event.repeat) setAutoScroll(!autoScroll);
       break;
     case ',':
       setScrollSpeed(scrollSpeed - SPEED_KEY_STEP);
@@ -166,16 +166,16 @@ window.addEventListener('keydown', (e) => {
       showToast(`Auto-scroll speed: ${scrollSpeed} px/s`);
       break;
     case 's':
-      if (!e.repeat && state.items.length) shuffle();
+      if (!event.repeat && state.items.length) shuffle();
       break;
     case 'a':
-      if (!e.repeat) document.getElementById('btn-add').click();
+      if (!event.repeat) document.getElementById('btn-add').click();
       break;
     case 'p':
-      if (!e.repeat) setPanelOpen(!panelOpen);
+      if (!event.repeat) setPanelOpen(!panelOpen);
       break;
     case 't':
-      if (!e.repeat) setToolbarOpen(!toolbarOpen);
+      if (!event.repeat) setToolbarOpen(!toolbarOpen);
       break;
     case '-':
       setColumns(columns - 1);
@@ -187,7 +187,7 @@ window.addEventListener('keydown', (e) => {
     case 'f':
       // plain toggle is safe here: element-fullscreen (the F11 edge case in
       // fullscreen.js) can only originate from the lightbox, which blocks shortcuts
-      if (!e.repeat) window.api.toggleFullscreen();
+      if (!event.repeat) window.api.toggleFullscreen();
       break;
   }
 });

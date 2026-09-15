@@ -7,17 +7,17 @@ const PREFIX = 'collager.';
 export function createPrefs(storage) {
   return {
     bool(key, def) {
-      const v = storage.getItem(PREFIX + key);
-      return v === null ? def : v === '1';
+      const raw = storage.getItem(PREFIX + key);
+      return raw === null ? def : raw === '1';
     },
     int(key, def, min, max) {
-      const v = parseInt(storage.getItem(PREFIX + key), 10);
-      if (!Number.isFinite(v)) return def;
-      return Math.min(max, Math.max(min, v));
+      const parsed = parseInt(storage.getItem(PREFIX + key), 10);
+      if (!Number.isFinite(parsed)) return def;
+      return Math.min(max, Math.max(min, parsed));
     },
     string(key, def) {
-      const v = storage.getItem(PREFIX + key);
-      return v === null ? def : v;
+      const raw = storage.getItem(PREFIX + key);
+      return raw === null ? def : raw;
     },
     set(key, value) {
       const encoded = typeof value === 'boolean' ? (value ? '1' : '0') : String(value);

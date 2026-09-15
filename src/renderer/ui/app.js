@@ -31,8 +31,8 @@ import * as fullscreenModule from './fullscreen.js';
 const dropOverlay = document.getElementById('drop-overlay');
 
 let dragDepth = 0;
-window.addEventListener('dragenter', (e) => {
-  if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+window.addEventListener('dragenter', (event) => {
+  if (event.dataTransfer && [...event.dataTransfer.types].includes('Files')) {
     dragDepth++;
     dropOverlay.hidden = false;
   }
@@ -41,12 +41,13 @@ window.addEventListener('dragleave', () => {
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) dropOverlay.hidden = true;
 });
-window.addEventListener('dragover', (e) => e.preventDefault());
-window.addEventListener('drop', (e) => {
-  e.preventDefault();
+window.addEventListener('dragover', (event) => event.preventDefault());
+window.addEventListener('drop', (event) => {
+  event.preventDefault();
   dragDepth = 0;
   dropOverlay.hidden = true;
-  const paths = [...e.dataTransfer.files].map((f) => window.api.pathForFile(f)).filter(Boolean);
+  const files = [...event.dataTransfer.files];
+  const paths = files.map((file) => window.api.pathForFile(file)).filter(Boolean);
   addPaths(paths);
 });
 
@@ -60,25 +61,25 @@ document.getElementById('btn-shuffle').addEventListener('click', shuffle);
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
 document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
 document.getElementById('btn-clear').addEventListener('click', () => {
-  const n = state.items.length;
-  if (!n) return;
-  if (!confirm(`Remove all ${formatCount(n, 'item')} from the collage?`)) return;
+  const count = state.items.length;
+  if (!count) return;
+  if (!confirm(`Remove all ${formatCount(count, 'item')} from the collage?`)) return;
   state.items = [];
   selected.clear();
   state.selectionAnchor = null;
   render();
   persist();
-  showToast(`Cleared ${formatCount(n, 'item')}`);
+  showToast(`Cleared ${formatCount(count, 'item')}`);
 });
 document.getElementById('btn-clear-missing').addEventListener('click', () => {
-  const n = state.items.filter((i) => i.missing).length;
-  if (!n) return;
-  if (!confirm(`Remove all ${formatCount(n, 'missing file')} from the collage?`)) return;
-  state.items = state.items.filter((i) => !i.missing);
+  const count = state.items.filter((item) => item.missing).length;
+  if (!count) return;
+  if (!confirm(`Remove all ${formatCount(count, 'missing file')} from the collage?`)) return;
+  state.items = state.items.filter((item) => !item.missing);
   // render() prunes the selection of anything that no longer exists
   render();
   persist();
-  showToast(`Removed ${formatCount(n, 'missing file')}`);
+  showToast(`Removed ${formatCount(count, 'missing file')}`);
 });
 
 /* ---------------- window resize ---------------- */
@@ -163,7 +164,7 @@ queueLibraryOperation(async function init() {
     render();
     if (measured) persist();
     const notes = [];
-    const missingCount = state.items.filter((i) => i.missing).length;
+    const missingCount = state.items.filter((item) => item.missing).length;
     if (missingCount) {
       notes.push(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
     }

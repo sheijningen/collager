@@ -39,8 +39,8 @@ export let columns = prefs.int('columns', DEFAULT_COLUMNS, MIN_COLUMNS, MAX_COLU
 const columnCount = document.getElementById('col-count');
 columnCount.textContent = String(columns);
 
-export function setColumns(n) {
-  const next = clampColumns(n);
+export function setColumns(count) {
+  const next = clampColumns(count);
   if (next === columns) return;
   columns = next;
   prefs.set('columns', columns);
@@ -176,9 +176,9 @@ export function render() {
 const clearMissingBtn = document.getElementById('btn-clear-missing');
 
 function updateClearMissingBtn() {
-  const n = state.items.filter((i) => i.missing).length;
-  clearMissingBtn.hidden = n === 0;
-  clearMissingBtn.textContent = `⚠ Clear ${n} missing`;
+  const count = state.items.filter((item) => item.missing).length;
+  clearMissingBtn.hidden = count === 0;
+  clearMissingBtn.textContent = `⚠ Clear ${count} missing`;
 }
 
 function createTile(item) {
@@ -199,13 +199,13 @@ function createTile(item) {
   remove.className = 'btn-remove';
   remove.title = 'Remove from collage';
   remove.textContent = '✕';
-  remove.addEventListener('click', (e) => {
-    e.stopPropagation();
+  remove.addEventListener('click', (event) => {
+    event.stopPropagation();
     removeItem(item.hash);
   });
   tile.appendChild(remove);
 
-  tile.addEventListener('click', (e) => handleSelectClick(item.hash, e, 'tile'));
+  tile.addEventListener('click', (event) => handleSelectClick(item.hash, event, 'tile'));
   tile.addEventListener('dblclick', () => {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox
@@ -218,9 +218,9 @@ function createTile(item) {
 /* ---------------- library operations ---------------- */
 
 function removeItem(hash) {
-  const idx = state.items.findIndex((i) => i.hash === hash);
-  if (idx === -1) return;
-  state.items.splice(idx, 1);
+  const index = state.items.findIndex((item) => item.hash === hash);
+  if (index === -1) return;
+  state.items.splice(index, 1);
   selected.delete(hash);
   render();
   persist();
@@ -228,9 +228,9 @@ function removeItem(hash) {
 
 export function shuffle() {
   const list = state.items;
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
+  for (let last = list.length - 1; last > 0; last--) {
+    const pick = Math.floor(Math.random() * (last + 1));
+    [list[last], list[pick]] = [list[pick], list[last]];
   }
   render();
   persist();
@@ -241,16 +241,16 @@ function measureItem(item) {
   const url = item.url;
   return new Promise((resolve) => {
     if (item.type === 'video') {
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      v.muted = true;
-      v.onloadedmetadata = () => {
-        resolve({ w: v.videoWidth || MISSING_W, h: v.videoHeight || MISSING_H });
-        v.removeAttribute('src');
-        v.load();
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.onloadedmetadata = () => {
+        resolve({ w: video.videoWidth || MISSING_W, h: video.videoHeight || MISSING_H });
+        video.removeAttribute('src');
+        video.load();
       };
-      v.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
-      v.src = url;
+      video.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
+      video.src = url;
     } else {
       const img = new Image();
       img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
@@ -263,7 +263,7 @@ function measureItem(item) {
 /* Fills in w/h for items that lack them (mutates the items). Returns whether
  * anything was measured, i.e. whether the caller should persist. */
 export async function measureMissingDimensions(list, onProgress = null) {
-  const pending = list.filter((i) => !i.missing && (!i.w || !i.h));
+  const pending = list.filter((item) => !item.missing && (!item.w || !item.h));
   const CONCURRENCY = 8;
   let cursor = 0;
   let done = 0;

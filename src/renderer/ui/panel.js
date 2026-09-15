@@ -68,10 +68,10 @@ export function renderList() {
     name.textContent = basename(item.path);
     li.appendChild(name);
 
-    li.addEventListener('click', (e) => handleSelectClick(item.hash, e, 'list'));
-    li.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      openCtxMenu(item, e.clientX, e.clientY);
+    li.addEventListener('click', (event) => handleSelectClick(item.hash, event, 'list'));
+    li.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      openCtxMenu(item, event.clientX, event.clientY);
     });
     fileList.appendChild(li);
     listEntries.set(item.hash, li);
@@ -86,10 +86,10 @@ export function handleSelectClick(hash, event, source) {
     hash,
     ctrl: event.ctrlKey || event.metaKey,
     shift: event.shiftKey,
-    order: sortedItems().map((i) => i.hash)
+    order: sortedItems().map((item) => item.hash)
   });
   selected.clear();
-  for (const h of next.selected) selected.add(h);
+  for (const selectedHash of next.selected) selected.add(selectedHash);
   state.selectionAnchor = next.anchor;
   applySelection();
 
@@ -125,14 +125,14 @@ function scrollCollageTo(hash) {
 
 function removeSelected() {
   if (!selected.size) return;
-  const n = selected.size;
-  if (!confirm(`Remove ${formatCount(n, 'selected item')} from the collage?`)) return;
-  state.items = state.items.filter((i) => !selected.has(i.hash));
+  const count = selected.size;
+  if (!confirm(`Remove ${formatCount(count, 'selected item')} from the collage?`)) return;
+  state.items = state.items.filter((item) => !selected.has(item.hash));
   selected.clear();
   state.selectionAnchor = null;
   render();
   persist();
-  showToast(`Removed ${formatCount(n, 'item')}`);
+  showToast(`Removed ${formatCount(count, 'item')}`);
 }
 
 export function setPanelOpen(open) {
@@ -153,8 +153,8 @@ sortSelect.addEventListener('change', () => {
 panel.classList.toggle('collapsed', !panelOpen);
 
 // Delete removes the selection; Escape belongs to the ladder in shortcuts.js
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Delete' || !selected.size) return;
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Delete' || !selected.size) return;
   if (!lightbox.hidden || anyOverlayOpen()) return;
   removeSelected();
 });
@@ -210,8 +210,8 @@ document.getElementById('ctx-reveal').addEventListener('click', () => {
 // dismiss on outside click, focus loss, list scroll or resize — the menu is
 // position:fixed, so anything that moves the list under it would leave it
 // annotating the wrong entry
-window.addEventListener('pointerdown', (e) => {
-  if (!ctxMenu.hidden && !ctxMenu.contains(e.target)) closeCtxMenu();
+window.addEventListener('pointerdown', (event) => {
+  if (!ctxMenu.hidden && !ctxMenu.contains(event.target)) closeCtxMenu();
 });
 window.addEventListener('blur', closeCtxMenu);
 // capture-phase because scroll doesn't bubble; scoped to the panel, since
@@ -219,8 +219,8 @@ window.addEventListener('blur', closeCtxMenu);
 // scrolling — e.g. auto-scroll — doesn't invalidate it)
 window.addEventListener(
   'scroll',
-  (e) => {
-    if (panel.contains(e.target)) closeCtxMenu();
+  (event) => {
+    if (panel.contains(event.target)) closeCtxMenu();
   },
   true
 );

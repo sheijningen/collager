@@ -13,8 +13,8 @@ const MEDIA_EXTS = {
   '.webm': 'video'
 };
 
-function typeForPath(p) {
-  return MEDIA_EXTS[path.extname(p).toLowerCase()];
+function typeForPath(filePath) {
+  return MEDIA_EXTS[path.extname(filePath).toLowerCase()];
 }
 
 /* Resolves to the SHA-256 of the whole file and the number of bytes that went
@@ -115,39 +115,39 @@ async function collectMediaPaths(inputPaths) {
   const skipped = [];
   const visitedDirs = new Set();
 
-  async function walk(p) {
+  async function walk(entryPath) {
     let stat;
     try {
-      stat = await fsp.stat(p);
+      stat = await fsp.stat(entryPath);
     } catch {
-      skipped.push(p);
+      skipped.push(entryPath);
       return;
     }
     if (stat.isDirectory()) {
       let real;
       try {
-        real = await fsp.realpath(p);
+        real = await fsp.realpath(entryPath);
       } catch {
-        skipped.push(p);
+        skipped.push(entryPath);
         return;
       }
       if (visitedDirs.has(real)) return;
       visitedDirs.add(real);
       let entries;
       try {
-        entries = await fsp.readdir(p);
+        entries = await fsp.readdir(entryPath);
       } catch {
-        skipped.push(p);
+        skipped.push(entryPath);
         return;
       }
-      for (const entry of entries) await walk(path.join(p, entry));
+      for (const entry of entries) await walk(path.join(entryPath, entry));
     } else {
-      if (typeForPath(p)) found.push(p);
-      else skipped.push(p);
+      if (typeForPath(entryPath)) found.push(entryPath);
+      else skipped.push(entryPath);
     }
   }
 
-  for (const p of inputPaths) await walk(p);
+  for (const inputPath of inputPaths) await walk(inputPath);
   return { found, skipped };
 }
 

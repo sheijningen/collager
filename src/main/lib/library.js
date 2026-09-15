@@ -108,8 +108,8 @@ function createLibraryStore(getDir) {
           new Error(`not saving: the library at ${saveBlockedBy} must stay as it is`)
         );
       }
-      const persisted = items.map(({ path: p, hash, type, size, w, h }) => ({
-        path: p,
+      const persisted = items.map(({ path: filePath, hash, type, size, w, h }) => ({
+        path: filePath,
         hash,
         type,
         size,
