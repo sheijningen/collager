@@ -3,6 +3,7 @@
  * here is what wires their event handlers up. */
 
 import * as layout from '../core/layout.js';
+import { basename } from '../core/layout.js';
 import { formatCount } from '../core/text.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
@@ -134,6 +135,15 @@ if (new URLSearchParams(location.search).has('e2e')) {
 
 render(); // empty state and toolbar geometry before the library arrives
 
+/* Toast for a library file that could not be loaded. It was moved aside,
+ * or, when even that failed, saving is off so it is not overwritten. */
+function describeLibraryProblem({ backup }) {
+  const where = backup
+    ? `It was kept as ${basename(backup)}.`
+    : 'It could not be moved aside, so saving is off to protect it.';
+  return `The library file was unreadable, starting empty. ${where}`;
+}
+
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
 queueLibraryOperation(async function init() {
@@ -141,8 +151,10 @@ queueLibraryOperation(async function init() {
     const loaded = await window.api.loadLibrary();
     state.items = loaded.items;
     reindexItems(); // the dimension pass below runs long before the first render
-    if (loaded.corrupted) {
-      showToast('Library file was corrupted — starting empty (backup: library.json.corrupt)');
+    if (loaded.problem) {
+      // a blocked save lasts the whole session, so that warning must not time out
+      const savingBlocked = loaded.problem.backup === null;
+      showToast(describeLibraryProblem(loaded.problem), savingBlocked);
     }
     const measured = await measureMissingDimensions(state.items, (done, total) => {
       showToast(`Preparing library — reading dimensions ${done}/${total}…`, true);
