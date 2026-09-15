@@ -2,8 +2,8 @@
  *
  * `state` holds the fields other modules reassign (the library itself, whether
  * it has loaded, and the selection anchor); everything else here is a
- * container that is mutated in place. Modules own their remaining state and export setters for what
- * others may change. */
+ * container that is mutated in place. Modules own their remaining state and
+ * export setters for what others may change. */
 
 import { createPrefs } from '../core/prefs.js';
 
@@ -43,8 +43,8 @@ export function reindexItems() {
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;
-/* sticky toasts stay up until the next showToast call replaces them —
- * used as a progress readout during long operations */
+/* A sticky toast stays up until the next showToast call replaces it, so a
+ * progress readout is never hidden by the timer. */
 export function showToast(message, sticky = false) {
   toastEl.textContent = message;
   toastEl.hidden = false;
