@@ -90,6 +90,24 @@ function hashMedia(filePath, type) {
   return type === 'video' ? hashFileSampled(filePath) : hashFile(filePath);
 }
 
+/* Runs `task(element, index)` over `list` with at most `concurrency` calls in
+ * flight, so a batch of disk reads overlaps without flooding the disk, and
+ * reports each completion as `onProgress(done, total)`. A task must handle
+ * its own failures: one that rejects fails the whole run. */
+async function runWithConcurrency(list, concurrency, task, onProgress = null) {
+  let cursor = 0;
+  let done = 0;
+  async function worker() {
+    while (cursor < list.length) {
+      const index = cursor++;
+      await task(list[index], index);
+      done++;
+      if (onProgress) onProgress(done, list.length);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, worker));
+}
+
 // Expand dropped paths: directories are walked recursively (symlink cycles
 // are guarded via realpath), files are kept if their extension is supported.
 async function collectMediaPaths(inputPaths) {
@@ -139,12 +157,10 @@ async function collectMediaPaths(inputPaths) {
 async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
   const { found, skipped } = await collectMediaPaths(inputPaths);
   const entries = new Array(found.length);
-  let cursor = 0;
-  let done = 0;
-  async function worker() {
-    while (cursor < found.length) {
-      const index = cursor++;
-      const filePath = found[index];
+  await runWithConcurrency(
+    found,
+    concurrency,
+    async (filePath, index) => {
       const type = typeForPath(filePath);
       try {
         // the size lets a later load tell that the file changed (a copy that
@@ -154,11 +170,9 @@ async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
       } catch {
         skipped.push(filePath);
       }
-      done++;
-      if (onProgress) onProgress(done, found.length);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, found.length) }, worker));
+    },
+    onProgress
+  );
   return { entries: entries.filter(Boolean), skippedCount: skipped.length };
 }
 
@@ -194,21 +208,16 @@ async function rehashStaleItems(items, sizeOnDisk, concurrency = 4) {
   if (!stale.length) return { items, rehashed: 0, collapsed: 0, changed: sized > 0 };
 
   const rehashedItems = new Set();
-  let cursor = 0;
-  async function worker() {
-    while (cursor < stale.length) {
-      const item = stale[cursor++];
-      try {
-        const { hash, size } = await hashMedia(item.path, item.type);
-        item.hash = hash;
-        item.size = size;
-        rehashedItems.add(item);
-      } catch {
-        // unreadable right now: keeps its hash and is retried on the next start
-      }
+  await runWithConcurrency(stale, concurrency, async (item) => {
+    try {
+      const { hash, size } = await hashMedia(item.path, item.type);
+      item.hash = hash;
+      item.size = size;
+      rehashedItems.add(item);
+    } catch {
+      // unreadable right now: keeps its hash and is retried on the next start
     }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, stale.length) }, worker));
+  });
   const rehashedHashes = new Set([...rehashedItems].map((item) => item.hash));
   // a missing entry must not outlive a present one on the same hash, or the
   // library would show a missing tile for a file that is on disk
@@ -238,6 +247,7 @@ module.exports = {
   hashFileSampled,
   hashMedia,
   isSampledHash,
+  runWithConcurrency,
   collectMediaPaths,
   probeFiles,
   rehashStaleItems
