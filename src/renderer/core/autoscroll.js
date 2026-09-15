@@ -1,9 +1,9 @@
 /* Pure auto-scroll stepping. The ui module owns the animation frame loop and
  * the DOM; this decides where one tick lands. */
 
-export const MAX_TICK_SECONDS = 0.1; // an unbounded delta after a hidden window would leap to the end
-export const MANUAL_SCROLL_TOLERANCE = 2; // px; scrollTop rounds, virtualTop does not
-export const END_TOLERANCE = 0.5; // px short of maxScroll that still counts as the end
+const MAX_TICK_SECONDS = 0.1; // an unbounded delta after a hidden window would leap to the end
+const MANUAL_SCROLL_TOLERANCE = 2; // px; scrollTop rounds, virtualTop does not
+const END_TOLERANCE = 0.5; // px short of maxScroll that still counts as the end
 
 /**
  * One auto-scroll step.

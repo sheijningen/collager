@@ -15,9 +15,10 @@ window.api.onFullscreenChanged(applyFullscreenState);
 // would otherwise leave the state stale and disarm the Escape fallback
 window.api.isFullscreen().then(applyFullscreenState);
 
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'F11' || e.repeat || e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return;
-  e.preventDefault();
+window.addEventListener('keydown', (event) => {
+  const modified = event.ctrlKey || event.altKey || event.shiftKey || event.metaKey;
+  if (event.key !== 'F11' || event.repeat || modified) return;
+  event.preventDefault();
   // a lightbox video's native controls can enter HTML element-fullscreen,
   // which Electron promotes to window fullscreen; unwind that first or the
   // page would be stuck in element-fullscreen layout inside a normal window

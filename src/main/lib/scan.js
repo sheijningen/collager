@@ -13,8 +13,8 @@ const MEDIA_EXTS = {
   '.webm': 'video'
 };
 
-function typeForPath(p) {
-  return MEDIA_EXTS[path.extname(p).toLowerCase()];
+function typeForPath(filePath) {
+  return MEDIA_EXTS[path.extname(filePath).toLowerCase()];
 }
 
 /* Resolves to the SHA-256 of the whole file and the number of bytes that went
@@ -115,39 +115,39 @@ async function collectMediaPaths(inputPaths) {
   const skipped = [];
   const visitedDirs = new Set();
 
-  async function walk(p) {
+  async function walk(entryPath) {
     let stat;
     try {
-      stat = await fsp.stat(p);
+      stat = await fsp.stat(entryPath);
     } catch {
-      skipped.push(p);
+      skipped.push(entryPath);
       return;
     }
     if (stat.isDirectory()) {
       let real;
       try {
-        real = await fsp.realpath(p);
+        real = await fsp.realpath(entryPath);
       } catch {
-        skipped.push(p);
+        skipped.push(entryPath);
         return;
       }
       if (visitedDirs.has(real)) return;
       visitedDirs.add(real);
       let entries;
       try {
-        entries = await fsp.readdir(p);
+        entries = await fsp.readdir(entryPath);
       } catch {
-        skipped.push(p);
+        skipped.push(entryPath);
         return;
       }
-      for (const entry of entries) await walk(path.join(p, entry));
+      for (const entry of entries) await walk(path.join(entryPath, entry));
     } else {
-      if (typeForPath(p)) found.push(p);
-      else skipped.push(p);
+      if (typeForPath(entryPath)) found.push(entryPath);
+      else skipped.push(entryPath);
     }
   }
 
-  for (const p of inputPaths) await walk(p);
+  for (const inputPath of inputPaths) await walk(inputPath);
   return { found, skipped };
 }
 
@@ -176,19 +176,15 @@ async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
   return { entries: entries.filter(Boolean), skippedCount: skipped.length };
 }
 
-/* A stored hash describes the file as it was when it was read. A file can
- * change under the library (a copy that was still running when its folder was
- * dropped is the usual way), and a video entry can predate sampled hashing.
- * Both leave the hash describing something the file no longer is, so an item
- * is rehashed when its size on disk moved away from the stored one or its
- * scheme is out of date. `sizeOnDisk` holds the current size of every present
- * item, as measured by the load; an item without one is missing and left
- * alone. Entries saved before sizes were recorded get theirs filled in, which
- * is what later loads compare against. When a rehash lands on another entry's
- * hash the two hold the same media under two names: a present entry survives
- * over a missing one, otherwise the earlier entry does. Resolves to the items
- * to keep, how many were rehashed, how many collapsed, and whether anything
- * changed and is worth saving. The item objects are updated in place. */
+/* Rehashes items whose stored hash no longer describes the file: the size on
+ * disk moved away from the stored one (a copy that was still running when it
+ * was added), or a video hash predates the sampled scheme. `sizeOnDisk` holds
+ * the current size of every present item; an item without one is missing and
+ * left alone. Items without a stored size get theirs filled in. When a rehash
+ * lands on another entry's hash the two hold the same media under two names:
+ * a present entry survives over a missing one, otherwise the earlier one does.
+ * Resolves to the items to keep, the rehashed and collapsed counts, and
+ * whether anything changed and is worth saving. Items are updated in place. */
 async function rehashStaleItems(items, sizeOnDisk, concurrency = 4) {
   const stale = [];
   let sized = 0;
@@ -245,7 +241,6 @@ module.exports = {
   readExactly,
   hashFile,
   hashFileSampled,
-  hashMedia,
   isSampledHash,
   runWithConcurrency,
   collectMediaPaths,

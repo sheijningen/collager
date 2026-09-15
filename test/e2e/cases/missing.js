@@ -10,15 +10,14 @@ module.exports = {
     const missingTip = await js(`(() => {
       const item = T.state.items[0];
       item.missing = true;
-      const old = T.tiles.get(item.hash);
-      T.observer.unobserve(old); T.dehydrate(old); old.remove(); T.tiles.delete(item.hash);
+      T.discardTile(item.hash);
       T.render();
       const tile = T.tiles.get(item.hash);
       const tileHint = tile.classList.contains('missing') && tile.title.includes('external drive');
       const li = T.listEntries.get(item.hash);
       const listHint = li.title.includes(item.path) && li.title.includes('moved or renamed');
       item.missing = false;
-      T.observer.unobserve(tile); tile.remove(); T.tiles.delete(item.hash);
+      T.discardTile(item.hash);
       T.render();
       return tileHint && listHint;
     })()`);

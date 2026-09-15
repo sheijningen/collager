@@ -18,10 +18,12 @@
 export function clickSelection({ selected, anchor, hash, ctrl, shift, order }) {
   const next = new Set(selected);
   if (shift && anchor !== null && order.includes(anchor)) {
-    const a = order.indexOf(anchor);
-    const b = order.indexOf(hash);
+    const anchorIndex = order.indexOf(anchor);
+    const clickedIndex = order.indexOf(hash);
     if (!ctrl) next.clear();
-    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) next.add(order[i]);
+    const first = Math.min(anchorIndex, clickedIndex);
+    const last = Math.max(anchorIndex, clickedIndex);
+    for (let index = first; index <= last; index++) next.add(order[index]);
     return { selected: next, anchor };
   }
   if (ctrl) {

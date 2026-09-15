@@ -3,11 +3,10 @@ module.exports = {
   name: 'shortcuts',
   async run({ js, check }) {
     const speed = await js(`(() => {
-      const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
       T.setScrollSpeed(80);
-      key('.');
+      press('.');
       const faster = T.scrollSpeed === 90;
-      key(','); key(',');
+      press(','); press(',');
       const slower = T.scrollSpeed === 70;
       const sliderSynced = parseInt(T.speedSlider.value, 10) === 70;
       T.setScrollSpeed(80);
@@ -19,10 +18,9 @@ module.exports = {
     check(
       'Space toggles auto-scroll',
       await js(`(() => {
-      const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
-      key(' ');
+      press(' ');
       const on = T.autoScroll;
-      key(' ');
+      press(' ');
       return on && !T.autoScroll;
     })()`)
     );
@@ -30,11 +28,10 @@ module.exports = {
     check(
       '-/+ change the column count',
       await js(`(() => {
-      const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
       const before = T.columns;
-      key('-');
+      press('-');
       const minus = T.columns === Math.max(T.MIN_COLUMNS, before - 1);
-      key('+');
+      press('+');
       return minus && T.columns === before;
     })()`)
     );

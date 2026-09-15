@@ -55,8 +55,6 @@ app.on('child-process-gone', (_event, details) => {
   }
 });
 
-/* Every channel the preload script exposes is registered here; the handlers
- * live in src/main/ipc, grouped by what they touch. */
 registerLibraryIpc(library);
 registerFilesIpc();
 registerWindowIpc();

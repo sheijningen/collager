@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
-  // Dropped File objects no longer expose .path directly; webUtils bridges that.
+  // a dropped File carries no path in the isolated renderer; webUtils resolves it
   pathForFile: (file) => webUtils.getPathForFile(file),
   probeFiles: (paths) => ipcRenderer.invoke('probe-files', paths),
   loadLibrary: () => ipcRenderer.invoke('load-library'),

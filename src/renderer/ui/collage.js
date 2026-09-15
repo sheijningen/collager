@@ -27,8 +27,10 @@ import {
   itemCount,
   prefs,
   showToast,
-  persist
+  persist,
+  countMissing
 } from './state.js';
+import { createMediaElement, releaseMedia } from './media.js';
 import { handleSelectClick, renderList } from './panel.js';
 import { openLightbox } from './lightbox.js';
 import { lastDragEndAt } from './tiledrag.js';
@@ -39,8 +41,8 @@ export let columns = prefs.int('columns', DEFAULT_COLUMNS, MIN_COLUMNS, MAX_COLU
 const columnCount = document.getElementById('col-count');
 columnCount.textContent = String(columns);
 
-export function setColumns(n) {
-  const next = clampColumns(n);
+export function setColumns(count) {
+  const next = clampColumns(count);
   if (next === columns) return;
   columns = next;
   prefs.set('columns', columns);
@@ -66,7 +68,7 @@ export const MISSING_FILE_HINT = [
   'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
 ].join('\n');
 
-export const observer = new IntersectionObserver(
+const observer = new IntersectionObserver(
   (entries) => {
     for (const entry of entries) {
       if (entry.isIntersecting) hydrate(entry.target);
@@ -76,23 +78,12 @@ export const observer = new IntersectionObserver(
   { root: scroller, rootMargin: `${HYDRATE_MARGIN} 0px` }
 );
 
-export function hydrate(tile) {
+function hydrate(tile) {
   if (tile.dataset.hydrated === '1') return;
   const item = itemsByHash.get(tile.dataset.hash);
   if (!item || item.missing) return;
-  const url = item.url;
-  let media;
-  if (item.type === 'video') {
-    media = document.createElement('video');
-    media.muted = true;
-    media.loop = true;
-    media.autoplay = true;
-    media.playsInline = true;
-    media.src = url;
-  } else {
-    media = document.createElement('img');
-    media.src = url; // gifs loop natively
-  }
+  const media = createMediaElement(item);
+  if (item.type === 'video') media.playsInline = true;
   media.draggable = false;
   // the file can vanish between the startup existence check and hydration
   // (deleted, drive unplugged): mark the item missing so the tile, the file
@@ -110,20 +101,21 @@ export function hydrate(tile) {
   tile.dataset.hydrated = '1';
 }
 
-export function dehydrate(tile) {
+function dehydrate(tile) {
   if (tile.dataset.hydrated !== '1') return;
   const media = tile.querySelector('img, video');
-  if (media) {
-    if (media.tagName === 'VIDEO') {
-      media.pause();
-      media.removeAttribute('src');
-      media.load();
-    } else {
-      media.removeAttribute('src');
-    }
-    media.remove();
-  }
+  if (media) releaseMedia(media);
   tile.dataset.hydrated = '0';
+}
+
+/* Takes a tile out of the collage and the index, releasing its media first. */
+export function discardTile(hash) {
+  const tile = tiles.get(hash);
+  if (!tile) return;
+  observer.unobserve(tile);
+  dehydrate(tile);
+  tile.remove();
+  tiles.delete(hash);
 }
 
 /* ---------------- rendering ---------------- */
@@ -150,13 +142,8 @@ export function render() {
     tile.style.width = `${pos.w}px`;
     tile.style.height = `${pos.h}px`;
   }
-  for (const [hash, tile] of tiles) {
-    if (!seen.has(hash)) {
-      observer.unobserve(tile);
-      dehydrate(tile);
-      tile.remove();
-      tiles.delete(hash);
-    }
+  for (const hash of [...tiles.keys()]) {
+    if (!seen.has(hash)) discardTile(hash);
   }
   // the selection must never reference items that are gone
   for (const hash of selected) {
@@ -175,10 +162,10 @@ export function render() {
 /* only visible while something is actually missing */
 const clearMissingBtn = document.getElementById('btn-clear-missing');
 
-export function updateClearMissingBtn() {
-  const n = state.items.filter((i) => i.missing).length;
-  clearMissingBtn.hidden = n === 0;
-  clearMissingBtn.textContent = `⚠ Clear ${n} missing`;
+function updateClearMissingBtn() {
+  const count = countMissing();
+  clearMissingBtn.hidden = count === 0;
+  clearMissingBtn.textContent = `⚠ Clear ${count} missing`;
 }
 
 function createTile(item) {
@@ -199,13 +186,13 @@ function createTile(item) {
   remove.className = 'btn-remove';
   remove.title = 'Remove from collage';
   remove.textContent = '✕';
-  remove.addEventListener('click', (e) => {
-    e.stopPropagation();
-    removeItem(item.hash);
+  remove.addEventListener('click', (event) => {
+    event.stopPropagation();
+    removeItems((candidate) => candidate.hash !== item.hash);
   });
   tile.appendChild(remove);
 
-  tile.addEventListener('click', (e) => handleSelectClick(item.hash, e, 'tile'));
+  tile.addEventListener('click', (event) => handleSelectClick(item.hash, event, 'tile'));
   tile.addEventListener('dblclick', () => {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox
@@ -217,20 +204,19 @@ function createTile(item) {
 
 /* ---------------- library operations ---------------- */
 
-export function removeItem(hash) {
-  const idx = state.items.findIndex((i) => i.hash === hash);
-  if (idx === -1) return;
-  state.items.splice(idx, 1);
-  selected.delete(hash);
+/* Drops every item `keep` rejects, then renders and saves. The render prunes
+ * the selection of whatever went. */
+export function removeItems(keep) {
+  state.items = state.items.filter(keep);
   render();
   persist();
 }
 
 export function shuffle() {
   const list = state.items;
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
+  for (let last = list.length - 1; last > 0; last--) {
+    const pick = Math.floor(Math.random() * (last + 1));
+    [list[last], list[pick]] = [list[pick], list[last]];
   }
   render();
   persist();
@@ -241,16 +227,15 @@ function measureItem(item) {
   const url = item.url;
   return new Promise((resolve) => {
     if (item.type === 'video') {
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      v.muted = true;
-      v.onloadedmetadata = () => {
-        resolve({ w: v.videoWidth || MISSING_W, h: v.videoHeight || MISSING_H });
-        v.removeAttribute('src');
-        v.load();
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.onloadedmetadata = () => {
+        resolve({ w: video.videoWidth || MISSING_W, h: video.videoHeight || MISSING_H });
+        releaseMedia(video);
       };
-      v.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
-      v.src = url;
+      video.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
+      video.src = url;
     } else {
       const img = new Image();
       img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
@@ -263,7 +248,7 @@ function measureItem(item) {
 /* Fills in w/h for items that lack them (mutates the items). Returns whether
  * anything was measured, i.e. whether the caller should persist. */
 export async function measureMissingDimensions(list, onProgress = null) {
-  const pending = list.filter((i) => !i.missing && (!i.w || !i.h));
+  const pending = list.filter((item) => !item.missing && (!item.w || !item.h));
   const CONCURRENCY = 8;
   let cursor = 0;
   let done = 0;
@@ -323,12 +308,7 @@ async function doAddPaths(paths) {
         existing.url = entry.url;
         existing.size = entry.size;
         existing.missing = false;
-        const tile = tiles.get(existing.hash);
-        if (tile) {
-          observer.unobserve(tile);
-          tile.remove();
-          tiles.delete(existing.hash);
-        }
+        discardTile(existing.hash); // the next render builds a tile that loads the file
       } else {
         duplicates++;
       }

@@ -22,6 +22,9 @@ pnpm start
 Electron downloads its binary on first run, so the first `pnpm start` takes a
 while.
 
+After three graphics-process crashes the app restarts with hardware acceleration off and
+stays that way. `collager --gpu` turns it back on; `--no-gpu` turns it off for one run.
+
 Installers:
 
 ```bash

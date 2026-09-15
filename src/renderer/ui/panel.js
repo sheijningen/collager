@@ -10,22 +10,13 @@ import { clickSelection } from '../core/selection.js';
 import { clampMenuPosition } from '../core/menuposition.js';
 import { buildListKey } from '../core/listkey.js';
 import { formatCount } from '../core/text.js';
-import {
-  state,
-  selected,
-  tiles,
-  lastPositions,
-  scroller,
-  prefs,
-  showToast,
-  persist
-} from './state.js';
-import { render, MISSING_FILE_HINT } from './collage.js';
+import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
+import { render, removeItems, MISSING_FILE_HINT } from './collage.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
 import { anyOverlayOpen } from './shortcuts.js';
 
-export const panel = document.getElementById('panel');
+const panel = document.getElementById('panel');
 export const fileList = document.getElementById('file-list');
 export const sortSelect = document.getElementById('sort-select');
 export const removeSelectedBtn = document.getElementById('btn-remove-selected');
@@ -68,10 +59,10 @@ export function renderList() {
     name.textContent = basename(item.path);
     li.appendChild(name);
 
-    li.addEventListener('click', (e) => handleSelectClick(item.hash, e, 'list'));
-    li.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      openCtxMenu(item, e.clientX, e.clientY);
+    li.addEventListener('click', (event) => handleSelectClick(item.hash, event, 'list'));
+    li.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      openCtxMenu(item, event.clientX, event.clientY);
     });
     fileList.appendChild(li);
     listEntries.set(item.hash, li);
@@ -86,10 +77,10 @@ export function handleSelectClick(hash, event, source) {
     hash,
     ctrl: event.ctrlKey || event.metaKey,
     shift: event.shiftKey,
-    order: sortedItems().map((i) => i.hash)
+    order: sortedItems().map((item) => item.hash)
   });
   selected.clear();
-  for (const h of next.selected) selected.add(h);
+  for (const selectedHash of next.selected) selected.add(selectedHash);
   state.selectionAnchor = next.anchor;
   applySelection();
 
@@ -107,12 +98,12 @@ export function applySelection() {
   updateRemoveSelectedBtn();
 }
 
-export function updateRemoveSelectedBtn() {
+function updateRemoveSelectedBtn() {
   removeSelectedBtn.textContent = `Remove (${selected.size})`;
   removeSelectedBtn.disabled = selected.size === 0;
 }
 
-export function scrollCollageTo(hash) {
+function scrollCollageTo(hash) {
   const pos = lastPositions.get(hash);
   if (!pos) return;
   const top = Math.max(0, pos.y - 40);
@@ -123,16 +114,12 @@ export function scrollCollageTo(hash) {
   scroller.scrollTo({ top, behavior: autoScroll ? 'auto' : 'smooth' });
 }
 
-export function removeSelected() {
+function removeSelected() {
   if (!selected.size) return;
-  const n = selected.size;
-  if (!confirm(`Remove ${formatCount(n, 'selected item')} from the collage?`)) return;
-  state.items = state.items.filter((i) => !selected.has(i.hash));
-  selected.clear();
-  state.selectionAnchor = null;
-  render();
-  persist();
-  showToast(`Removed ${formatCount(n, 'item')}`);
+  const count = selected.size;
+  if (!confirm(`Remove ${formatCount(count, 'selected item')} from the collage?`)) return;
+  removeItems((item) => !selected.has(item.hash));
+  showToast(`Removed ${formatCount(count, 'item')}`);
 }
 
 export function setPanelOpen(open) {
@@ -153,8 +140,8 @@ sortSelect.addEventListener('change', () => {
 panel.classList.toggle('collapsed', !panelOpen);
 
 // Delete removes the selection; Escape belongs to the ladder in shortcuts.js
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Delete' || !selected.size) return;
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Delete' || !selected.size) return;
   if (!lightbox.hidden || anyOverlayOpen()) return;
   removeSelected();
 });
@@ -162,7 +149,7 @@ window.addEventListener('keydown', (e) => {
 /* ---------------- context menu (right-click on a panel entry) ---------------- */
 
 export const ctxMenu = document.getElementById('ctx-menu');
-export const ctxPath = document.getElementById('ctx-path');
+const ctxPath = document.getElementById('ctx-path');
 let ctxItem = null;
 
 export function openCtxMenu(item, x, y) {
@@ -210,8 +197,8 @@ document.getElementById('ctx-reveal').addEventListener('click', () => {
 // dismiss on outside click, focus loss, list scroll or resize — the menu is
 // position:fixed, so anything that moves the list under it would leave it
 // annotating the wrong entry
-window.addEventListener('pointerdown', (e) => {
-  if (!ctxMenu.hidden && !ctxMenu.contains(e.target)) closeCtxMenu();
+window.addEventListener('pointerdown', (event) => {
+  if (!ctxMenu.hidden && !ctxMenu.contains(event.target)) closeCtxMenu();
 });
 window.addEventListener('blur', closeCtxMenu);
 // capture-phase because scroll doesn't bubble; scoped to the panel, since
@@ -219,8 +206,8 @@ window.addEventListener('blur', closeCtxMenu);
 // scrolling — e.g. auto-scroll — doesn't invalidate it)
 window.addEventListener(
   'scroll',
-  (e) => {
-    if (panel.contains(e.target)) closeCtxMenu();
+  (event) => {
+    if (panel.contains(event.target)) closeCtxMenu();
   },
   true
 );

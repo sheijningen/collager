@@ -19,7 +19,8 @@ src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll s
                      menu placement, count text, file list key
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
-test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core
+test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
+                     test/main/helpers.js holds what the main tests share
 test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js
 build/               icon (SVG source, PNG export for electron-builder)
 docs/                README media
@@ -105,15 +106,14 @@ docs/                README media
 - `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code
   (video only when ffmpeg is installed) and drives the renderer via `executeJavaScript`.
   Each file in `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every
-  case the harness resets the app (empty library, nothing open or selected, default columns,
+  case the harness resets the app (empty library, nothing open or selected, two columns, default
   speed, sort and panels, `confirm()` answering yes), so a case loads what it needs
   (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
   never cleans up. A case that needs the startup path seeds a saved library and restarts the
   renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named
-  cases, in file order. The
-  harness sets `COLLAGER_E2E=1`;
-  main then loads the page with `?e2e` and `app.js` exposes every module export on
-  `window.collagerTest`, which the snippets reach as `T`.
+  cases, in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e`
+  and `app.js` exposes every module export on `window.collagerTest`, which the snippets reach
+  as `T`; every snippet also gets `press(key)`, which fires a keydown on the window.
 - Run the e2e suite locally as `env -u ELECTRON_RUN_AS_NODE pnpm test:e2e`, straight on the
   desktop: the app window opens and closes on the current display during the run, which is
   fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes

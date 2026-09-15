@@ -8,6 +8,7 @@ const {
   readLibraryItems,
   loadAndRepairLibrary
 } = require('../../src/main/lib/library.js');
+const { skipWithoutPermissionBits } = require('./helpers.js');
 
 function tmpStore(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-lib-'));
@@ -99,10 +100,7 @@ test('later unreadable files never overwrite an earlier backup', async (t) => {
 });
 
 test('when the unreadable file cannot be moved, saving is refused until a clean load', async (t) => {
-  if (process.platform === 'win32' || process.getuid?.() === 0) {
-    t.skip('permission bits not enforceable here');
-    return;
-  }
+  if (skipWithoutPermissionBits(t)) return;
   const { dir, store } = tmpStore(t);
   fs.writeFileSync(path.join(dir, 'library.json'), '{not json');
   fs.chmodSync(dir, 0o555); // no new files, no unlink

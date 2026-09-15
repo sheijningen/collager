@@ -13,7 +13,7 @@ import { ctxMenu } from './panel.js';
 import { anyOverlayOpen } from './shortcuts.js';
 import { tileDrag } from './tiledrag.js';
 
-export const autoScrollBtn = document.getElementById('btn-autoscroll');
+const autoScrollBtn = document.getElementById('btn-autoscroll');
 export const speedSlider = document.getElementById('scroll-speed');
 const loopCheckbox = document.getElementById('scroll-loop');
 const shuffleCheckbox = document.getElementById('scroll-shuffle');
