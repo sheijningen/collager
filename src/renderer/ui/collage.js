@@ -17,6 +17,8 @@ import { formatCount } from '../core/text.js';
 import {
   state,
   selected,
+  itemsByHash,
+  reindexItems,
   tiles,
   lastPositions,
   scroller,
@@ -76,7 +78,7 @@ export const observer = new IntersectionObserver(
 
 export function hydrate(tile) {
   if (tile.dataset.hydrated === '1') return;
-  const item = state.items.find((i) => i.hash === tile.dataset.hash);
+  const item = itemsByHash.get(tile.dataset.hash);
   if (!item || item.missing) return;
   const url = item.url;
   let media;
@@ -127,6 +129,7 @@ export function dehydrate(tile) {
 /* ---------------- rendering ---------------- */
 
 export function render() {
+  reindexItems();
   const width = scroller.clientWidth - GAP * 2;
   const { positions, height } = packItems(state.items, Math.max(width, 100), columns);
   collage.style.height = `${height + GAP}px`;
@@ -308,7 +311,7 @@ async function doAddPaths(paths) {
   showToast('Adding — scanning…', true);
   const { entries, skippedCount } = await window.api.probeFiles(paths);
 
-  const known = new Map(state.items.map((i) => [i.hash, i]));
+  const known = new Map(itemsByHash); // a private copy: the batch dedups against itself too
   const fresh = [];
   let duplicates = 0;
   for (const entry of entries) {

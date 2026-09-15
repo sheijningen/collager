@@ -6,7 +6,7 @@
  */
 
 import { reorderByHash, basename } from '../core/layout.js';
-import { state, tiles, collage, persist } from './state.js';
+import { state, itemsByHash, tiles, collage, persist } from './state.js';
 import { render } from './collage.js';
 
 const DRAG_THRESHOLD = 8;
@@ -47,7 +47,7 @@ window.addEventListener('pointermove', (e) => {
     tiles.get(tileDrag.hash)?.classList.add('dragging');
     const ghost = document.createElement('div');
     ghost.id = 'drag-ghost';
-    const item = state.items.find((i) => i.hash === tileDrag.hash);
+    const item = itemsByHash.get(tileDrag.hash);
     ghost.textContent = item ? basename(item.path) : '';
     document.body.appendChild(ghost);
     tileDrag.ghost = ghost;

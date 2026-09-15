@@ -6,7 +6,7 @@ import * as layout from '../core/layout.js';
 import { formatCount } from '../core/text.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
-import { state, selected, showToast, persist } from './state.js';
+import { state, selected, showToast, persist, reindexItems } from './state.js';
 // named imports stay live; destructuring the namespace would freeze `columns`
 import {
   columns,
@@ -140,6 +140,7 @@ queueLibraryOperation(async function init() {
   try {
     const loaded = await window.api.loadLibrary();
     state.items = loaded.items;
+    reindexItems(); // the dimension pass below runs long before the first render
     if (loaded.corrupted) {
       showToast('Library file was corrupted — starting empty (backup: library.json.corrupt)');
     }

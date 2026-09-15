@@ -8,6 +8,7 @@
 import { sortItems, basename } from '../core/layout.js';
 import { clickSelection } from '../core/selection.js';
 import { clampMenuPosition } from '../core/menuposition.js';
+import { buildListKey } from '../core/listkey.js';
 import { formatCount } from '../core/text.js';
 import {
   state,
@@ -33,17 +34,26 @@ export const removeSelectedBtn = document.getElementById('btn-remove-selected');
 export const listEntries = new Map();
 let sortMode = prefs.string('sort', 'added');
 export let panelOpen = prefs.bool('panel', true);
+let renderedListKey = null; // what the list currently shows, or null while hidden
 
 function sortedItems() {
   return sortItems(state.items, sortMode);
 }
 
 export function renderList() {
+  if (!panelOpen) {
+    closeCtxMenu();
+    renderedListKey = null; // rebuilt on reopen (setPanelOpen → render)
+    return;
+  }
+  const items = sortedItems();
+  const key = buildListKey(items, sortMode);
+  if (key === renderedListKey) return; // selection classes are already current
+  renderedListKey = key;
   closeCtxMenu(); // list is being rebuilt under the menu
-  if (!panelOpen) return; // hidden list is rebuilt on reopen (setPanelOpen → render)
   fileList.textContent = '';
   listEntries.clear();
-  for (const item of sortedItems()) {
+  for (const item of items) {
     const li = document.createElement('li');
     li.className = (selected.has(item.hash) ? 'selected' : '') + (item.missing ? ' missing' : '');
     li.title = item.missing ? `${item.path}\n\n${MISSING_FILE_HINT}` : item.path;
