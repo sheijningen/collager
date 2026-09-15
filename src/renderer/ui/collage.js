@@ -311,7 +311,7 @@ async function doAddPaths(paths) {
   showToast('Adding — scanning…', true);
   const { entries, skippedCount } = await window.api.probeFiles(paths);
 
-  const known = new Map(state.items.map((i) => [i.hash, i]));
+  const known = new Map(itemsByHash); // a private copy: the batch dedups against itself too
   const fresh = [];
   let duplicates = 0;
   for (const entry of entries) {

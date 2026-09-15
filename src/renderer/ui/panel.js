@@ -8,6 +8,7 @@
 import { sortItems, basename } from '../core/layout.js';
 import { clickSelection } from '../core/selection.js';
 import { clampMenuPosition } from '../core/menuposition.js';
+import { buildListKey } from '../core/listkey.js';
 import { formatCount } from '../core/text.js';
 import {
   state,
@@ -39,15 +40,6 @@ function sortedItems() {
   return sortItems(state.items, sortMode);
 }
 
-/* Everything an entry shows, in display order: hash, path (name and title),
- * type (badge) and missing state. Selection is applied separately, so a
- * render that changes none of these (a resize, a column change) leaves the
- * list DOM alone. */
-function listKey(items) {
-  const entries = items.map((i) => `${i.hash}\t${i.path}\t${i.type}\t${i.missing ? '!' : ''}`);
-  return `${sortMode}\n${entries.join('\n')}`;
-}
-
 export function renderList() {
   if (!panelOpen) {
     closeCtxMenu();
@@ -55,7 +47,7 @@ export function renderList() {
     return;
   }
   const items = sortedItems();
-  const key = listKey(items);
+  const key = buildListKey(items, sortMode);
   if (key === renderedListKey) return; // selection classes are already current
   renderedListKey = key;
   closeCtxMenu(); // list is being rebuilt under the menu

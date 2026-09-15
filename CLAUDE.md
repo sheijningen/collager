@@ -16,7 +16,7 @@ src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, count text
+                     menu placement, count text, file list key
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core

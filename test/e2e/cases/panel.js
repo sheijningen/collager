@@ -5,9 +5,22 @@ module.exports = {
   async run({ js, check, readLibraryWhen, expected, loadFixtures }) {
     await loadFixtures();
     check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
-    await js(
-      `T.sortSelect.value = 'name'; T.sortSelect.dispatchEvent(new Event('change')); void 0`
+
+    // a render that changes nothing the list shows leaves its DOM alone, so an
+    // open context menu stays anchored to its entry; a rebuild closes it
+    const memo = await js(`(() => {
+      const li = T.fileList.children[0];
+      T.openCtxMenu(T.state.items[0], 10, 10);
+      T.setColumns(T.columns + 1);
+      T.render();
+      return { sameNode: T.fileList.children[0] === li, menuOpen: !T.ctxMenu.hidden };
+    })()`);
+    check('an unrelated render keeps the list DOM', memo.sameNode);
+    check('an unrelated render keeps the context menu open', memo.menuOpen);
+    const menuClosedByRebuild = await js(
+      `T.sortSelect.value = 'name'; T.sortSelect.dispatchEvent(new Event('change')); T.ctxMenu.hidden`
     );
+    check('rebuilding the list closes the context menu', menuClosedByRebuild);
     const names = await js(
       `[...T.fileList.children].map(li => li.querySelector('.fname').textContent)`
     );
