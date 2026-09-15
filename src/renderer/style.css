@@ -648,6 +648,7 @@ kbd {
   font-size: 13px;
   z-index: 200;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: none; /* a sticky toast must not block the collage under it */
 }
 
 [hidden] {

@@ -103,7 +103,7 @@ test('when the unreadable file cannot be moved, saving is refused until a clean 
 
 test('readLibraryItems rejects anything but an array of entries', () => {
   for (const bad of ['{"a":1}', '"str"', '42', 'null', '{not json']) {
-    assert.throws(() => readLibraryItems(bad), bad);
+    assert.throws(() => readLibraryItems(bad), Error, bad);
   }
   assert.deepEqual(readLibraryItems('[]'), []);
 });

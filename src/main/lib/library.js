@@ -1,5 +1,4 @@
 const fsp = require('fs').promises;
-const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -52,7 +51,7 @@ function createLibraryStore(getDir) {
     for (let attempt = 0; attempt < 10; attempt++) {
       const target = attempt === 0 ? base : `${base}.${stamp}${attempt > 1 ? `-${attempt}` : ''}`;
       try {
-        await fsp.copyFile(libraryFile(), target, fs.constants.COPYFILE_EXCL);
+        await fsp.copyFile(libraryFile(), target, fsp.constants.COPYFILE_EXCL);
       } catch (err) {
         if (err && err.code === 'EEXIST') continue;
         return null;

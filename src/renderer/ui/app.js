@@ -151,7 +151,11 @@ queueLibraryOperation(async function init() {
     const loaded = await window.api.loadLibrary();
     state.items = loaded.items;
     reindexItems(); // the dimension pass below runs long before the first render
-    if (loaded.problem) showToast(describeLibraryProblem(loaded.problem));
+    if (loaded.problem) {
+      // a blocked save lasts the whole session, so that warning must not time out
+      const savingBlocked = loaded.problem.backup === null;
+      showToast(describeLibraryProblem(loaded.problem), savingBlocked);
+    }
     const measured = await measureMissingDimensions(state.items, (done, total) => {
       showToast(`Preparing library — reading dimensions ${done}/${total}…`, true);
     });
