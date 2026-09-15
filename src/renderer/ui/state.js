@@ -40,6 +40,10 @@ export function reindexItems() {
   for (const item of state.items) itemsByHash.set(item.hash, item);
 }
 
+export function countMissing() {
+  return state.items.filter((item) => item.missing).length;
+}
+
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;

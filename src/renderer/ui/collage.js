@@ -27,8 +27,10 @@ import {
   itemCount,
   prefs,
   showToast,
-  persist
+  persist,
+  countMissing
 } from './state.js';
+import { createMediaElement, releaseMedia } from './media.js';
 import { handleSelectClick, renderList } from './panel.js';
 import { openLightbox } from './lightbox.js';
 import { lastDragEndAt } from './tiledrag.js';
@@ -66,7 +68,7 @@ export const MISSING_FILE_HINT = [
   'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
 ].join('\n');
 
-export const observer = new IntersectionObserver(
+const observer = new IntersectionObserver(
   (entries) => {
     for (const entry of entries) {
       if (entry.isIntersecting) hydrate(entry.target);
@@ -80,19 +82,8 @@ function hydrate(tile) {
   if (tile.dataset.hydrated === '1') return;
   const item = itemsByHash.get(tile.dataset.hash);
   if (!item || item.missing) return;
-  const url = item.url;
-  let media;
-  if (item.type === 'video') {
-    media = document.createElement('video');
-    media.muted = true;
-    media.loop = true;
-    media.autoplay = true;
-    media.playsInline = true;
-    media.src = url;
-  } else {
-    media = document.createElement('img');
-    media.src = url; // gifs loop natively
-  }
+  const media = createMediaElement(item);
+  if (item.type === 'video') media.playsInline = true;
   media.draggable = false;
   // the file can vanish between the startup existence check and hydration
   // (deleted, drive unplugged): mark the item missing so the tile, the file
@@ -110,20 +101,21 @@ function hydrate(tile) {
   tile.dataset.hydrated = '1';
 }
 
-export function dehydrate(tile) {
+function dehydrate(tile) {
   if (tile.dataset.hydrated !== '1') return;
   const media = tile.querySelector('img, video');
-  if (media) {
-    if (media.tagName === 'VIDEO') {
-      media.pause();
-      media.removeAttribute('src');
-      media.load();
-    } else {
-      media.removeAttribute('src');
-    }
-    media.remove();
-  }
+  if (media) releaseMedia(media);
   tile.dataset.hydrated = '0';
+}
+
+/* Takes a tile out of the collage and the index, releasing its media first. */
+export function discardTile(hash) {
+  const tile = tiles.get(hash);
+  if (!tile) return;
+  observer.unobserve(tile);
+  dehydrate(tile);
+  tile.remove();
+  tiles.delete(hash);
 }
 
 /* ---------------- rendering ---------------- */
@@ -150,13 +142,8 @@ export function render() {
     tile.style.width = `${pos.w}px`;
     tile.style.height = `${pos.h}px`;
   }
-  for (const [hash, tile] of tiles) {
-    if (!seen.has(hash)) {
-      observer.unobserve(tile);
-      dehydrate(tile);
-      tile.remove();
-      tiles.delete(hash);
-    }
+  for (const hash of [...tiles.keys()]) {
+    if (!seen.has(hash)) discardTile(hash);
   }
   // the selection must never reference items that are gone
   for (const hash of selected) {
@@ -176,7 +163,7 @@ export function render() {
 const clearMissingBtn = document.getElementById('btn-clear-missing');
 
 function updateClearMissingBtn() {
-  const count = state.items.filter((item) => item.missing).length;
+  const count = countMissing();
   clearMissingBtn.hidden = count === 0;
   clearMissingBtn.textContent = `⚠ Clear ${count} missing`;
 }
@@ -201,7 +188,7 @@ function createTile(item) {
   remove.textContent = '✕';
   remove.addEventListener('click', (event) => {
     event.stopPropagation();
-    removeItem(item.hash);
+    removeItems((candidate) => candidate.hash !== item.hash);
   });
   tile.appendChild(remove);
 
@@ -217,11 +204,10 @@ function createTile(item) {
 
 /* ---------------- library operations ---------------- */
 
-function removeItem(hash) {
-  const index = state.items.findIndex((item) => item.hash === hash);
-  if (index === -1) return;
-  state.items.splice(index, 1);
-  selected.delete(hash);
+/* Drops every item `keep` rejects, then renders and saves. The render prunes
+ * the selection of whatever went. */
+export function removeItems(keep) {
+  state.items = state.items.filter(keep);
   render();
   persist();
 }
@@ -246,8 +232,7 @@ function measureItem(item) {
       video.muted = true;
       video.onloadedmetadata = () => {
         resolve({ w: video.videoWidth || MISSING_W, h: video.videoHeight || MISSING_H });
-        video.removeAttribute('src');
-        video.load();
+        releaseMedia(video);
       };
       video.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
       video.src = url;
@@ -323,12 +308,7 @@ async function doAddPaths(paths) {
         existing.url = entry.url;
         existing.size = entry.size;
         existing.missing = false;
-        const tile = tiles.get(existing.hash);
-        if (tile) {
-          observer.unobserve(tile);
-          tile.remove();
-          tiles.delete(existing.hash);
-        }
+        discardTile(existing.hash); // the next render builds a tile that loads the file
       } else {
         duplicates++;
       }

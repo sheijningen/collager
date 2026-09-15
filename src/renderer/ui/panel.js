@@ -10,17 +10,8 @@ import { clickSelection } from '../core/selection.js';
 import { clampMenuPosition } from '../core/menuposition.js';
 import { buildListKey } from '../core/listkey.js';
 import { formatCount } from '../core/text.js';
-import {
-  state,
-  selected,
-  tiles,
-  lastPositions,
-  scroller,
-  prefs,
-  showToast,
-  persist
-} from './state.js';
-import { render, MISSING_FILE_HINT } from './collage.js';
+import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
+import { render, removeItems, MISSING_FILE_HINT } from './collage.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
 import { anyOverlayOpen } from './shortcuts.js';
@@ -127,11 +118,7 @@ function removeSelected() {
   if (!selected.size) return;
   const count = selected.size;
   if (!confirm(`Remove ${formatCount(count, 'selected item')} from the collage?`)) return;
-  state.items = state.items.filter((item) => !selected.has(item.hash));
-  selected.clear();
-  state.selectionAnchor = null;
-  render();
-  persist();
+  removeItems((item) => !selected.has(item.hash));
   showToast(`Removed ${formatCount(count, 'item')}`);
 }
 

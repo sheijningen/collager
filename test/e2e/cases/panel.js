@@ -41,14 +41,13 @@ module.exports = {
 
     // escape ladder: one layer per press
     const ladder = await js(`(async () => {
-      const escape = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       T.openLightbox(T.state.items[0]);
-      escape();
+      press('Escape');
       const lightboxOnly = T.lightbox.hidden && T.selected.size === 2;
       T.helpOverlay.hidden = false;
-      escape();
+      press('Escape');
       const overlayOnly = T.helpOverlay.hidden && T.selected.size === 2;
-      escape();
+      press('Escape');
       const selectionCleared = T.selected.size === 0;
       T.selected.add(T.state.items[0].hash); T.selected.add(T.state.items[1].hash); T.applySelection();
       return { lightboxOnly, overlayOnly, selectionCleared };

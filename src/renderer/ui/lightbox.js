@@ -3,36 +3,22 @@
  * can be unmuted there). A backdrop click closes it, as does Escape through
  * the ladder in shortcuts.js. */
 
+import { createMediaElement, releaseMedia } from './media.js';
+
 export const lightbox = document.getElementById('lightbox');
 const lightboxContent = document.getElementById('lightbox-content');
 
 export function openLightbox(item) {
   lightboxContent.textContent = '';
-  const url = item.url;
-  let media;
-  if (item.type === 'video') {
-    media = document.createElement('video');
-    media.controls = true;
-    media.loop = true;
-    media.autoplay = true;
-    media.muted = true; // stays muted by default; unmute via controls if wanted
-    media.src = url;
-  } else {
-    media = document.createElement('img');
-    media.src = url;
-  }
+  const media = createMediaElement(item);
+  if (item.type === 'video') media.controls = true;
   lightboxContent.appendChild(media);
   lightbox.hidden = false;
 }
 
 export function closeLightbox() {
-  const video = lightboxContent.querySelector('video');
-  if (video) {
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-  }
-  lightboxContent.textContent = '';
+  const media = lightboxContent.querySelector('img, video');
+  if (media) releaseMedia(media);
   lightbox.hidden = true;
 }
 

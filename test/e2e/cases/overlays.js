@@ -4,16 +4,16 @@ const pkg = require('../../../package.json');
 module.exports = {
   name: 'overlays',
   async run({ js, check, waitFor }) {
-    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }))`);
+    await js(`press('F1')`);
     check('F1 opens the shortcuts overlay', await js('!T.helpOverlay.hidden'));
     check(
       'the overlay lists every binding',
       await js(`T.shortcutList.querySelectorAll('tr').length === T.SHORTCUTS.length`)
     );
-    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await js(`press('Escape')`);
     check('Escape closes the overlay', await js('T.helpOverlay.hidden'));
 
-    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))`);
+    await js(`press('i')`);
     // the about data arrives over IPC
     await waitFor(() => js(`document.getElementById('about-version').textContent !== ''`), 5000);
     const aboutOk = await js(`(() => ({

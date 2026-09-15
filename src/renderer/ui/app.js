@@ -7,7 +7,7 @@ import { basename } from '../core/layout.js';
 import { formatCount } from '../core/text.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
-import { state, selected, showToast, persist, reindexItems } from './state.js';
+import { state, showToast, persist, reindexItems, countMissing } from './state.js';
 // named imports stay live; destructuring the namespace would freeze `columns`
 import {
   columns,
@@ -15,6 +15,7 @@ import {
   shuffle,
   render,
   addPaths,
+  removeItems,
   measureMissingDimensions,
   queueLibraryOperation
 } from './collage.js';
@@ -64,21 +65,14 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   const count = state.items.length;
   if (!count) return;
   if (!confirm(`Remove all ${formatCount(count, 'item')} from the collage?`)) return;
-  state.items = [];
-  selected.clear();
-  state.selectionAnchor = null;
-  render();
-  persist();
+  removeItems(() => false);
   showToast(`Cleared ${formatCount(count, 'item')}`);
 });
 document.getElementById('btn-clear-missing').addEventListener('click', () => {
-  const count = state.items.filter((item) => item.missing).length;
+  const count = countMissing();
   if (!count) return;
   if (!confirm(`Remove all ${formatCount(count, 'missing file')} from the collage?`)) return;
-  state.items = state.items.filter((item) => !item.missing);
-  // render() prunes the selection of anything that no longer exists
-  render();
-  persist();
+  removeItems((item) => !item.missing);
   showToast(`Removed ${formatCount(count, 'missing file')}`);
 });
 
@@ -164,7 +158,7 @@ queueLibraryOperation(async function init() {
     render();
     if (measured) persist();
     const notes = [];
-    const missingCount = state.items.filter((item) => item.missing).length;
+    const missingCount = countMissing();
     if (missingCount) {
       notes.push(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
     }

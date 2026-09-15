@@ -84,8 +84,14 @@ async function run() {
   const fixtures = fs.readdirSync(mediaDir).map((f) => path.join(mediaDir, f));
 
   const wc = BrowserWindow.getAllWindows()[0].webContents;
-  // every snippet sees the app's module exports as T (see app.js)
-  const js = (code) => wc.executeJavaScript(`{ const T = window.collagerTest; ${code} }`);
+  // every snippet sees the app's module exports as T (see app.js) and can
+  // press(key) to fire a keydown on the window
+  const js = (code) =>
+    wc.executeJavaScript(`{
+      const T = window.collagerTest;
+      const press = (key) => window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+      ${code}
+    }`);
 
   /* Reads the persisted library once it holds `count` items, or null. */
   const libraryFile = path.join(workDir, 'userdata', 'library.json');

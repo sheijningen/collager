@@ -15,6 +15,7 @@ const {
   probeFiles,
   SAMPLE_BYTES
 } = require('../../src/main/lib/scan.js');
+const { skipWithoutPermissionBits } = require('./helpers.js');
 
 const SAMPLED_HASH = /^sampled-[0-9a-f]{64}$/;
 
@@ -211,10 +212,7 @@ test('probeFiles: reports progress once per file, ending at total', async (t) =>
 });
 
 test('probeFiles: unreadable file counts as skipped, not a rejection', async (t) => {
-  if (process.platform === 'win32' || process.getuid?.() === 0) {
-    t.skip('permission bits not enforceable here');
-    return;
-  }
+  if (skipWithoutPermissionBits(t)) return;
   const dir = tmpTree({ 'ok.png': 'x', 'locked.png': 'x' });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.chmodSync(path.join(dir, 'locked.png'), 0);
@@ -363,10 +361,7 @@ test('rehashStaleItems: nothing to do reports no work', async () => {
 });
 
 test('rehashStaleItems: an unreadable video keeps its hash while the others move', async (t) => {
-  if (process.platform === 'win32' || process.getuid?.() === 0) {
-    t.skip('permission bits not enforceable here');
-    return;
-  }
+  if (skipWithoutPermissionBits(t)) return;
   const dir = tmpTree({ 'ok.mp4': 'fine', 'locked.mp4': 'locked' });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.chmodSync(path.join(dir, 'locked.mp4'), 0);
@@ -526,10 +521,7 @@ test('rehashStaleItems: entries saved before sizes were recorded get one without
 });
 
 test('rehashStaleItems: a failed rehash keeps the old size so the next start retries', async (t) => {
-  if (process.platform === 'win32' || process.getuid?.() === 0) {
-    t.skip('permission bits not enforceable here');
-    return;
-  }
+  if (skipWithoutPermissionBits(t)) return;
   const dir = tmpTree({ 'locked.png': 'much longer than claimed' });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.chmodSync(path.join(dir, 'locked.png'), 0);
