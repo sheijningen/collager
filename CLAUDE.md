@@ -81,11 +81,19 @@ docs/                README media
   entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
+- **File panel** starts closed on a fresh profile; the saved preference wins after that.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.
-- **Escape order**: context menu, lightbox, help/about overlays, selection, fullscreen. One
-  keydown handler in `shortcuts.js` walks that ladder and closes exactly one layer.
+- **Toolbar**: three dropdown menus on the left (Files: add and the panel toggle; Collage:
+  shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings), fullscreen and
+  help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens one menu at a
+  time, not modal; a button in a menu closes it unless it or a row above it is marked
+  `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a second row
+  rather than overflow, and media queries drop the hint and counters first.
+- **Escape order**: toolbar dropdown, context menu, lightbox, help/about overlays, selection,
+  fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
+  layer.
 - **File panel list**: rebuilt only when what it shows changes (sort mode, and each entry's
   hash, path, type and missing state in order); other renders leave its DOM alone.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
@@ -107,7 +115,7 @@ docs/                README media
   (video only when ffmpeg is installed) and drives the renderer via `executeJavaScript`.
   Each file in `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every
   case the harness resets the app (empty library, nothing open or selected, two columns, default
-  speed, sort and panels, `confirm()` answering yes), so a case loads what it needs
+  speed, sort, panels and window size, `confirm()` answering yes), so a case loads what it needs
   (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
   never cleans up. A case that needs the startup path seeds a saved library and restarts the
   renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named

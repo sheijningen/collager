@@ -83,7 +83,9 @@ async function run() {
   const expected = hasVideo ? 5 : 4; // wide, tall, square, gif (+video), copy deduped
   const fixtures = fs.readdirSync(mediaDir).map((f) => path.join(mediaDir, f));
 
-  const wc = BrowserWindow.getAllWindows()[0].webContents;
+  const win = BrowserWindow.getAllWindows()[0];
+  const wc = win.webContents;
+  const [baseWidth, baseHeight] = win.getSize(); // a case may resize; the reset puts it back
   // every snippet sees the app's module exports as T (see app.js) and can
   // press(key) to fire a keydown on the window
   const js = (code) =>
@@ -112,6 +114,7 @@ async function run() {
   const ctx = {
     js,
     check,
+    win,
     waitFor,
     readLibraryWhen,
     workDir,
@@ -140,11 +143,13 @@ async function run() {
 
   /* Puts the app back to a known state: empty library, no selection, nothing
    * open, auto-scroll off, two columns, collage order, default speed, panel
-   * and toolbar shown, not fullscreen, scrolled to the top, and confirm()
-   * answering yes. */
+   * and toolbar shown, not fullscreen, the starting window size, scrolled to
+   * the top, and confirm() answering yes. */
   async function resetApp() {
+    win.setSize(baseWidth, baseHeight);
     await js(`(async () => {
       window.confirm = () => true;
+      T.closeDropdown();
       T.closeCtxMenu();
       T.closeLightbox();
       T.closeOverlays();

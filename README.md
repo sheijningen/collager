@@ -35,33 +35,37 @@ pnpm dist:win     # NSIS installer (run on Windows, or via wine)
 ## Usage
 
 - **Add media**: drag and drop files or folders anywhere in the window (folders
-  are scanned recursively), or use the **+ Add** button. Duplicate content is
-  detected by file hash, whatever the file name.
+  are scanned recursively), or pick **Add media files** from the **Files ▾**
+  menu. Duplicate content is detected by file hash, whatever the file name.
 - **Remove**: hover a tile and click the ✕.
 - **Reorder**: drag a tile onto another tile to move it there. The order
   persists and is what shuffle randomizes.
-- **Shuffle**: the 🔀 button re-shuffles and re-packs the collage.
-- **Clear all**: the 🗑 button removes every item, after confirmation.
-- **Columns**: the − / + control sets how many columns the collage uses (1 to 8).
-- **File panel**: the ☰ button toggles a sidebar listing every file, sortable
-  by collage order, name, path or type. Clicking an entry scrolls to it;
-  clicking a tile highlights its entry. Ctrl-click toggles, Shift-click selects
-  a range, **Remove (N)** or Delete removes the selection, Escape clears it.
-  Right-click an entry to copy its path or show it in the file manager.
-- **Auto-scroll**: the ▶ Auto button scrolls the collage continuously. The
-  slider sets the speed (10 to 600 px/s); **restart** jumps back to the top at
-  the end, **shuffle** re-shuffles on each restart, **keep awake** stops the
-  display from sleeping while it runs. Manual scrolling moves the auto-scroll
-  position.
+- **Files menu**: **Files ▾** holds **Add media files** and the file panel
+  toggle.
+- **Collage menu**: **Collage ▾** holds **Shuffle**, which re-shuffles and
+  re-packs the collage, the **Columns** stepper (1 to 8), and **Clear all**,
+  which removes every item after confirmation.
+- **File panel**: a sidebar, hidden until opened from the Files menu or with P,
+  listing every file, sortable by collage order, name, path or type. Clicking
+  an entry scrolls to it; clicking a tile
+  highlights its entry. Ctrl-click toggles, Shift-click selects a range,
+  **Remove (N)** or Delete removes the selection, Escape clears it. Right-click
+  an entry to copy its path or show it in the file manager.
+- **Auto-scroll**: **Scroll ▾** holds **Start auto-scroll**, which scrolls the
+  collage continuously, and its settings: the speed slider (10 to 600 px/s),
+  **Restart at the end** to jump back to the top, **Shuffle on restart**, and
+  **Keep the display awake** while it runs. The Scroll button is highlighted
+  while auto-scroll runs. Manual scrolling moves the auto-scroll position.
 - **Lightbox**: double-click a tile to view it enlarged. Videos get controls
   there, so you can unmute. Esc or click to close.
-- **Fullscreen**: the ⛶ button or F11. Esc also exits when nothing else
-  consumes it.
+- **Fullscreen**: the ⛶ button at the right of the toolbar, or F11. Esc also
+  exits when nothing else consumes it.
 - **Toolbar**: the chevron in the top-right corner hides and shows the toolbar.
   With fullscreen and auto-scroll this gives a clean kiosk or wall mode.
 - **Missing files** (moved, deleted, drive disconnected) show as red dashed
-  tiles and red panel entries. A **⚠ Clear N missing** button removes them all;
-  re-adding the same content from a new location repairs the entry.
+  tiles and red panel entries, and the Collage menu shows a ⚠ marker. Its
+  **⚠ Clear N missing** entry removes them all; re-adding the same content from
+  a new location repairs the entry.
 - **About**: click the "Collager" title or press I.
 
 The collection and all settings persist between launches.

@@ -24,7 +24,7 @@ export const removeSelectedBtn = document.getElementById('btn-remove-selected');
 /** hash -> list <li> element */
 export const listEntries = new Map();
 let sortMode = prefs.string('sort', 'added');
-export let panelOpen = prefs.bool('panel', true);
+export let panelOpen = prefs.bool('panel', false);
 let renderedListKey = null; // what the list currently shows, or null while hidden
 
 function sortedItems() {
@@ -122,9 +122,17 @@ function removeSelected() {
   showToast(`Removed ${formatCount(count, 'item')}`);
 }
 
-export function setPanelOpen(open) {
+const panelToggleLabel = document.getElementById('panel-toggle-label');
+
+function applyPanelOpen(open) {
   panelOpen = open;
   panel.classList.toggle('collapsed', !open);
+  // the toggle sits in the Files menu, so its label says what a click does
+  panelToggleLabel.textContent = open ? '☰ Hide file panel' : '☰ Show file panel';
+}
+
+export function setPanelOpen(open) {
+  applyPanelOpen(open);
   prefs.set('panel', open);
   render(); // collage width changed
 }
@@ -137,7 +145,7 @@ sortSelect.addEventListener('change', () => {
   prefs.set('sort', sortMode);
   renderList();
 });
-panel.classList.toggle('collapsed', !panelOpen);
+applyPanelOpen(panelOpen);
 
 // Delete removes the selection; Escape belongs to the ladder in shortcuts.js
 window.addEventListener('keydown', (event) => {
