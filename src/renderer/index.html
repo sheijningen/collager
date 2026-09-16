@@ -11,38 +11,110 @@
   </head>
   <body>
     <header id="toolbar">
-      <button id="btn-panel" title="Show/hide file panel (P)">&#x2630;</button>
       <span id="app-title" title="About Collager (I)">Collager</span>
-      <button id="btn-add" title="Add media files">+ Add</button>
-      <button id="btn-shuffle" title="Shuffle the collage">&#x1F500; Shuffle</button>
-      <button id="btn-clear" title="Remove all media from the collage">&#x1F5D1; Clear all</button>
-      <button id="btn-clear-missing" title="Remove every file that failed to load" hidden></button>
-      <span id="col-control" title="Number of columns">
-        <button id="btn-col-minus">&minus;</button>
-        <span id="col-count">3</span> col
-        <button id="btn-col-plus">+</button>
-      </span>
-      <span id="scroll-control">
-        <button id="btn-autoscroll" title="Toggle auto-scroll">&#x25B6; Auto</button>
-        <input type="range" id="scroll-speed" min="10" max="600" step="10" title="Scroll speed" />
-        <label title="Jump back to the top after reaching the end">
-          <input type="checkbox" id="scroll-loop" /> restart
-        </label>
-        <label title="Re-shuffle the collage on each restart">
-          <input type="checkbox" id="scroll-shuffle" /> shuffle
-        </label>
-        <label title="Prevent the display from sleeping while auto-scrolling">
-          <input type="checkbox" id="scroll-awake" /> keep awake
-        </label>
-      </span>
-      <button id="btn-fullscreen" title="Toggle fullscreen (F11)">&#x26F6;</button>
-      <button id="btn-help" title="Keyboard shortcuts (F1)">?</button>
-      <span id="item-count"></span>
-      <span id="toolbar-hint"
-        >drag &amp; drop media anywhere &middot; double-click to enlarge &middot; ? for
-        shortcuts</span
+      <button
+        id="btn-files-menu"
+        class="menu-btn"
+        data-menu="files-menu"
+        aria-haspopup="true"
+        aria-controls="files-menu"
+        aria-expanded="false"
       >
+        Files<span class="caret" aria-hidden="true">&#x25BE;</span>
+      </button>
+      <button
+        id="btn-collage-menu"
+        class="menu-btn"
+        data-menu="collage-menu"
+        aria-haspopup="true"
+        aria-controls="collage-menu"
+        aria-expanded="false"
+      >
+        Collage<span id="missing-badge" aria-hidden="true" hidden>&#x26A0;</span
+        ><span class="caret" aria-hidden="true">&#x25BE;</span>
+      </button>
+      <button
+        id="btn-scroll-menu"
+        class="menu-btn"
+        data-menu="scroll-menu"
+        title="Auto-scroll"
+        aria-haspopup="true"
+        aria-controls="scroll-menu"
+        aria-expanded="false"
+      >
+        <span id="scroll-state" aria-hidden="true" hidden>&#x25B6;</span>Scroll<span
+          class="caret"
+          aria-hidden="true"
+          >&#x25BE;</span
+        >
+      </button>
+      <span id="item-count"></span>
+      <span id="toolbar-right">
+        <span id="toolbar-hint"
+          >drag &amp; drop media anywhere &middot; double-click to enlarge &middot; ? for
+          shortcuts</span
+        >
+        <button id="btn-fullscreen" title="Toggle fullscreen (F11)">&#x26F6;</button>
+        <button id="btn-help" title="Keyboard shortcuts (F1)">?</button>
+      </span>
     </header>
+
+    <div id="files-menu" class="dropdown" role="group" aria-label="Files" tabindex="-1" hidden>
+      <button id="btn-add">
+        <span>+ Add media files&hellip;</span><kbd class="menu-key">A</kbd>
+      </button>
+      <button id="btn-panel">
+        <span id="panel-toggle-label"></span><kbd class="menu-key">P</kbd>
+      </button>
+    </div>
+
+    <div id="collage-menu" class="dropdown" role="group" aria-label="Collage" tabindex="-1" hidden>
+      <button id="btn-shuffle" class="keep-open">
+        <span>&#x1F500; Shuffle</span><kbd class="menu-key">S</kbd>
+      </button>
+      <div class="dropdown-row keep-open" title="Number of columns (- / +)">
+        <span>Columns</span>
+        <span id="col-control">
+          <button id="btn-col-minus" title="Fewer columns">&minus;</button>
+          <span id="col-count">3</span>
+          <button id="btn-col-plus" title="More columns">+</button>
+        </span>
+      </div>
+      <hr />
+      <button id="btn-clear-missing" class="danger" hidden></button>
+      <button id="btn-clear" class="danger">&#x1F5D1; Clear all</button>
+    </div>
+
+    <div
+      id="scroll-menu"
+      class="dropdown"
+      role="group"
+      aria-label="Auto-scroll"
+      tabindex="-1"
+      hidden
+    >
+      <button id="btn-autoscroll">
+        <span id="autoscroll-label"></span><kbd class="menu-key">Space</kbd>
+      </button>
+      <hr />
+      <label class="dropdown-row keep-open" title="Scroll speed (, / .)">
+        <span>Speed</span>
+        <input type="range" id="scroll-speed" min="10" max="600" step="10" />
+        <span id="scroll-speed-value"></span>
+      </label>
+      <label class="dropdown-row keep-open" title="Jump back to the top after reaching the end">
+        <input type="checkbox" id="scroll-loop" /> Restart at the end
+      </label>
+      <label class="dropdown-row keep-open" title="Re-shuffle the collage on each restart">
+        <input type="checkbox" id="scroll-shuffle" /> Shuffle on restart
+      </label>
+      <label
+        class="dropdown-row keep-open"
+        title="Prevent the display from sleeping while auto-scrolling"
+      >
+        <input type="checkbox" id="scroll-awake" /> Keep the display awake
+      </label>
+    </div>
 
     <button id="btn-toolbar-toggle" title="Show/hide toolbar">&#x25B4;</button>
 
@@ -67,7 +139,7 @@
         <div id="collage"></div>
         <div id="empty-state" hidden>
           <p>Drop images (png/jpeg/webp), gifs or videos (mp4/webm) here</p>
-          <p class="sub">or use the + Add button</p>
+          <p class="sub">or use Add media files in the Files menu</p>
         </div>
       </main>
     </div>

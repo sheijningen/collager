@@ -26,6 +26,7 @@ import * as autoscrollModule from './autoscroll.js';
 import * as shortcutsModule from './shortcuts.js';
 import * as toolbarModule from './toolbar.js';
 import * as fullscreenModule from './fullscreen.js';
+import * as dropdownModule from './dropdown.js';
 
 /* ---------------- OS file drag & drop ---------------- */
 
@@ -122,7 +123,8 @@ if (new URLSearchParams(location.search).has('e2e')) {
     autoscrollModule,
     shortcutsModule,
     toolbarModule,
-    fullscreenModule
+    fullscreenModule,
+    dropdownModule
   ]);
 }
 

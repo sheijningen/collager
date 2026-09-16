@@ -4,6 +4,7 @@
 
 import { prefs } from './state.js';
 import { render } from './collage.js';
+import { closeDropdown } from './dropdown.js';
 
 const toolbarToggleBtn = document.getElementById('btn-toolbar-toggle');
 export let toolbarOpen = prefs.bool('toolbar', true);
@@ -17,6 +18,7 @@ function applyToolbarOpen(open) {
 }
 
 export function setToolbarOpen(open) {
+  if (!open) closeDropdown(); // the popup's anchor button is about to vanish
   applyToolbarOpen(open);
   // the height change can flip scrollbar presence, which changes the
   // packing width — same reason setPanelOpen re-renders

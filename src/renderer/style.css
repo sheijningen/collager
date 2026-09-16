@@ -27,14 +27,26 @@ body {
   overflow: hidden;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---------- toolbar ---------- */
 
+/* three menu buttons on the left, fullscreen and help on the right next to
+ * the floating toolbar toggle; a very narrow window wraps the bar onto a
+ * second row rather than overflow past the window edge */
 #toolbar {
-  height: var(--toolbar-h);
+  flex-shrink: 0;
+  min-height: var(--toolbar-h);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 0 44px 0 14px; /* right padding clears the floating toolbar toggle */
+  gap: 6px 12px;
+  /* the right padding clears the floating toolbar toggle; CSS cannot tell the
+   * rows apart, so a wrapped second row keeps the same clearance */
+  padding: 6px 54px 6px 14px;
   border-bottom: 1px solid #26262e;
   user-select: none;
 }
@@ -43,17 +55,15 @@ body.toolbar-collapsed #toolbar {
   display: none;
 }
 
-body.toolbar-collapsed #workspace {
-  height: 100%;
-}
-
+/* the same square as the header's icon buttons, at their top, so it reads as
+ * the last one in the row while staying reachable when the toolbar is collapsed */
 #btn-toolbar-toggle {
   position: fixed;
-  top: 9px;
+  top: 8px;
   right: 10px;
   z-index: 60;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1px solid #33333d;
   border-radius: 6px;
   background: rgba(29, 29, 35, 0.75);
@@ -113,70 +123,38 @@ body.toolbar-collapsed #btn-toolbar-toggle:hover {
 }
 
 /* icon-only buttons are uniform squares */
-#btn-panel,
 #btn-fullscreen,
-#btn-help,
-#btn-col-minus,
-#btn-col-plus {
+#btn-help {
   width: 32px;
   padding: 0;
   flex-shrink: 0;
 }
 
-#col-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.caret {
+  font-size: 11px;
+  margin-left: 5px;
   color: var(--fg-dim);
-  font-size: 13px;
 }
 
-#col-count {
-  color: var(--fg);
-  min-width: 12px;
-  text-align: center;
+#toolbar .menu-btn.open {
+  border-color: var(--accent);
+  background: #26262e;
 }
 
-#scroll-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--fg-dim);
-  font-size: 13px;
+#missing-badge {
+  color: var(--danger);
+  margin-left: 6px;
 }
 
-#scroll-control label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap; /* "keep awake" must not wrap to two lines */
+/* the Scroll button shows that auto-scroll is running while its menu is closed */
+#scroll-state {
+  margin-right: 5px;
 }
 
-#scroll-control input[type='range'] {
-  width: 90px;
-  accent-color: var(--accent);
-}
-
-#scroll-control input[type='checkbox'] {
-  accent-color: var(--accent);
-}
-
-#btn-autoscroll.active,
+#toolbar .menu-btn.active,
 #btn-fullscreen.active {
   border-color: var(--accent);
   color: var(--accent);
-}
-
-#toolbar #btn-clear-missing,
-#toolbar #btn-clear-missing:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-#toolbar #btn-clear-missing:hover {
-  background: rgba(229, 72, 77, 0.15);
 }
 
 #item-count {
@@ -185,8 +163,17 @@ body.toolbar-collapsed #btn-toolbar-toggle:hover {
   white-space: nowrap;
 }
 
-#toolbar-hint {
+/* the hint and the window controls sit at the right edge, next to the
+ * floating toolbar toggle */
+#toolbar-right {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+#toolbar-hint {
   color: var(--fg-dim);
   font-size: 12px;
   white-space: nowrap;
@@ -194,11 +181,162 @@ body.toolbar-collapsed #btn-toolbar-toggle:hover {
   text-overflow: ellipsis;
 }
 
+/* narrower windows drop the decorations first, then the counters */
+@media (max-width: 1000px) {
+  #toolbar {
+    column-gap: 8px;
+  }
+
+  #toolbar-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  #item-count {
+    display: none;
+  }
+}
+
+/* ---------- toolbar dropdowns ---------- */
+
+.dropdown {
+  position: fixed;
+  z-index: 350; /* above the context menu, below the drag ghost: the Escape order */
+  outline: none; /* the popup itself takes focus on open; only its controls show a ring */
+  min-width: 200px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  background: #26262e;
+  border: 1px solid #3a3a46;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  user-select: none;
+}
+
+.dropdown:focus-visible {
+  border-color: var(--accent); /* a keyboard-opened popup shows where focus went */
+}
+
+.dropdown hr {
+  border: none;
+  border-top: 1px solid #3a3a46;
+  margin: 4px 0;
+}
+
+.dropdown button {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdown button:hover,
+.dropdown button:focus-visible {
+  background: rgba(79, 140, 255, 0.22);
+  outline: none;
+}
+
+.dropdown button.danger {
+  color: var(--danger);
+}
+
+.dropdown button.danger:hover,
+.dropdown button.danger:focus-visible {
+  background: rgba(229, 72, 77, 0.15);
+}
+
+.menu-key {
+  margin-left: auto;
+  padding-left: 18px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+.dropdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdown-row:hover {
+  background: rgba(79, 140, 255, 0.12);
+}
+
+/* a row of stepper buttons rather than a clickable label */
+div.dropdown-row {
+  cursor: default;
+}
+
+/* the column stepper: label left, the − N + control right */
+#col-control {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dropdown #col-control button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  justify-content: center;
+  border: 1px solid #3a3a46;
+  background: var(--bg-tile);
+}
+
+.dropdown #col-control button:hover,
+.dropdown #col-control button:focus-visible {
+  border-color: var(--accent);
+  background: var(--bg-tile);
+}
+
+#col-count {
+  min-width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.dropdown-row input[type='range'] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--accent);
+}
+
+.dropdown-row input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+#scroll-speed-value {
+  min-width: 58px;
+  text-align: right;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- workspace / panel ---------- */
 
 #workspace {
   display: flex;
-  height: calc(100% - var(--toolbar-h));
+  flex: 1;
+  min-height: 0;
 }
 
 #panel {

@@ -14,7 +14,13 @@ import { anyOverlayOpen } from './shortcuts.js';
 import { tileDrag } from './tiledrag.js';
 
 const autoScrollBtn = document.getElementById('btn-autoscroll');
+const autoScrollLabel = document.getElementById('autoscroll-label');
+// the Scroll menu button and its running marker, so the state shows while
+// the menu is closed
+const scrollMenuBtn = document.getElementById('btn-scroll-menu');
+const scrollState = document.getElementById('scroll-state');
 export const speedSlider = document.getElementById('scroll-speed');
+const speedValue = document.getElementById('scroll-speed-value');
 const loopCheckbox = document.getElementById('scroll-loop');
 const shuffleCheckbox = document.getElementById('scroll-shuffle');
 const awakeCheckbox = document.getElementById('scroll-awake');
@@ -79,11 +85,16 @@ function autoScrollTick(ts) {
   }
 }
 
+function showAutoScrollState(on) {
+  autoScrollLabel.textContent = on ? '⏸ Stop auto-scroll' : '▶ Start auto-scroll';
+  scrollMenuBtn.classList.toggle('active', on);
+  scrollState.hidden = !on;
+}
+
 export function setAutoScroll(on) {
   if (on === autoScroll) return;
   autoScroll = on;
-  autoScrollBtn.classList.toggle('active', on);
-  autoScrollBtn.innerHTML = on ? '&#x23F8; Auto' : '&#x25B6; Auto';
+  showAutoScrollState(on);
   if (on) {
     virtualTop = scroller.scrollTop;
     lastTick = null;
@@ -96,16 +107,22 @@ export function setAutoScroll(on) {
 }
 
 autoScrollBtn.addEventListener('click', () => setAutoScroll(!autoScroll));
+showAutoScrollState(autoScroll);
 
 /* single setter for the speed, so the slider, the ,/. shortcuts and the
  * saved pref can never disagree */
 export function setScrollSpeed(value) {
   scrollSpeed = Math.max(Number(speedSlider.min), Math.min(Number(speedSlider.max), value));
-  speedSlider.value = String(scrollSpeed);
+  showScrollSpeed();
   prefs.set('scrollSpeed', scrollSpeed);
 }
 
-speedSlider.value = String(scrollSpeed);
+function showScrollSpeed() {
+  speedSlider.value = String(scrollSpeed);
+  speedValue.textContent = `${scrollSpeed} px/s`;
+}
+
+showScrollSpeed();
 speedSlider.addEventListener('input', () => {
   setScrollSpeed(parseInt(speedSlider.value, 10));
 });
