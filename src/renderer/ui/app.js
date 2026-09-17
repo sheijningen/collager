@@ -90,7 +90,7 @@ window.addEventListener('resize', () => {
 
 window.api.onGpuFallback(() => {
   showToast(
-    'Hardware acceleration is off after repeated graphics crashes — start with --gpu to retry'
+    'Graphics trouble: Collager restarted in a safer display mode. The next start tries the normal one again.'
   );
 });
 

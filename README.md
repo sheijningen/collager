@@ -26,9 +26,8 @@ Download the latest installer from the
 Every release also carries a `SHA256SUMS` file; `sha256sum -c SHA256SUMS` in the download
 folder checks the installers against it.
 
-After three graphics-process crashes the app restarts with hardware acceleration off and
-stays that way. Starting it with `--gpu` turns it back on; `--no-gpu` turns it off for one
-run.
+If the graphics driver keeps crashing, Collager restarts itself in a safer display mode
+for the rest of that session. Starting it again always tries the normal mode first.
 
 ## Usage
 

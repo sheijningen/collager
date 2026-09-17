@@ -112,8 +112,9 @@ docs/                README media
   a condition that lasts the session, such as a blocked save, and progress never goes through it.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
-- **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and
-  relaunch without hardware acceleration. `--gpu` clears it, `--no-gpu` forces it once.
+- **GPU fallback**: three GPU process crashes relaunch the app with hardware acceleration
+  disabled, passing an internal switch to the new process. Nothing is written to disk and
+  there are no user-facing flags, so every normal start tries hardware acceleration again.
 
 ## Conventions
 
