@@ -24,7 +24,7 @@ export const removeSelectedBtn = document.getElementById('btn-remove-selected');
 /** hash -> list <li> element */
 export const listEntries = new Map();
 let sortMode = prefs.string('sort', 'added');
-export let panelOpen = prefs.bool('panel', false);
+export let panelOpen = false; // always starts closed, never remembered
 let renderedListKey = null; // what the list currently shows, or null while hidden
 
 function sortedItems() {
@@ -133,7 +133,6 @@ function applyPanelOpen(open) {
 
 export function setPanelOpen(open) {
   applyPanelOpen(open);
-  prefs.set('panel', open);
   render(); // collage width changed
 }
 

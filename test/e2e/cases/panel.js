@@ -2,7 +2,7 @@
  * Escape ladder, batch remove. */
 module.exports = {
   name: 'panel',
-  async run({ js, check, readLibraryWhen, expected, loadFixtures }) {
+  async run({ js, check, readLibraryWhen, expected, loadFixtures, restartWith }) {
     await loadFixtures();
     check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
 
@@ -86,5 +86,14 @@ module.exports = {
     );
     check('selection is empty after removal', (await js('T.selected.size')) === 0);
     check('the removal is persisted', (await readLibraryWhen(expected - 2)) !== null);
+
+    // the panel is closed on every start, whatever it was when the app quit
+    await js('T.setPanelOpen(true)');
+    await restartWith([]);
+    const afterRestart = await js(
+      `({ open: T.panelOpen,
+          collapsed: document.getElementById('panel').classList.contains('collapsed') })`
+    );
+    check('the panel starts closed after a restart', !afterRestart.open && afterRestart.collapsed);
   }
 };

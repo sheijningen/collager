@@ -81,7 +81,7 @@ docs/                README media
   entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
-- **File panel** starts closed on a fresh profile; the saved preference wins after that.
+- **File panel** always starts closed; its open state is not remembered across restarts.
 - **Item menu**: one context menu (`ui/ctxmenu.js`) serves tiles and file panel entries: maximize
   (the lightbox, which the copy never names), open in the default app, copy the path or (for
   still images) the bitmap, show in the file manager, remove. Actions that need the file are
