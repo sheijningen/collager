@@ -73,7 +73,8 @@ for the rest of that session. Starting it again always tries the normal mode fir
   as well, it says so.
 - **About**: click the "Collager" title or press I.
 
-The collection and all settings persist between launches.
+The collection and all settings persist between launches. Starting Collager while it is
+already running brings the open window forward instead of opening a second one.
 
 ## Keyboard shortcuts
 

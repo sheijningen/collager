@@ -21,7 +21,8 @@ src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
                      test/main/helpers.js holds what the main tests share
-test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js
+test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js,
+                     second-instance.js (a second launch against the harness profile)
 build/               icon (SVG source, PNG export for electron-builder)
 docs/                README media
 ```
@@ -114,6 +115,8 @@ docs/                README media
   a condition that lasts the session, such as a blocked save, and progress never goes through it.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
+- **Single instance**: a second launch exits at once and the running instance brings its
+  window forward, so two instances can never take turns writing `library.json`.
 - **GPU fallback**: three GPU process crashes relaunch the app with hardware acceleration
   disabled, passing an internal switch to the new process. Nothing is written to disk and
   there are no user-facing flags, so every normal start tries hardware acceleration again.

@@ -7,6 +7,20 @@ const { registerWindowIpc } = require('./ipc/window');
 
 const library = createLibraryStore(() => app.getPath('userData'));
 
+/* One instance per library: a second launch (a double double-click, a second
+ * shortcut) would write library.json in turns with the first and lose what
+ * either added. */
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+  return;
+}
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
+
 /* ---------------- GPU crash resilience ----------------
  * Some Windows GPU drivers make Chromium's GPU process crash ("GPU state
  * invalid after WaitForGetOffsetInRange", blank window, hard crash). If the
