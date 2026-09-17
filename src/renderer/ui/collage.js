@@ -32,6 +32,7 @@ import {
 } from './state.js';
 import { createMediaElement, releaseMedia } from './media.js';
 import { handleSelectClick, renderList } from './panel.js';
+import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { openLightbox } from './lightbox.js';
 import { lastDragEndAt } from './tiledrag.js';
 import { startJob } from './status.js';
@@ -146,6 +147,9 @@ export function render() {
   for (const hash of [...tiles.keys()]) {
     if (!seen.has(hash)) discardTile(hash);
   }
+  // the layout just moved every tile, so a menu opened on one now sits over
+  // whatever took its place
+  if (ctxAnchoredTo('tile')) closeCtxMenu();
   // the selection must never reference items that are gone
   for (const hash of selected) {
     if (!seen.has(hash)) selected.delete(hash);
@@ -198,6 +202,10 @@ function createTile(item) {
   tile.appendChild(remove);
 
   tile.addEventListener('click', (event) => handleSelectClick(item.hash, event, 'tile'));
+  tile.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openCtxMenu(item, event.clientX, event.clientY, 'tile');
+  });
   tile.addEventListener('dblclick', () => {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox

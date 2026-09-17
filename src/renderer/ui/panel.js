@@ -7,11 +7,11 @@
 
 import { sortItems, basename } from '../core/layout.js';
 import { clickSelection } from '../core/selection.js';
-import { clampMenuPosition } from '../core/menuposition.js';
 import { buildListKey } from '../core/listkey.js';
 import { formatCount } from '../core/text.js';
 import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
 import { render, removeItems, MISSING_FILE_HINT } from './collage.js';
+import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
 import { anyOverlayOpen } from './shortcuts.js';
@@ -33,7 +33,7 @@ function sortedItems() {
 
 export function renderList() {
   if (!panelOpen) {
-    closeCtxMenu();
+    if (ctxAnchoredTo('list')) closeCtxMenu(); // a tile's menu is unaffected
     renderedListKey = null; // rebuilt on reopen (setPanelOpen → render)
     return;
   }
@@ -41,7 +41,7 @@ export function renderList() {
   const key = buildListKey(items, sortMode);
   if (key === renderedListKey) return; // selection classes are already current
   renderedListKey = key;
-  closeCtxMenu(); // list is being rebuilt under the menu
+  if (ctxAnchoredTo('list')) closeCtxMenu(); // list is being rebuilt under the menu
   fileList.textContent = '';
   listEntries.clear();
   for (const item of items) {
@@ -62,7 +62,7 @@ export function renderList() {
     li.addEventListener('click', (event) => handleSelectClick(item.hash, event, 'list'));
     li.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      openCtxMenu(item, event.clientX, event.clientY);
+      openCtxMenu(item, event.clientX, event.clientY, 'list');
     });
     fileList.appendChild(li);
     listEntries.set(item.hash, li);
@@ -114,7 +114,7 @@ function scrollCollageTo(hash) {
   scroller.scrollTo({ top, behavior: autoScroll ? 'auto' : 'smooth' });
 }
 
-function removeSelected() {
+export function removeSelected() {
   if (!selected.size) return;
   const count = selected.size;
   if (!confirm(`Remove ${formatCount(count, 'selected item')} from the collage?`)) return;
@@ -153,70 +153,3 @@ window.addEventListener('keydown', (event) => {
   if (!lightbox.hidden || anyOverlayOpen()) return;
   removeSelected();
 });
-
-/* ---------------- context menu (right-click on a panel entry) ---------------- */
-
-export const ctxMenu = document.getElementById('ctx-menu');
-const ctxPath = document.getElementById('ctx-path');
-let ctxItem = null;
-
-export function openCtxMenu(item, x, y) {
-  ctxItem = item;
-  ctxPath.textContent = item.path;
-  // measure at a neutral position (stale left/top from a previous opening
-  // would cap shrink-to-fit width and skew the measurement), then clamp
-  ctxMenu.style.left = '0px';
-  ctxMenu.style.top = '0px';
-  ctxMenu.hidden = false;
-  const rect = ctxMenu.getBoundingClientRect();
-  const { left, top } = clampMenuPosition({
-    x,
-    y,
-    width: rect.width,
-    height: rect.height,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight
-  });
-  ctxMenu.style.left = `${left}px`;
-  ctxMenu.style.top = `${top}px`;
-}
-
-export function closeCtxMenu() {
-  ctxMenu.hidden = true;
-  ctxItem = null;
-}
-
-document.getElementById('ctx-copy').addEventListener('click', async () => {
-  if (!ctxItem) return;
-  try {
-    await navigator.clipboard.writeText(ctxItem.path);
-    showToast('Path copied to clipboard');
-  } catch {
-    showToast('Could not access the clipboard');
-  }
-  closeCtxMenu();
-});
-
-document.getElementById('ctx-reveal').addEventListener('click', () => {
-  if (ctxItem) window.api.revealFile(ctxItem.path);
-  closeCtxMenu();
-});
-
-// dismiss on outside click, focus loss, list scroll or resize — the menu is
-// position:fixed, so anything that moves the list under it would leave it
-// annotating the wrong entry
-window.addEventListener('pointerdown', (event) => {
-  if (!ctxMenu.hidden && !ctxMenu.contains(event.target)) closeCtxMenu();
-});
-window.addEventListener('blur', closeCtxMenu);
-// capture-phase because scroll doesn't bubble; scoped to the panel, since
-// only list scrolling moves the entry the menu is anchored to (collage
-// scrolling — e.g. auto-scroll — doesn't invalidate it)
-window.addEventListener(
-  'scroll',
-  (event) => {
-    if (panel.contains(event.target)) closeCtxMenu();
-  },
-  true
-);
-window.addEventListener('resize', closeCtxMenu);

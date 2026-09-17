@@ -16,7 +16,7 @@ src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, count text, file list key
+                     menu placement, item menu shape, count text, file list key
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
@@ -82,6 +82,16 @@ docs/                README media
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
 - **File panel** starts closed on a fresh profile; the saved preference wins after that.
+- **Item menu**: one context menu (`ui/ctxmenu.js`) serves tiles and file panel entries: maximize
+  (the lightbox, which the copy never names), open in the default app, copy the path or (for
+  still images) the bitmap, show in the file manager, remove. Actions that need the file are
+  disabled for a missing item, except showing it in the file manager: that opens the folder the
+  file was in, and reports it when that folder is gone as well. When the clicked item is part of
+  a multi-selection the menu shows a count instead of the path and hides every single-item
+  action, leaving remove, which then takes the whole selection. The menu records which surface
+  it was opened on, so only what moves its own anchor closes it: a scroll of that container, a
+  rebuild of the list for an entry, a re-layout of the collage for a tile. Auto-scroll holds
+  while a tile's menu is up and runs on under an entry's.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.

@@ -47,16 +47,21 @@ pnpm dist:win     # NSIS installer (run on Windows, or via wine)
   which removes every item after confirmation.
 - **File panel**: a sidebar, hidden until opened from the Files menu or with P,
   listing every file, sortable by collage order, name, path or type. Clicking
-  an entry scrolls to it; clicking a tile
-  highlights its entry. Ctrl-click toggles, Shift-click selects a range,
-  **Remove (N)** or Delete removes the selection, Escape clears it. Right-click
-  an entry to copy its path or show it in the file manager.
+  an entry scrolls to it; clicking a tile highlights its entry. Ctrl-click
+  toggles, Shift-click selects a range, **Remove (N)** or Delete removes the
+  selection, Escape clears it.
+- **Item menu**: right-click a tile or a panel entry to maximize it, open it
+  in the system's default app, copy its path (or, for still images, the image
+  itself), show it in the file manager, or remove it. For a missing file the
+  actions that need it are greyed out, bar **Show in folder**. When the item is
+  part of a multi-selection the menu offers only **Remove N selected**, which
+  takes the whole selection: the other actions name a single file.
 - **Auto-scroll**: **Scroll ▾** holds **Start auto-scroll**, which scrolls the
   collage continuously, and its settings: the speed slider (10 to 600 px/s),
   **Restart at the end** to jump back to the top, **Shuffle on restart**, and
   **Keep the display awake** while it runs. The Scroll button is highlighted
   while auto-scroll runs. Manual scrolling moves the auto-scroll position.
-- **Lightbox**: double-click a tile to view it enlarged. Videos get controls
+- **Maximize**: double-click a tile to view it enlarged. Videos get controls
   there, so you can unmute. Esc or click to close.
 - **Fullscreen**: the ⛶ button at the right of the toolbar, or F11. Esc also
   exits when nothing else consumes it.
@@ -65,7 +70,9 @@ pnpm dist:win     # NSIS installer (run on Windows, or via wine)
 - **Missing files** (moved, deleted, drive disconnected) show as red dashed
   tiles and red panel entries, and the Collage menu shows a ⚠ marker. Its
   **⚠ Clear N missing** entry removes them all; re-adding the same content from
-  a new location repairs the entry.
+  a new location repairs the entry. The item menu's **Show in folder** still
+  works for one, and opens the folder the file was in; if that folder is gone
+  as well, it says so.
 - **About**: click the "Collager" title or press I.
 
 The collection and all settings persist between launches.
@@ -74,20 +81,22 @@ The collection and all settings persist between launches.
 
 Press **?** (or F1) in the app for this list.
 
-| Key         | Action                                                 |
-| ----------- | ------------------------------------------------------ |
-| `Space`     | Start / stop auto-scroll                               |
-| `,` / `.`   | Auto-scroll slower / faster                            |
-| `S`         | Shuffle the collage                                    |
-| `A`         | Add media files                                        |
-| `P`         | Show / hide the file panel                             |
-| `T`         | Show / hide the toolbar                                |
-| `-` / `+`   | Fewer / more columns                                   |
-| `F` / `F11` | Toggle fullscreen                                      |
-| `Del`       | Remove the selected items                              |
-| `Esc`       | Close overlays / clear the selection / exit fullscreen |
-| `I`         | About Collager                                         |
-| `?` / `F1`  | Show the shortcuts overlay                             |
+| Key          | Action                                                                |
+| ------------ | --------------------------------------------------------------------- |
+| `Space`      | Start / stop auto-scroll                                              |
+| `,` / `.`    | Auto-scroll slower / faster                                           |
+| `S`          | Shuffle the collage                                                   |
+| `A`          | Add media files                                                       |
+| `P`          | Show / hide the file panel                                            |
+| `T`          | Show / hide the toolbar                                               |
+| `-` / `+`    | Fewer / more columns                                                  |
+| `F` / `F11`  | Toggle fullscreen                                                     |
+| `Del`        | Remove the selected items                                             |
+| `Esc`        | Close overlays / clear the selection / exit fullscreen                |
+| `I`          | About Collager                                                        |
+| `?` / `F1`   | Show the shortcuts overlay                                            |
+| Double-click | Maximize a tile                                                       |
+| Right-click  | Item menu: maximize, open, copy path or image, show in folder, remove |
 
 ## Development
 
