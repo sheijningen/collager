@@ -47,6 +47,8 @@ export function countMissing() {
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;
+// long enough to read a two-sentence message without hurrying
+const TOAST_MS = 8000;
 /* A sticky toast has no timer and stays up until another toast replaces it.
  * It is reserved for a warning about a condition that lasts the session (a
  * blocked save). Progress of long-running work goes through startJob in
@@ -59,7 +61,7 @@ export function showToast(message, sticky = false) {
     ? null
     : setTimeout(() => {
         toastEl.hidden = true;
-      }, 2600);
+      }, TOAST_MS);
 }
 
 /* ---------------- persistence ---------------- */
