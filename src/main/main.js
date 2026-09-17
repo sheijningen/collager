@@ -43,6 +43,11 @@ app.on('child-process-gone', (_event, details) => {
   }
 });
 
+// must match build.appId in package.json: electron-builder stamps that id on
+// the Start menu shortcut, and Windows only groups and pins the running window
+// with the shortcut when the process claims the same id
+if (process.platform === 'win32') app.setAppUserModelId('dev.svh.collager');
+
 registerLibraryIpc(library);
 registerFilesIpc();
 registerWindowIpc();

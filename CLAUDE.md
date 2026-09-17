@@ -164,3 +164,7 @@ by hand before the run is retried. The installer file names come from the `artif
 fields; the build job's upload globs and the publish job's patterns match them on everything
 except the architecture part (electron-builder writes `x86_64` for AppImage and `x64` for
 NSIS), and the README spells out the names the x64 runners produce. Change all four together.
+`build.appId` doubles as the Windows AppUserModelID: electron-builder stamps it on the
+shortcuts and `main.js` sets the same literal on the running process, so the taskbar groups
+and pins them together. electron-builder strips the `build` field from the packaged
+`package.json`, so main must not read it back at runtime.
