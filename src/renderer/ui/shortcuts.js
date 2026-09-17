@@ -79,11 +79,7 @@ async function openAbout() {
     const meta = document.getElementById('about-meta');
     const rows = [
       ['Author', info.author],
-      ['License', info.license],
-      ['Electron', info.electron],
-      ['Chromium', info.chromium],
-      ['Node', info.node],
-      ['Platform', info.platform]
+      ['License', info.license]
     ];
     for (const [term, value] of rows) {
       if (!value) continue;

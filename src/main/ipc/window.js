@@ -35,11 +35,7 @@ function registerWindowIpc() {
       version: pkg.version,
       description: pkg.description,
       author: typeof pkg.author === 'object' ? pkg.author.name : pkg.author,
-      license: pkg.license,
-      electron: process.versions.electron,
-      chromium: process.versions.chrome,
-      node: process.versions.node,
-      platform: `${process.platform} (${process.arch})`
+      license: pkg.license
     };
   });
 }
