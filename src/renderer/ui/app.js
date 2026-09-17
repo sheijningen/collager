@@ -27,6 +27,8 @@ import * as shortcutsModule from './shortcuts.js';
 import * as toolbarModule from './toolbar.js';
 import * as fullscreenModule from './fullscreen.js';
 import * as dropdownModule from './dropdown.js';
+import * as statusModule from './status.js';
+import { startJob } from './status.js';
 
 /* ---------------- OS file drag & drop ---------------- */
 
@@ -124,7 +126,8 @@ if (new URLSearchParams(location.search).has('e2e')) {
     shortcutsModule,
     toolbarModule,
     fullscreenModule,
-    dropdownModule
+    dropdownModule,
+    statusModule
   ]);
 }
 
@@ -144,6 +147,7 @@ function describeLibraryProblem({ backup }) {
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
 queueLibraryOperation(async function init() {
+  const job = startJob('Preparing library');
   try {
     const loaded = await window.api.loadLibrary();
     state.items = loaded.items;
@@ -155,7 +159,7 @@ queueLibraryOperation(async function init() {
       showToast(describeLibraryProblem(loaded.problem), savingBlocked);
     }
     const measured = await measureMissingDimensions(state.items, (done, total) => {
-      showToast(`Preparing library — reading dimensions ${done}/${total}…`, true);
+      job.update(`reading dimensions ${done}/${total}`);
     });
     render();
     if (measured) persist();
@@ -167,16 +171,14 @@ queueLibraryOperation(async function init() {
     if (loaded.collapsed) {
       notes.push(`${formatCount(loaded.collapsed, 'duplicate')} merged`);
     }
-    if (notes.length) {
-      showToast(notes.join(' · '));
-    } else if (measured) {
-      showToast('Library ready'); // replaces the sticky progress toast
-    }
+    if (notes.length) showToast(notes.join(' · '));
   } catch (err) {
     console.error('Failed to load the library', err);
     render();
     // saving stays off for the whole session (see persist), so the warning
     // must not time out
     showToast('Could not load the saved library. Saving is off to protect it.', true);
+  } finally {
+    job.finish();
   }
 });
