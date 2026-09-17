@@ -108,11 +108,26 @@ async function runWithConcurrency(list, concurrency, task, onProgress = null) {
   await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, worker));
 }
 
+/* Distinct extensions of `paths`, the ones that dominate the drop first so a
+ * capped list still names them. A dotfile has no extension and is left out. */
+function summarizeExtensions(paths) {
+  const counts = new Map();
+  for (const filePath of paths) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext) counts.set(ext, (counts.get(ext) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([extA, countA], [extB, countB]) => countB - countA || extA.localeCompare(extB))
+    .map(([ext]) => ext);
+}
+
 // Expand dropped paths: directories are walked recursively (symlink cycles
-// are guarded via realpath), files are kept if their extension is supported.
+// are guarded via realpath). Every path walked lands in exactly one of the
+// three lists.
 async function collectMediaPaths(inputPaths) {
   const found = [];
-  const skipped = [];
+  const unsupported = [];
+  const unreadable = [];
   const visitedDirs = new Set();
 
   async function walk(entryPath) {
@@ -120,7 +135,7 @@ async function collectMediaPaths(inputPaths) {
     try {
       stat = await fsp.stat(entryPath);
     } catch {
-      skipped.push(entryPath);
+      unreadable.push(entryPath);
       return;
     }
     if (stat.isDirectory()) {
@@ -128,7 +143,7 @@ async function collectMediaPaths(inputPaths) {
       try {
         real = await fsp.realpath(entryPath);
       } catch {
-        skipped.push(entryPath);
+        unreadable.push(entryPath);
         return;
       }
       if (visitedDirs.has(real)) return;
@@ -137,25 +152,28 @@ async function collectMediaPaths(inputPaths) {
       try {
         entries = await fsp.readdir(entryPath);
       } catch {
-        skipped.push(entryPath);
+        unreadable.push(entryPath);
         return;
       }
       for (const entry of entries) await walk(path.join(entryPath, entry));
+    } else if (typeForPath(entryPath)) {
+      found.push(entryPath);
     } else {
-      if (typeForPath(entryPath)) found.push(entryPath);
-      else skipped.push(entryPath);
+      unsupported.push(entryPath);
     }
   }
 
   for (const inputPath of inputPaths) await walk(inputPath);
-  return { found, skipped };
+  return { found, unsupported, unreadable };
 }
 
 /* Expand paths, then hash the found media with bounded concurrency so a
- * large drop overlaps its disk reads. Returns entries in discovery order;
- * unreadable files count as skipped. */
+ * large drop overlaps its disk reads. Returns entries in discovery order,
+ * and counts what was left out: unsupported formats (with the extensions,
+ * so the user learns what to convert) and files that could not be read,
+ * a failed hash included. */
 async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
-  const { found, skipped } = await collectMediaPaths(inputPaths);
+  const { found, unsupported, unreadable } = await collectMediaPaths(inputPaths);
   const entries = new Array(found.length);
   await runWithConcurrency(
     found,
@@ -168,12 +186,17 @@ async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
         const { hash, size } = await hashMedia(filePath, type);
         entries[index] = { path: filePath, hash, type, size };
       } catch {
-        skipped.push(filePath);
+        unreadable.push(filePath);
       }
     },
     onProgress
   );
-  return { entries: entries.filter(Boolean), skippedCount: skipped.length };
+  return {
+    entries: entries.filter(Boolean),
+    unsupportedCount: unsupported.length,
+    unsupportedExtensions: summarizeExtensions(unsupported),
+    unreadableCount: unreadable.length
+  };
 }
 
 /* Rehashes items whose stored hash no longer describes the file: the size on
@@ -243,6 +266,7 @@ module.exports = {
   hashFileSampled,
   isSampledHash,
   runWithConcurrency,
+  summarizeExtensions,
   collectMediaPaths,
   probeFiles,
   rehashStaleItems

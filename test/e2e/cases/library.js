@@ -42,6 +42,10 @@ module.exports = {
       'incompatible files in the directory are skipped',
       (await js(`T.state.items.some(i => i.path.endsWith('notes.txt'))`)) === false
     );
+    check(
+      'the toast names the skipped format',
+      (await js('T.toastEl.textContent')).includes('1 unsupported file skipped (.txt)')
+    );
 
     // persistence: the library file holds every item with its dimensions
     const saved = await readLibraryWhen(expected + 2);

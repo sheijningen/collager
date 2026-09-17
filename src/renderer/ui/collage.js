@@ -13,7 +13,7 @@ import {
   MAX_COLUMNS,
   DEFAULT_COLUMNS
 } from '../core/layout.js';
-import { formatCount } from '../core/text.js';
+import { formatCount, describeAddOutcome } from '../core/text.js';
 import {
   state,
   selected,
@@ -328,7 +328,8 @@ async function doAddPaths(paths) {
 
 async function addPathsUnderJob(paths, job) {
   job.update('scanning');
-  const { entries, skippedCount } = await probeFilesWithProgress(paths, job);
+  const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } =
+    await probeFilesWithProgress(paths, job);
 
   const known = new Map(itemsByHash); // a private copy: the batch dedups against itself too
   const fresh = [];
@@ -359,9 +360,13 @@ async function addPathsUnderJob(paths, job) {
   render();
   persist();
 
-  const parts = [];
-  if (fresh.length) parts.push(`added ${fresh.length}`);
-  if (duplicates) parts.push(`${formatCount(duplicates, 'duplicate')} skipped`);
-  if (skippedCount) parts.push(`${skippedCount} unsupported skipped`);
-  showToast(parts.length ? parts.join(' · ') : 'Nothing to add');
+  showToast(
+    describeAddOutcome({
+      added: fresh.length,
+      duplicates,
+      unsupportedCount,
+      unsupportedExtensions,
+      unreadableCount
+    })
+  );
 }

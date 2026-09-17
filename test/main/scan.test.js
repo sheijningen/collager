@@ -11,6 +11,7 @@ const {
   readExactly,
   rehashStaleItems,
   runWithConcurrency,
+  summarizeExtensions,
   typeForPath,
   probeFiles,
   SAMPLE_BYTES
@@ -72,7 +73,7 @@ test('typeForPath maps extensions case-insensitively', () => {
 test('collectMediaPaths keeps supported files, skips others', async (t) => {
   const dir = tmpTree({ 'a.png': 'x', 'b.MP4': 'x', 'c.txt': 'x', 'd.webm': 'x', 'e.tiff': 'x' });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const { found, skipped } = await collectMediaPaths([
+  const { found, unsupported, unreadable } = await collectMediaPaths([
     path.join(dir, 'a.png'),
     path.join(dir, 'b.MP4'),
     path.join(dir, 'c.txt'),
@@ -80,7 +81,8 @@ test('collectMediaPaths keeps supported files, skips others', async (t) => {
     path.join(dir, 'e.tiff')
   ]);
   assert.deepEqual(found.map((p) => path.basename(p)).sort(), ['a.png', 'b.MP4', 'd.webm']);
-  assert.equal(skipped.length, 2);
+  assert.deepEqual(unsupported.map((p) => path.basename(p)).sort(), ['c.txt', 'e.tiff']);
+  assert.deepEqual(unreadable, []);
 });
 
 test('collectMediaPaths recurses into directories', async (t) => {
@@ -89,23 +91,57 @@ test('collectMediaPaths recurses into directories', async (t) => {
     sub: { 'nested.gif': 'x', deeper: { 'deep.jpg': 'x', 'skip.doc': 'x' } }
   });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const { found, skipped } = await collectMediaPaths([dir]);
+  const { found, unsupported } = await collectMediaPaths([dir]);
   assert.deepEqual(found.map((p) => path.basename(p)).sort(), [
     'deep.jpg',
     'nested.gif',
     'top.png'
   ]);
   assert.deepEqual(
-    skipped.map((p) => path.basename(p)),
+    unsupported.map((p) => path.basename(p)),
     ['skip.doc']
   );
 });
 
-test('collectMediaPaths reports nonexistent paths as skipped', async () => {
+test('collectMediaPaths reports nonexistent paths as unreadable, not unsupported', async () => {
   const ghost = path.join(os.tmpdir(), 'collager-does-not-exist-42.png');
-  const { found, skipped } = await collectMediaPaths([ghost]);
+  const { found, unsupported, unreadable } = await collectMediaPaths([ghost]);
   assert.equal(found.length, 0);
-  assert.deepEqual(skipped, [ghost]);
+  assert.deepEqual(unsupported, []);
+  assert.deepEqual(unreadable, [ghost]);
+});
+
+test('collectMediaPaths reports a directory it cannot list as unreadable', async (t) => {
+  if (skipWithoutPermissionBits(t)) return;
+  const dir = tmpTree({ 'a.png': 'x', locked: { 'b.png': 'x' } });
+  const locked = path.join(dir, 'locked');
+  t.after(() => {
+    fs.chmodSync(locked, 0o700);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  fs.chmodSync(locked, 0);
+  const { found, unsupported, unreadable } = await collectMediaPaths([dir]);
+  assert.deepEqual(
+    found.map((p) => path.basename(p)),
+    ['a.png']
+  );
+  assert.deepEqual(unsupported, []);
+  assert.deepEqual(unreadable, [locked]);
+});
+
+test('summarizeExtensions: lower-cased, commonest first, ties alphabetical', () => {
+  assert.deepEqual(summarizeExtensions(['a.HEIC', 'b.heic', 'c.mov', 'd.txt', 'e.avi']), [
+    '.heic',
+    '.avi',
+    '.mov',
+    '.txt'
+  ]);
+  assert.deepEqual(
+    summarizeExtensions(['Thumbs', 'noext', '.DS_Store']),
+    [],
+    'no extension, no entry'
+  );
+  assert.deepEqual(summarizeExtensions([]), []);
 });
 
 test('collectMediaPaths survives symlink cycles without duplicates', async (t) => {
@@ -180,9 +216,16 @@ test('runWithConcurrency: an empty list runs nothing and reports nothing', async
 });
 
 test('probeFiles: hashes concurrently, keeps discovery order, types entries', async (t) => {
-  const dir = tmpTree({ 'a.png': 'aaa', 'b.gif': 'bbb', 'c.mp4': 'ccc', 'skip.txt': 'x' });
+  const dir = tmpTree({
+    'a.png': 'aaa',
+    'b.gif': 'bbb',
+    'c.mp4': 'ccc',
+    'skip.txt': 'x',
+    README: 'x'
+  });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const { entries, skippedCount } = await probeFiles([dir]);
+  const probed = await probeFiles([dir]);
+  const entries = probed.entries;
   assert.deepEqual(
     entries.map((e) => path.basename(e.path)),
     ['a.png', 'b.gif', 'c.mp4']
@@ -198,7 +241,9 @@ test('probeFiles: hashes concurrently, keeps discovery order, types entries', as
     [3, 3, 3],
     'the size the hash was taken over travels with the entry'
   );
-  assert.equal(skippedCount, 1);
+  assert.equal(probed.unsupportedCount, 2);
+  assert.deepEqual(probed.unsupportedExtensions, ['.txt'], 'an extension-less file is not named');
+  assert.equal(probed.unreadableCount, 0);
 });
 
 test('probeFiles: reports progress once per file, ending at total', async (t) => {
@@ -211,17 +256,21 @@ test('probeFiles: reports progress once per file, ending at total', async (t) =>
   assert.ok(calls.every(([, t2]) => t2 === 3));
 });
 
-test('probeFiles: unreadable file counts as skipped, not a rejection', async (t) => {
+test('probeFiles: unreadable file counts as unreadable, not a rejection', async (t) => {
   if (skipWithoutPermissionBits(t)) return;
-  const dir = tmpTree({ 'ok.png': 'x', 'locked.png': 'x' });
+  const dir = tmpTree({ 'ok.png': 'x', 'locked.png': 'x', 'notes.txt': 'x' });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.chmodSync(path.join(dir, 'locked.png'), 0);
-  const { entries, skippedCount } = await probeFiles([dir]);
+  const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } = await probeFiles([
+    dir
+  ]);
   assert.deepEqual(
     entries.map((e) => path.basename(e.path)),
     ['ok.png']
   );
-  assert.equal(skippedCount, 1);
+  assert.equal(unsupportedCount, 1);
+  assert.deepEqual(unsupportedExtensions, ['.txt'], 'unreadable is not unsupported');
+  assert.equal(unreadableCount, 1);
 });
 
 test('hashFileSampled: same bytes hash equal, prefix marks the scheme', async (t) => {

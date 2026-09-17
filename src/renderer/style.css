@@ -861,6 +861,7 @@ kbd {
 }
 
 #toast {
+  max-width: min(90vw, 560px);
   background: #26262e;
   color: var(--fg);
   padding: 10px 18px;
