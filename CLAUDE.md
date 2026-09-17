@@ -82,6 +82,8 @@ docs/                README media
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
 - **File panel** always starts closed; its open state is not remembered across restarts.
+  A counter above the list gives the item total and expands on click into the split by
+  file extension, biggest group first.
 - **Item menu**: one context menu (`ui/ctxmenu.js`) serves tiles and file panel entries: maximize
   (the lightbox, which the copy never names), open in the default app, copy the path or (for
   still images) the bitmap, show in the file manager, remove. Actions that need the file are

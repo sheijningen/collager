@@ -8,6 +8,7 @@
 import { sortItems, basename } from '../core/layout.js';
 import { clickSelection } from '../core/selection.js';
 import { buildListKey } from '../core/listkey.js';
+import { countByExtension } from '../core/counts.js';
 import { formatCount } from '../core/text.js';
 import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
 import { render, removeItems, MISSING_FILE_HINT } from './collage.js';
@@ -20,12 +21,15 @@ const panel = document.getElementById('panel');
 export const fileList = document.getElementById('file-list');
 export const sortSelect = document.getElementById('sort-select');
 export const removeSelectedBtn = document.getElementById('btn-remove-selected');
+export const panelCount = document.getElementById('panel-count');
+export const panelBreakdown = document.getElementById('panel-breakdown');
 
 /** hash -> list <li> element */
 export const listEntries = new Map();
 let sortMode = prefs.string('sort', 'added');
 export let panelOpen = false; // always starts closed, never remembered
 let renderedListKey = null; // what the list currently shows, or null while hidden
+let breakdownOpen = false;
 
 function sortedItems() {
   return sortItems(state.items, sortMode);
@@ -37,6 +41,7 @@ export function renderList() {
     renderedListKey = null; // rebuilt on reopen (setPanelOpen → render)
     return;
   }
+  renderCounts();
   const items = sortedItems();
   const key = buildListKey(items, sortMode);
   if (key === renderedListKey) return; // selection classes are already current
@@ -68,6 +73,34 @@ export function renderList() {
     listEntries.set(item.hash, li);
   }
   updateRemoveSelectedBtn();
+}
+
+/* The total, and under it the split by extension while it is expanded. */
+function renderCounts() {
+  const { total, extensions } = countByExtension(state.items);
+  panelCount.textContent = `${breakdownOpen ? '\u25BE' : '\u25B8'} ${formatCount(total, 'item')}`;
+  panelCount.title = breakdownOpen ? 'Hide the split by file type' : 'Split the count by file type';
+  panelCount.disabled = total === 0;
+  panelCount.setAttribute('aria-expanded', String(breakdownOpen));
+
+  panelBreakdown.hidden = !breakdownOpen || total === 0;
+  panelBreakdown.textContent = '';
+  if (panelBreakdown.hidden) return;
+  for (const { extension, count } of extensions) {
+    const row = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = extension;
+    const value = document.createElement('span');
+    value.className = 'ext-count';
+    value.textContent = String(count);
+    row.append(name, value);
+    panelBreakdown.appendChild(row);
+  }
+}
+
+export function setBreakdownOpen(open) {
+  breakdownOpen = open;
+  renderCounts();
 }
 
 export function handleSelectClick(hash, event, source) {
@@ -137,6 +170,7 @@ export function setPanelOpen(open) {
 }
 
 removeSelectedBtn.addEventListener('click', removeSelected);
+panelCount.addEventListener('click', () => setBreakdownOpen(!breakdownOpen));
 document.getElementById('btn-panel').addEventListener('click', () => setPanelOpen(!panelOpen));
 sortSelect.value = sortMode;
 sortSelect.addEventListener('change', () => {

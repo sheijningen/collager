@@ -43,10 +43,11 @@ for the rest of that session. Starting it again always tries the normal mode fir
   re-packs the collage, the **Columns** stepper (1 to 8), and **Clear all**,
   which removes every item after confirmation.
 - **File panel**: a sidebar, hidden until opened from the Files menu or with P,
-  listing every file, sortable by collage order, name, path or type. Clicking
-  an entry scrolls to it; clicking a tile highlights its entry. Ctrl-click
-  toggles, Shift-click selects a range, **Remove (N)** or Delete removes the
-  selection, Escape clears it.
+  listing every file, sortable by collage order, name, path or type. A counter
+  above the list gives the item total and expands on click into the split by
+  file extension. Clicking an entry scrolls to it; clicking a tile highlights
+  its entry. Ctrl-click toggles, Shift-click selects a range, **Remove (N)** or
+  Delete removes the selection, Escape clears it.
 - **Item menu**: right-click a tile or a panel entry to maximize it, open it
   in the system's default app, copy its path (or, for still images, the image
   itself), show it in the file manager, or remove it. For a missing file the

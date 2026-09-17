@@ -372,6 +372,47 @@ div.dropdown-row {
   font-size: 12px;
 }
 
+/* the counter reads as a line of text, not a button, until pointed at */
+#panel-count {
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #26262e;
+  color: var(--fg-dim);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#panel-count:not(:disabled):hover {
+  color: var(--fg);
+}
+
+#panel-count:disabled {
+  cursor: default;
+}
+
+#panel-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px 6px;
+  border-bottom: 1px solid #26262e;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+#panel-breakdown li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+#panel-breakdown .ext-count {
+  color: var(--fg);
+}
+
 #file-list {
   flex: 1;
   overflow-y: auto;

@@ -6,6 +6,26 @@ module.exports = {
     await loadFixtures();
     check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
 
+    const counter = await js(`(() => {
+      const collapsed = { text: T.panelCount.textContent, hidden: T.panelBreakdown.hidden };
+      T.panelCount.click();
+      const rows = [...T.panelBreakdown.children].map((li) => ({
+        extension: li.firstChild.textContent,
+        count: Number(li.lastChild.textContent)
+      }));
+      T.panelCount.click();
+      return { collapsed, rows, reclosed: T.panelBreakdown.hidden };
+    })()`);
+    check('the counter shows the total', counter.collapsed.text.includes(`${expected} items`));
+    check('the split starts hidden', counter.collapsed.hidden);
+    check(
+      'clicking the counter splits the total by extension',
+      counter.rows.length > 0 &&
+        counter.rows.reduce((sum, row) => sum + row.count, 0) === expected &&
+        counter.rows.every((row) => row.extension.startsWith('.'))
+    );
+    check('clicking the counter again hides the split', counter.reclosed);
+
     // a render that changes nothing the list shows leaves its DOM alone, so an
     // open context menu stays anchored to its entry; a rebuild closes it
     const memo = await js(`(() => {
