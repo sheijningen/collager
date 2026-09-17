@@ -2,6 +2,7 @@
  * clear-missing button. */
 const fs = require('fs');
 const path = require('path');
+const { dialog } = require('electron');
 
 module.exports = {
   name: 'missing',
@@ -43,7 +44,7 @@ module.exports = {
     })()`);
     check('re-adding repairs a missing entry and renames its panel entry', repaired);
 
-    const clearMissing = await js(`(async () => {
+    const clearMissing = await js(`(() => {
       const btn = document.getElementById('btn-clear-missing');
       const hiddenWhenNoneMissing = btn.hidden;
       T.state.items[0].missing = true;
@@ -51,28 +52,40 @@ module.exports = {
       T.render();
       const visible = !btn.hidden && btn.textContent.includes('2');
       const liCoded = T.listEntries.get(T.state.items[0].hash).classList.contains('missing');
-      const before = T.state.items.length;
-      window.confirm = () => false;
-      btn.click();
-      const cancelKeeps = T.state.items.length === before;
-      window.confirm = () => true;
-      btn.click();
-      await new Promise((r) => setTimeout(r, 100));
-      return {
-        hiddenWhenNoneMissing, visible, liCoded, cancelKeeps,
-        removed: T.state.items.length === before - 2 && !T.state.items.some((i) => i.missing),
-        hiddenAgain: btn.hidden
-      };
+      return { hiddenWhenNoneMissing, visible, liCoded, before: T.state.items.length };
     })()`);
     check(
       'clear-missing button only shows while something is missing',
       clearMissing.hiddenWhenNoneMissing && clearMissing.visible
     );
     check('missing entries are color-coded in the panel', clearMissing.liCoded);
-    check('cancelling the confirmation keeps everything', clearMissing.cancelKeeps);
+
+    // the question names the outcome; Keep is the second button
+    let question = null;
+    dialog.showMessageBox = async (_win, options) => {
+      question = options;
+      return { response: 1 };
+    };
+    await js('T.clearMissing()');
     check(
-      'confirming removes exactly the missing items',
-      clearMissing.removed && clearMissing.hiddenAgain
+      'the question names what Remove would do',
+      question !== null &&
+        question.buttons[0] === 'Remove 2 missing files' &&
+        question.buttons[1] === 'Keep'
+    );
+    check(
+      'choosing Keep keeps everything',
+      (await js('T.state.items.length')) === clearMissing.before
+    );
+    dialog.showMessageBox = async () => ({ response: 0 });
+    await js('T.clearMissing()');
+    const removed = await js(`({
+      exact: T.state.items.length === ${clearMissing.before} - 2 && !T.state.items.some((i) => i.missing),
+      hiddenAgain: document.getElementById('btn-clear-missing').hidden
+    })`);
+    check(
+      'choosing Remove removes exactly the missing items',
+      removed.exact && removed.hiddenAgain
     );
   }
 };

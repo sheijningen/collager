@@ -96,6 +96,9 @@ docs/                README media
   rebuild of the list for an entry, a re-layout of the collage for a tile. Auto-scroll holds
   while a tile's menu is up and runs on under an entry's.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
+- **Removal questions** (clear all, clear missing, remove the selection) are native message
+  boxes whose buttons name the outcome ("Remove all 12 items" / "Keep"); Keep is the default, so
+  Enter and Escape both keep. The renderer asks through the `confirm-removal` channel.
 - **Empty state**: the text on an empty collage carries an Add media files button, the same
   action as the Files menu entry, so a first start has something to click.
 - **Empty drops**: a drop that resolves to no paths is explained when it carried links or a
@@ -135,17 +138,17 @@ docs/                README media
 ## Testing
 
 - `pnpm test`: unit tests with `node:test`, no display needed.
-- `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code
-  (video only when ffmpeg is installed) and drives the renderer via `executeJavaScript`.
-  Each file in `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every
-  case the harness resets the app (empty library, nothing open or selected, two columns, default
-  speed, sort, panels and window size, `confirm()` answering yes), so a case loads what it needs
-  (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
+- `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code (video
+  only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
+  `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the
+  harness resets the app (empty library, nothing open or selected, two columns, default speed,
+  sort, panels and window size, the removal question answering yes), so a case loads what it
+  needs (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
   never cleans up. A case that needs the startup path seeds a saved library and restarts the
-  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named
-  cases, in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e`
-  and `app.js` exposes every module export on `window.collagerTest`, which the snippets reach
-  as `T`; every snippet also gets `press(key)`, which fires a keydown on the window.
+  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named cases,
+  in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e` and
+  `app.js` exposes every module export on `window.collagerTest`, which the snippets reach as `T`;
+  every snippet also gets `press(key)`, which fires a keydown on the window.
 - Run the e2e suite locally as `env -u ELECTRON_RUN_AS_NODE pnpm test:e2e`, straight on the
   desktop: the app window opens and closes on the current display during the run, which is
   fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes

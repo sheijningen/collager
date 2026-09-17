@@ -2,7 +2,7 @@
  * Escape ladder, batch remove. */
 module.exports = {
   name: 'panel',
-  async run({ js, check, readLibraryWhen, expected, loadFixtures, restartWith }) {
+  async run({ js, check, readLibraryWhen, expected, loadFixtures, restartWith, waitFor }) {
     await loadFixtures();
     check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
 
@@ -99,10 +99,10 @@ module.exports = {
     check('Escape closes an overlay and keeps the selection', ladder.overlayOnly);
     check('Escape then clears the selection', ladder.selectionCleared);
 
-    await js(`window.confirm = () => true; T.removeSelectedBtn.click(); void 0`);
+    await js('T.removeSelectedBtn.click(); void 0');
     check(
       'batch remove removes the selection',
-      (await js('T.state.items.length')) === expected - 2
+      await waitFor(async () => (await js('T.state.items.length')) === expected - 2)
     );
     check('selection is empty after removal', (await js('T.selected.size')) === 0);
     check('the removal is persisted', (await readLibraryWhen(expected - 2)) !== null);

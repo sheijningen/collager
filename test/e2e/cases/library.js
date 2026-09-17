@@ -56,7 +56,10 @@ module.exports = {
 
     // clear all, and the removal reaches disk
     await js(`document.getElementById('btn-clear').click(); void 0`);
-    check('clear-all empties the collage', (await js('T.state.items.length')) === 0);
+    check(
+      'clear-all empties the collage',
+      await waitFor(async () => (await js('T.state.items.length')) === 0)
+    );
     check('empty state is shown again', await js(`!document.getElementById('empty-state').hidden`));
     check('clear-all is persisted', (await readLibraryWhen(0)) !== null);
   }

@@ -4,11 +4,11 @@
 
 import * as layout from '../core/layout.js';
 import { basename } from '../core/layout.js';
-import { formatCount } from '../core/text.js';
 import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
 import { state, showToast, persist, reindexItems, countMissing } from './state.js';
+import { formatCount } from '../core/text.js';
 // named imports stay live; destructuring the namespace would freeze `columns`
 import {
   columns,
@@ -16,7 +16,8 @@ import {
   shuffle,
   render,
   addPaths,
-  removeItems,
+  clearAll,
+  clearMissing,
   measureMissingDimensions,
   queueLibraryOperation
 } from './collage.js';
@@ -80,20 +81,8 @@ document.getElementById('btn-empty-add').addEventListener('click', (event) => {
 document.getElementById('btn-shuffle').addEventListener('click', shuffle);
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
 document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
-document.getElementById('btn-clear').addEventListener('click', () => {
-  const count = state.items.length;
-  if (!count) return;
-  if (!confirm(`Remove all ${formatCount(count, 'item')} from the collage?`)) return;
-  removeItems(() => false);
-  showToast(`Cleared ${formatCount(count, 'item')}`);
-});
-document.getElementById('btn-clear-missing').addEventListener('click', () => {
-  const count = countMissing();
-  if (!count) return;
-  if (!confirm(`Remove all ${formatCount(count, 'missing file')} from the collage?`)) return;
-  removeItems((item) => !item.missing);
-  showToast(`Removed ${formatCount(count, 'missing file')}`);
-});
+document.getElementById('btn-clear').addEventListener('click', clearAll);
+document.getElementById('btn-clear-missing').addEventListener('click', clearMissing);
 
 /* ---------------- window resize ---------------- */
 

@@ -6,6 +6,15 @@ export function formatCount(count, noun, plural = `${noun}s`) {
   return `${count} ${count === 1 ? noun : plural}`;
 }
 
+/* The question before removing `subject` ("all 12 items", "3 missing files")
+ * and the button that answers yes, so the choice is never a bare OK. */
+export function describeRemoval(subject) {
+  return {
+    message: `Remove ${subject} from the collage?`,
+    confirmLabel: `Remove ${subject}`
+  };
+}
+
 const LISTED_FORMATS = 3; // a longer list wraps the toast onto a second line
 
 /* "12 unsupported files skipped (.heic, .mov)": the formats tell the user

@@ -11,7 +11,7 @@ import { buildListKey } from '../core/listkey.js';
 import { countByExtension } from '../core/counts.js';
 import { formatCount } from '../core/text.js';
 import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
-import { render, removeItems, MISSING_FILE_HINT } from './collage.js';
+import { render, removeItems, askRemoval, MISSING_FILE_HINT } from './collage.js';
 import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
@@ -147,12 +147,11 @@ function scrollCollageTo(hash) {
   scroller.scrollTo({ top, behavior: autoScroll ? 'auto' : 'smooth' });
 }
 
-export function removeSelected() {
+export async function removeSelected() {
   if (!selected.size) return;
-  const count = selected.size;
-  if (!confirm(`Remove ${formatCount(count, 'selected item')} from the collage?`)) return;
-  removeItems((item) => !selected.has(item.hash));
-  showToast(`Removed ${formatCount(count, 'item')}`);
+  if (!(await askRemoval(formatCount(selected.size, 'selected item')))) return;
+  const removed = removeItems((item) => !selected.has(item.hash));
+  showToast(`Removed ${formatCount(removed, 'item')}`);
 }
 
 const panelToggleLabel = document.getElementById('panel-toggle-label');

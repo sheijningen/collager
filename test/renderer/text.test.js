@@ -1,6 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { formatCount, describeAddOutcome } = require('../../src/renderer/core/text.js');
+const {
+  formatCount,
+  describeAddOutcome,
+  describeRemoval
+} = require('../../src/renderer/core/text.js');
 
 test('formatCount picks the singular only for exactly one', () => {
   assert.equal(formatCount(1, 'item'), '1 item');
@@ -63,4 +67,11 @@ test('describeAddOutcome caps the list at three formats', () => {
     outcome(['.heic', '.mov', '.aae']),
     '9 unsupported files skipped (.heic, .mov, .aae)'
   );
+});
+
+test('describeRemoval names the outcome on the button', () => {
+  assert.deepEqual(describeRemoval('all 12 items'), {
+    message: 'Remove all 12 items from the collage?',
+    confirmLabel: 'Remove all 12 items'
+  });
 });

@@ -13,7 +13,7 @@ import {
   MAX_COLUMNS,
   DEFAULT_COLUMNS
 } from '../core/layout.js';
-import { formatCount, describeAddOutcome } from '../core/text.js';
+import { formatCount, describeAddOutcome, describeRemoval } from '../core/text.js';
 import {
   state,
   selected,
@@ -218,11 +218,43 @@ function createTile(item) {
 /* ---------------- library operations ---------------- */
 
 /* Drops every item `keep` rejects, then renders and saves. The render prunes
- * the selection of whatever went. */
+ * the selection of whatever went. Returns how many items went. */
 export function removeItems(keep) {
+  const before = state.items.length;
   state.items = state.items.filter(keep);
   render();
   persist();
+  return before - state.items.length;
+}
+
+/* Asks before removing `subject` ("all 12 items"). One question at a time:
+ * the box does not block input until it is mapped, and a second click in
+ * that gap would ask again over an already emptied selection. */
+let removalQuestionOpen = false;
+export async function askRemoval(subject) {
+  if (removalQuestionOpen) return false;
+  removalQuestionOpen = true;
+  try {
+    return await window.api.confirmRemoval(describeRemoval(subject));
+  } finally {
+    removalQuestionOpen = false;
+  }
+}
+
+export async function clearAll() {
+  const count = state.items.length;
+  if (!count) return;
+  if (!(await askRemoval(`all ${formatCount(count, 'item')}`))) return;
+  const removed = removeItems(() => false);
+  showToast(`Cleared ${formatCount(removed, 'item')}`);
+}
+
+export async function clearMissing() {
+  const count = countMissing();
+  if (!count) return;
+  if (!(await askRemoval(formatCount(count, 'missing file')))) return;
+  const removed = removeItems((item) => !item.missing);
+  showToast(`Removed ${formatCount(removed, 'missing file')}`);
 }
 
 export function shuffle() {

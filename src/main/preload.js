@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   saveLibrary: (items) => ipcRenderer.invoke('save-library', items),
   pickFiles: () => ipcRenderer.invoke('pick-files'),
   pickFolders: () => ipcRenderer.invoke('pick-folders'),
+  confirmRemoval: (question) => ipcRenderer.invoke('confirm-removal', question),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   revealFile: (filePath) => ipcRenderer.invoke('reveal-file', filePath),
   openExternally: (filePath) => ipcRenderer.invoke('open-externally', filePath),
