@@ -16,7 +16,8 @@ src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, item menu shape, count text, file list key, empty drop
+                     menu placement, item menu shape, count text, file list key, empty drop,
+                     lightbox stepping
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
@@ -68,6 +69,9 @@ docs/                README media
   removed by hand.
 - **Resource limiting**: tiles are placeholders until within 800px of the viewport; the
   `<img>`/`<video>` is created then and torn down again once far away.
+- **Lightbox**: the arrow keys step to the previous or next item in collage order that can be
+  shown, and the collage scrolls to it, so closing the lightbox lands where the browsing
+  stopped. A focused video keeps the arrows for seeking.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
 - **Persistence**: `library.json` in `userData` is an array of items, saves serialized and atomic

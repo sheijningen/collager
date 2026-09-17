@@ -145,15 +145,18 @@ function updateRemoveSelectedBtn() {
   removeSelectedBtn.disabled = selected.size === 0;
 }
 
-function scrollCollageTo(hash) {
+export function scrollCollageTo(hash) {
   const pos = lastPositions.get(hash);
   if (!pos) return;
   const top = Math.max(0, pos.y - 40);
   // with auto-scroll running a smooth scroll cannot survive: the next tick
   // would treat the moving position as manual scrolling, adopt it and cancel
-  // the animation — so jump instantly and hand the tick the new position
+  // the animation — so jump instantly and hand the tick the new position.
+  // Behind the lightbox nobody sees the animation, and it would hydrate
+  // every tile it passes.
   setAutoScrollPosition(top);
-  scroller.scrollTo({ top, behavior: autoScroll ? 'auto' : 'smooth' });
+  const instant = autoScroll || !lightbox.hidden;
+  scroller.scrollTo({ top, behavior: instant ? 'auto' : 'smooth' });
 }
 
 export async function removeSelected() {

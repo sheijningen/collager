@@ -14,7 +14,7 @@ import { panelOpen, setPanelOpen, applySelection } from './panel.js';
 import { ctxMenu, closeCtxMenu } from './ctxmenu.js';
 import { toolbarOpen, setToolbarOpen } from './toolbar.js';
 import { openDropdownId, closeDropdown } from './dropdown.js';
-import { lightbox, closeLightbox } from './lightbox.js';
+import { lightbox, closeLightbox, stepLightbox } from './lightbox.js';
 import { isFullscreen } from './fullscreen.js';
 
 export const helpOverlay = document.getElementById('help-overlay');
@@ -22,6 +22,17 @@ export const aboutOverlay = document.getElementById('about-overlay');
 export const shortcutList = document.getElementById('shortcut-list');
 
 const SPEED_KEY_STEP = 10; // matches the slider's step
+const SCROLLING_KEYS = [
+  ' ',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'PageUp',
+  'PageDown',
+  'Home',
+  'End'
+];
 
 export const SHORTCUTS = [
   ['Space', 'Start / stop auto-scroll'],
@@ -38,6 +49,7 @@ export const SHORTCUTS = [
   ['I', 'About Collager'],
   ['? / F1', 'Show this help'],
   ['Double-click', 'Maximize a tile'],
+  ['← / →', 'Previous / next item while maximized'],
   ['Right-click', 'Item menu: maximize, open, copy path or image, show in folder, remove']
 ];
 
@@ -153,8 +165,17 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   // the lightbox and the context menu are modal too; Escape left above, so
-  // every remaining key is inert while either is open
-  if (!lightbox.hidden || !ctxMenu.hidden) return;
+  // every remaining key is inert while either is open, bar stepping through
+  // the collage from the lightbox
+  if (!lightbox.hidden) {
+    // the collage behind the backdrop must not scroll away from the shown item
+    if (SCROLLING_KEYS.includes(event.key)) event.preventDefault();
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      stepLightbox(event.key === 'ArrowRight' ? 1 : -1);
+    }
+    return;
+  }
+  if (!ctxMenu.hidden) return;
 
   switch (event.key) {
     case '?':

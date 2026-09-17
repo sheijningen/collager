@@ -63,7 +63,10 @@ for the rest of that session. Starting it again always tries the normal mode fir
   **Keep the display awake** while it runs. The Scroll button is highlighted
   while auto-scroll runs. Manual scrolling moves the auto-scroll position.
 - **Maximize**: double-click a tile to view it enlarged. Videos get controls
-  there, so you can unmute. Esc or click to close.
+  there, so you can unmute. The arrow keys step to the previous or next item,
+  and the collage scrolls along, so closing leaves you where you stopped. Once
+  you click a video, the arrows work its own controls instead; close and
+  reopen to go back to stepping. Esc or click to close.
 - **Fullscreen**: the ⛶ button at the right of the toolbar, or F11. Esc also
   exits when nothing else consumes it.
 - **Toolbar**: the chevron in the top-right corner hides and shows the toolbar.
@@ -103,6 +106,7 @@ Press **?** (or F1) in the app for this list.
 | `I`          | About Collager                                                        |
 | `?` / `F1`   | Show the shortcuts overlay                                            |
 | Double-click | Maximize a tile                                                       |
+| `←` / `→`    | Previous / next item while maximized                                  |
 | Right-click  | Item menu: maximize, open, copy path or image, show in folder, remove |
 
 ## Development
