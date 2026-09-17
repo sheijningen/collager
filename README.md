@@ -34,7 +34,8 @@ for the rest of that session. Starting it again always tries the normal mode fir
 - **Add media**: drag and drop files or folders anywhere in the window (folders
   are scanned recursively), or pick **Add media files** or **Add a folder** from
   the **Files ▾** menu. Duplicate content is detected by file hash, whatever the
-  file name.
+  file name. Media dragged straight out of a web page cannot be added: save it to
+  the computer first.
 - **Remove**: hover a tile and click the ✕.
 - **Reorder**: drag a tile onto another tile to move it there. The order
   persists and is what shuffle randomizes.

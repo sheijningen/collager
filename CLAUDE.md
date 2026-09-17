@@ -16,7 +16,7 @@ src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, item menu shape, count text, file list key
+                     menu placement, item menu shape, count text, file list key, empty drop
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
@@ -96,6 +96,8 @@ docs/                README media
   rebuild of the list for an entry, a re-layout of the collage for a tile. Auto-scroll holds
   while a tile's menu is up and runs on under an entry's.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
+- **Empty drops**: a drop that resolves to no paths is explained when it carried links or a
+  file with no location on disk (an image dragged out of a browser), and ignored otherwise.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.
 - **Toolbar**: three dropdown menus on the left (Files: add files, add a folder, the panel

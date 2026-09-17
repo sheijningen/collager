@@ -5,6 +5,7 @@
 import * as layout from '../core/layout.js';
 import { basename } from '../core/layout.js';
 import { formatCount } from '../core/text.js';
+import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
 import { state, showToast, persist, reindexItems, countMissing } from './state.js';
@@ -37,7 +38,7 @@ const dropOverlay = document.getElementById('drop-overlay');
 
 let dragDepth = 0;
 window.addEventListener('dragenter', (event) => {
-  if (event.dataTransfer && [...event.dataTransfer.types].includes('Files')) {
+  if (event.dataTransfer && mayCarryMedia([...event.dataTransfer.types])) {
     dragDepth++;
     dropOverlay.hidden = false;
   }
@@ -53,6 +54,11 @@ window.addEventListener('drop', (event) => {
   dropOverlay.hidden = true;
   const files = [...event.dataTransfer.files];
   const paths = files.map((file) => window.api.pathForFile(file)).filter(Boolean);
+  if (!paths.length) {
+    const explanation = explainEmptyDrop([...event.dataTransfer.types], files.length);
+    if (explanation) showToast(explanation);
+    return;
+  }
   addPaths(paths);
 });
 
