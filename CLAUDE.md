@@ -96,6 +96,8 @@ docs/                README media
   rebuild of the list for an entry, a re-layout of the collage for a tile. Auto-scroll holds
   while a tile's menu is up and runs on under an entry's.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
+- **Empty state**: the text on an empty collage carries an Add media files button, the same
+  action as the Files menu entry, so a first start has something to click.
 - **Empty drops**: a drop that resolves to no paths is explained when it carried links or a
   file with no location on disk (an image dragged out of a browser), and ignored otherwise.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops

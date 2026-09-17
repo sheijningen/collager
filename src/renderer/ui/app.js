@@ -72,6 +72,11 @@ document.getElementById('btn-add-folder').addEventListener('click', async () => 
   const paths = await window.api.pickFolders();
   addPaths(paths);
 });
+document.getElementById('btn-empty-add').addEventListener('click', (event) => {
+  // a focused button would claim Space and Enter from the shortcuts
+  if (event.detail) event.currentTarget.blur();
+  document.getElementById('btn-add').click();
+});
 document.getElementById('btn-shuffle').addEventListener('click', shuffle);
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
 document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));

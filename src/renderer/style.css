@@ -653,6 +653,30 @@ div.dropdown-row {
   font-size: 13px;
 }
 
+/* the one thing on an empty collage that can be clicked */
+#empty-state button {
+  pointer-events: auto;
+  margin: 8px 0;
+  height: 44px;
+  padding: 0 24px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#empty-state button:hover {
+  background: var(--fg);
+}
+
+#empty-state button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
 /* ---------- drag & drop overlay ---------- */
 
 #drop-overlay {

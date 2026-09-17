@@ -32,8 +32,9 @@ for the rest of that session. Starting it again always tries the normal mode fir
 ## Usage
 
 - **Add media**: drag and drop files or folders anywhere in the window (folders
-  are scanned recursively), or pick **Add media files** or **Add a folder** from
-  the **Files ▾** menu. Duplicate content is detected by file hash, whatever the
+  are scanned recursively), pick **Add media files** or **Add a folder** from
+  the **Files ▾** menu, or click the **Add media files** button on an empty
+  collage. Duplicate content is detected by file hash, whatever the
   file name. Media dragged straight out of a web page cannot be added: save it to
   the computer first.
 - **Remove**: hover a tile and click the ✕.
