@@ -28,6 +28,7 @@ export const SHORTCUTS = [
   [', / .', 'Auto-scroll slower / faster'],
   ['S', 'Shuffle the collage'],
   ['A', 'Add media files'],
+  ['Shift+A', 'Add a folder'],
   ['P', 'Show / hide the file panel'],
   ['T', 'Show / hide the toolbar'],
   ['− / +', 'Fewer / more columns'],
@@ -180,8 +181,12 @@ window.addEventListener('keydown', (event) => {
       if (!event.repeat && state.items.length) shuffle();
       break;
     case 'a':
-      if (!event.repeat) document.getElementById('btn-add').click();
+    case 'A': {
+      // the modifier, not the letter's case, so caps lock cannot swap the two
+      const button = event.shiftKey ? 'btn-add-folder' : 'btn-add';
+      if (!event.repeat) document.getElementById(button).click();
       break;
+    }
     case 'p':
       if (!event.repeat) setPanelOpen(!panelOpen);
       break;

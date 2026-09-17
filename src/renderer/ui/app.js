@@ -62,6 +62,10 @@ document.getElementById('btn-add').addEventListener('click', async () => {
   const paths = await window.api.pickFiles();
   addPaths(paths);
 });
+document.getElementById('btn-add-folder').addEventListener('click', async () => {
+  const paths = await window.api.pickFolders();
+  addPaths(paths);
+});
 document.getElementById('btn-shuffle').addEventListener('click', shuffle);
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
 document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));

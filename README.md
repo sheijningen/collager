@@ -32,13 +32,14 @@ for the rest of that session. Starting it again always tries the normal mode fir
 ## Usage
 
 - **Add media**: drag and drop files or folders anywhere in the window (folders
-  are scanned recursively), or pick **Add media files** from the **Files ▾**
-  menu. Duplicate content is detected by file hash, whatever the file name.
+  are scanned recursively), or pick **Add media files** or **Add a folder** from
+  the **Files ▾** menu. Duplicate content is detected by file hash, whatever the
+  file name.
 - **Remove**: hover a tile and click the ✕.
 - **Reorder**: drag a tile onto another tile to move it there. The order
   persists and is what shuffle randomizes.
-- **Files menu**: **Files ▾** holds **Add media files** and the file panel
-  toggle.
+- **Files menu**: **Files ▾** holds **Add media files**, **Add a folder** and
+  the file panel toggle.
 - **Collage menu**: **Collage ▾** holds **Shuffle**, which re-shuffles and
   re-packs the collage, the **Columns** stepper (1 to 8), and **Clear all**,
   which removes every item after confirmation.
@@ -86,6 +87,7 @@ Press **?** (or F1) in the app for this list.
 | `,` / `.`    | Auto-scroll slower / faster                                           |
 | `S`          | Shuffle the collage                                                   |
 | `A`          | Add media files                                                       |
+| `Shift+A`    | Add a folder                                                          |
 | `P`          | Show / hide the file panel                                            |
 | `T`          | Show / hide the toolbar                                               |
 | `-` / `+`    | Fewer / more columns                                                  |

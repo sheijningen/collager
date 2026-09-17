@@ -98,12 +98,12 @@ docs/                README media
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.
-- **Toolbar**: three dropdown menus on the left (Files: add and the panel toggle; Collage:
-  shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings), fullscreen and
-  help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens one menu at a
-  time, not modal; a button in a menu closes it unless it or a row above it is marked
-  `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a second row
-  rather than overflow, and media queries drop the hint and counters first.
+- **Toolbar**: three dropdown menus on the left (Files: add files, add a folder, the panel
+  toggle; Collage: shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings),
+  fullscreen and help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens
+  one menu at a time, not modal; a button in a menu closes it unless it or a row above it is
+  marked `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a
+  second row rather than overflow, and media queries drop the hint and counters first.
 - **Escape order**: toolbar dropdown, context menu, lightbox, help/about overlays, selection,
   fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
   layer.

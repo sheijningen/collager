@@ -21,15 +21,28 @@ async function revealFile(filePath) {
  * manager and the desktop's default application. A path coming back from the
  * renderer reaches the shell only after the checks in lib/mediapath.js. */
 function registerFilesIpc() {
-  ipcMain.handle('pick-files', async (event) => {
+  /* Resolves to the chosen paths, none when the dialog was cancelled. */
+  async function pickPaths(event, options) {
     const win = BrowserWindow.fromWebContents(event.sender);
-    const result = await dialog.showOpenDialog(win, {
+    const result = await dialog.showOpenDialog(win, options);
+    return result.canceled ? [] : result.filePaths;
+  }
+
+  ipcMain.handle('pick-files', (event) =>
+    pickPaths(event, {
       title: 'Add media',
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Media', extensions: Object.keys(MEDIA_EXTS).map((ext) => ext.slice(1)) }]
-    });
-    return result.canceled ? [] : result.filePaths;
-  });
+    })
+  );
+
+  // files and folders cannot share one dialog on Linux and Windows
+  ipcMain.handle('pick-folders', (event) =>
+    pickPaths(event, {
+      title: 'Add a folder',
+      properties: ['openDirectory']
+    })
+  );
 
   ipcMain.handle('reveal-file', (_event, filePath) => revealFile(filePath));
 
