@@ -6,6 +6,22 @@ export function formatCount(count, noun, plural = `${noun}s`) {
   return `${count} ${count === 1 ? noun : plural}`;
 }
 
+/* What keeps an item from being shown: 'missing' when its file is gone,
+ * 'unshowable' when the file is there but cannot be decoded, else null. */
+export function fileProblem(item) {
+  if (item.missing) return 'missing';
+  if (item.unshowable) return 'unshowable';
+  return null;
+}
+
+/* The placeholder text of a tile: the file name, prefixed by what is wrong. */
+export function tileLabel(item, name) {
+  const problem = fileProblem(item);
+  if (problem === 'missing') return `missing: ${name}`;
+  if (problem === 'unshowable') return `cannot be shown: ${name}`;
+  return name;
+}
+
 /* The question before removing `subject` ("all 12 items", "3 missing files")
  * and the button that answers yes, so the choice is never a bare OK. */
 export function describeRemoval(subject) {

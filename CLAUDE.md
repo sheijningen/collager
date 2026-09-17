@@ -70,18 +70,23 @@ docs/                README media
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
-- **Persistence**: `library.json` in `userData` is an array of items, saves serialized and
-  atomic (temp file plus rename). The renderer refuses to save until the saved library has been
-  loaded into its state, so nothing done during startup or after a failed load can overwrite the
-  file with an empty list. An unreadable file is moved to `library.json.corrupt` (a
-  timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
-  When the move fails the file stays in place and saving is refused so it is not overwritten.
-  There is no schema version: a file the current code cannot read counts as unreadable. Only
-  path, hash, size, type and dimensions are stored per item; URL and missing flag are derived at
-  load, and an entry without a hash makes the file unreadable. A size is optional on read, so an
-  entry from before sizes were recorded loads and has one filled in.
+- **Persistence**: `library.json` in `userData` is an array of items, saves serialized and atomic
+  (temp file plus rename). The renderer refuses to save until the saved library has been loaded
+  into its state, so nothing done during startup or after a failed load can overwrite the file
+  with an empty list. An unreadable file is moved to `library.json.corrupt` (a timestamped name
+  when that exists, so no backup is ever overwritten) and the app starts empty. When the move
+  fails the file stays in place and saving is refused so it is not overwritten. There is no
+  schema version: a file the current code cannot read counts as unreadable. Only path, hash,
+  size, type and dimensions are stored per item; URL and missing flag are derived at load, the
+  unshowable flag while the app runs, and an entry without a hash makes the file unreadable. A
+  size is optional on read, so an entry from before sizes were recorded loads and has one filled
+  in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
+- **Unshowable files**: a file that fails to load is missing only when the main process says
+  it is gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and
+  gets an amber dashed tile with its own hint for the session. It is not counted as missing,
+  and its menu keeps every action that does not need to show it.
 - **File panel** always starts closed; its open state is not remembered across restarts.
   A counter above the list gives the item total and expands on click into the split by
   file extension, biggest group first.
@@ -115,7 +120,7 @@ docs/                README media
   fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
   layer.
 - **File panel list**: rebuilt only when what it shows changes (sort mode, and each entry's
-  hash, path, type and missing state in order); other renders leave its DOM alone.
+  hash, path, type and file problem in order); other renders leave its DOM alone.
 - **Progress**: long-running work (preparing the library, adding a batch) reports through
   `startJob` in `status.js`, one line per job in the status area stacked above the toast at the
   bottom centre. Toasts carry one-off messages; a sticky toast is reserved for a warning about

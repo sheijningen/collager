@@ -13,7 +13,13 @@ import {
   MAX_COLUMNS,
   DEFAULT_COLUMNS
 } from '../core/layout.js';
-import { formatCount, describeAddOutcome, describeRemoval } from '../core/text.js';
+import {
+  formatCount,
+  describeAddOutcome,
+  describeRemoval,
+  fileProblem,
+  tileLabel
+} from '../core/text.js';
 import {
   state,
   selected,
@@ -70,6 +76,18 @@ export const MISSING_FILE_HINT = [
   'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
 ].join('\n');
 
+/* Tooltip for files that are on disk but cannot be decoded. */
+export const UNSHOWABLE_FILE_HINT = [
+  'This file is on disk but Collager cannot show it. Likely causes:',
+  '• its format is not supported by the built-in player (HEVC/H.265 video, for example)',
+  '• the file is damaged',
+  '• it could not be read just now (a network drive that dropped out, for example)',
+  '',
+  'Open it with the default app from the right-click menu to check, or click ✕ to remove it.'
+].join('\n');
+
+const FILE_HINTS = { missing: MISSING_FILE_HINT, unshowable: UNSHOWABLE_FILE_HINT };
+
 const observer = new IntersectionObserver(
   (entries) => {
     for (const entry of entries) {
@@ -83,24 +101,36 @@ const observer = new IntersectionObserver(
 function hydrate(tile) {
   if (tile.dataset.hydrated === '1') return;
   const item = itemsByHash.get(tile.dataset.hash);
-  if (!item || item.missing) return;
+  if (!item || fileProblem(item)) return;
   const media = createMediaElement(item);
   if (item.type === 'video') media.playsInline = true;
   media.draggable = false;
-  // the file can vanish between the startup existence check and hydration
-  // (deleted, drive unplugged): mark the item missing so the tile, the file
-  // panel and the clear-missing button all show it; re-adding repairs it
   media.addEventListener('error', () => {
     dehydrate(tile);
-    item.missing = true;
-    tile.classList.add('missing');
-    tile.title = MISSING_FILE_HINT;
-    tile.querySelector('.placeholder-label').textContent = `missing: ${basename(item.path)}`;
-    renderList();
-    updateClearMissingBtn();
+    recordLoadFailure(item);
   });
   tile.appendChild(media);
   tile.dataset.hydrated = '1';
+}
+
+/* A file that failed to load is either gone since the startup check
+ * (deleted, drive unplugged) or present in a shape Chromium cannot decode.
+ * Only the main process can tell, and the two get different tiles, hints and
+ * menus: re-adding repairs a missing entry, nothing repairs an unshowable
+ * one. The render rebuilds the tile, the panel entry and the missing count. */
+async function recordLoadFailure(item) {
+  const failedPath = item.path;
+  let present = false;
+  try {
+    present = await window.api.mediaFileExists(failedPath);
+  } catch {}
+  // removed, repaired or already judged while the question was out
+  if (itemsByHash.get(item.hash) !== item) return;
+  if (item.path !== failedPath || fileProblem(item)) return;
+  if (present) item.unshowable = true;
+  else item.missing = true;
+  discardTile(item.hash);
+  render();
 }
 
 function dehydrate(tile) {
@@ -178,18 +208,18 @@ function updateClearMissingBtn() {
 }
 
 function createTile(item) {
+  const problem = fileProblem(item);
   const tile = document.createElement('div');
   tile.className =
-    'tile' + (item.missing ? ' missing' : '') + (selected.has(item.hash) ? ' selected' : '');
+    'tile' + (problem ? ` ${problem}` : '') + (selected.has(item.hash) ? ' selected' : '');
   tile.dataset.hash = item.hash;
   tile.dataset.hydrated = '0';
 
   const label = document.createElement('div');
   label.className = 'placeholder-label';
-  const name = basename(item.path);
-  label.textContent = item.missing ? `missing: ${name}` : name;
+  label.textContent = tileLabel(item, basename(item.path));
   tile.appendChild(label);
-  if (item.missing) tile.title = MISSING_FILE_HINT;
+  if (problem) tile.title = FILE_HINTS[problem];
 
   const remove = document.createElement('button');
   remove.className = 'btn-remove';
@@ -210,7 +240,7 @@ function createTile(item) {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox
     if (performance.now() - lastDragEndAt < 400) return;
-    if (!item.missing) openLightbox(item);
+    if (!fileProblem(item)) openLightbox(item);
   });
   return tile;
 }
@@ -369,12 +399,14 @@ async function addPathsUnderJob(paths, job) {
   for (const entry of entries) {
     const existing = known.get(entry.hash);
     if (existing) {
-      // Same content already present. If its old file vanished, adopt the new path.
-      if (existing.missing) {
+      // Same content already present. If its old file vanished or would not
+      // show, adopt the new path and give it another go.
+      if (fileProblem(existing)) {
         existing.path = entry.path;
         existing.url = entry.url;
         existing.size = entry.size;
         existing.missing = false;
+        existing.unshowable = false;
         discardTile(existing.hash); // the next render builds a tile that loads the file
       } else {
         duplicates++;

@@ -46,6 +46,9 @@ function registerFilesIpc() {
 
   ipcMain.handle('reveal-file', (_event, filePath) => revealFile(filePath));
 
+  // lets the renderer tell a file that is gone from one it cannot decode
+  ipcMain.handle('media-file-exists', (_event, filePath) => isMediaFile(filePath));
+
   /* Opens a media file in whatever the desktop associates with its type.
    * Resolves to an empty string on success, otherwise the reason. */
   ipcMain.handle('open-externally', async (_event, filePath) => {

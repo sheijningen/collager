@@ -74,6 +74,10 @@ for the rest of that session. Starting it again always tries the normal mode fir
   a new location repairs the entry. The item menu's **Show in folder** still
   works for one, and opens the folder the file was in; if that folder is gone
   as well, it says so.
+- **Files that cannot be shown** (a video format the built-in player does not
+  support, such as HEVC, or a damaged file) get an amber dashed tile instead.
+  They are not missing: open one with the default app from the item menu to
+  check it, or remove it.
 - **About**: click the "Collager" title or press I.
 
 The collection and all settings persist between launches. Starting Collager while it is

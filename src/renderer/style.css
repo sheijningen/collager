@@ -11,6 +11,7 @@
   --fg-dim: #85858f;
   --accent: #4f8cff;
   --danger: #e5484d;
+  --warn: #e0a83a;
   --toolbar-h: 48px;
 }
 
@@ -444,6 +445,14 @@ div.dropdown-row {
   background: rgba(229, 72, 77, 0.18);
 }
 
+#file-list li.unshowable {
+  background: rgba(224, 168, 58, 0.1);
+}
+
+#file-list li.unshowable:hover {
+  background: rgba(224, 168, 58, 0.18);
+}
+
 #file-list li.selected {
   background: rgba(79, 140, 255, 0.22);
 }
@@ -456,6 +465,10 @@ div.dropdown-row {
 #file-list li.missing .badge {
   background: #5c1e22;
   color: #ff9b9e;
+}
+
+#file-list li.unshowable .fname {
+  color: var(--warn);
 }
 
 #file-list .fname {
@@ -577,6 +590,14 @@ div.dropdown-row {
 
 .tile.missing .placeholder-label {
   color: var(--danger);
+}
+
+.tile.unshowable {
+  outline: 1px dashed var(--warn);
+}
+
+.tile.unshowable .placeholder-label {
+  color: var(--warn);
 }
 
 .tile.selected {

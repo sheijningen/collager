@@ -19,6 +19,11 @@ test('order, sort mode and every shown field change the key', () => {
   assert.notEqual(buildListKey([wide, { ...tall, path: '/moved/tall.png' }], 'added'), base);
   assert.notEqual(buildListKey([wide, { ...tall, type: 'gif' }], 'added'), base);
   assert.notEqual(buildListKey([wide, { ...tall, missing: true }], 'added'), base);
+  assert.notEqual(buildListKey([wide, { ...tall, unshowable: true }], 'added'), base);
+  assert.notEqual(
+    buildListKey([wide, { ...tall, unshowable: true }], 'added'),
+    buildListKey([wide, { ...tall, missing: true }], 'added')
+  );
 });
 
 test('fields the list does not show leave the key alone', () => {

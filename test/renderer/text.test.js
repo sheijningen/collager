@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const {
   formatCount,
   describeAddOutcome,
-  describeRemoval
+  describeRemoval,
+  fileProblem,
+  tileLabel
 } = require('../../src/renderer/core/text.js');
 
 test('formatCount picks the singular only for exactly one', () => {
@@ -74,4 +76,17 @@ test('describeRemoval names the outcome on the button', () => {
     message: 'Remove all 12 items from the collage?',
     confirmLabel: 'Remove all 12 items'
   });
+});
+
+test('fileProblem tells a gone file from one that cannot be decoded', () => {
+  assert.equal(fileProblem({ missing: true }), 'missing');
+  assert.equal(fileProblem({ unshowable: true }), 'unshowable');
+  assert.equal(fileProblem({ missing: true, unshowable: true }), 'missing');
+  assert.equal(fileProblem({}), null);
+});
+
+test('tileLabel prefixes the name with the problem', () => {
+  assert.equal(tileLabel({}, 'a.png'), 'a.png');
+  assert.equal(tileLabel({ missing: true }, 'a.png'), 'missing: a.png');
+  assert.equal(tileLabel({ unshowable: true }, 'a.mp4'), 'cannot be shown: a.mp4');
 });
