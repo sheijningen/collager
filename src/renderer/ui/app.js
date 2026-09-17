@@ -168,7 +168,9 @@ queueLibraryOperation(async function init() {
     const notes = [];
     const missingCount = countMissing();
     if (missingCount) {
-      notes.push(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
+      notes.push(
+        `${formatCount(missingCount, 'file')} missing on disk, see Collage > ⚠ Clear ${missingCount} missing`
+      );
     }
     if (loaded.collapsed) {
       notes.push(`${formatCount(loaded.collapsed, 'duplicate')} merged`);
