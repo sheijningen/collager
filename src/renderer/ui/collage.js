@@ -34,7 +34,8 @@ import {
   prefs,
   showToast,
   persist,
-  countMissing
+  countMissing,
+  runOrToast
 } from './state.js';
 import { createMediaElement, releaseMedia } from './media.js';
 import { handleSelectClick, renderList } from './panel.js';
@@ -264,13 +265,18 @@ export function removeItems(keep) {
 
 /* Asks before removing `subject` ("all 12 items"). One question at a time:
  * the box does not block input until it is mapped, and a second click in
- * that gap would ask again over an already emptied selection. */
+ * that gap would ask again over an already emptied selection. A question
+ * that cannot be asked counts as answered no. */
 let removalQuestionOpen = false;
 export async function askRemoval(subject) {
   if (removalQuestionOpen) return false;
   removalQuestionOpen = true;
   try {
-    return await window.api.confirmRemoval(describeRemoval(subject));
+    const answer = await runOrToast(
+      () => window.api.confirmRemoval(describeRemoval(subject)),
+      'Could not ask before removing, so nothing was removed'
+    );
+    return answer === true;
   } finally {
     removalQuestionOpen = false;
   }

@@ -7,7 +7,7 @@
  */
 
 import { targetConsumesKey, normalizeShortcutKey, SCROLL_KEYS } from '../core/keys.js';
-import { state, selected, showToast } from './state.js';
+import { state, selected, showToast, runOrToast } from './state.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
 import { panelOpen, setPanelOpen, applySelection } from './panel.js';
@@ -68,30 +68,40 @@ export function closeOverlays() {
   aboutOverlay.hidden = true;
 }
 
-/* about: filled from package.json metadata (via the main process) once */
-let aboutLoaded = false;
+/* about: filled from package.json metadata (via the main process) once. The
+ * fill in flight is kept, so a second opening before it lands shares it
+ * instead of appending the rows twice. */
+let aboutFill = null;
+async function fillAbout() {
+  const info = await window.api.getAppInfo();
+  document.getElementById('about-name').textContent = info.name;
+  document.getElementById('about-version').textContent = `version ${info.version}`;
+  document.getElementById('about-desc').textContent = info.description;
+  const meta = document.getElementById('about-meta');
+  meta.textContent = ''; // a retry after a failure starts from no rows
+  const rows = [
+    ['Author', info.author],
+    ['License', info.license]
+  ];
+  for (const [term, value] of rows) {
+    if (!value) continue;
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    meta.append(dt, dd);
+  }
+  return true;
+}
+
 async function openAbout() {
   closeOverlays();
   closeDropdown();
-  if (!aboutLoaded) {
-    const info = await window.api.getAppInfo();
-    document.getElementById('about-name').textContent = info.name;
-    document.getElementById('about-version').textContent = `version ${info.version}`;
-    document.getElementById('about-desc').textContent = info.description;
-    const meta = document.getElementById('about-meta');
-    const rows = [
-      ['Author', info.author],
-      ['License', info.license]
-    ];
-    for (const [term, value] of rows) {
-      if (!value) continue;
-      const dt = document.createElement('dt');
-      dt.textContent = term;
-      const dd = document.createElement('dd');
-      dd.textContent = value;
-      meta.append(dt, dd);
-    }
-    aboutLoaded = true;
+  if (aboutFill === null) aboutFill = fillAbout();
+  const filled = await runOrToast(() => aboutFill, 'Could not load the About information');
+  if (!filled) {
+    aboutFill = null; // the next opening asks again
+    return;
   }
   aboutOverlay.hidden = false;
 }

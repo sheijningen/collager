@@ -7,7 +7,7 @@ import { basename } from '../core/layout.js';
 import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
-import { state, showToast, persist, reindexItems, countMissing } from './state.js';
+import { state, showToast, persist, reindexItems, countMissing, runOrToast } from './state.js';
 import { formatCount } from '../core/text.js';
 // named imports stay live; destructuring the namespace would freeze `columns`
 import {
@@ -66,12 +66,15 @@ window.addEventListener('drop', (event) => {
 /* ---------------- toolbar ---------------- */
 
 document.getElementById('btn-add').addEventListener('click', async () => {
-  const paths = await window.api.pickFiles();
-  addPaths(paths);
+  const paths = await runOrToast(() => window.api.pickFiles(), 'Could not open the file dialog');
+  if (paths) addPaths(paths);
 });
 document.getElementById('btn-add-folder').addEventListener('click', async () => {
-  const paths = await window.api.pickFolders();
-  addPaths(paths);
+  const paths = await runOrToast(
+    () => window.api.pickFolders(),
+    'Could not open the folder dialog'
+  );
+  if (paths) addPaths(paths);
 });
 document.getElementById('btn-empty-add').addEventListener('click', (event) => {
   // a focused button would claim Space and Enter from the shortcuts
