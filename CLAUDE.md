@@ -174,8 +174,8 @@ electron-builder config is the `build` field in `package.json`: AppImage and NSI
 `src/**` bundled, icon from `build/icon.png`. `desktopName` plus `syncDesktopName` keeps the
 Linux desktop entry matched to the running window.
 
-Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json`. The
-release workflow calls the lint, format, unit and e2e workflows as reusable workflows, which is
+Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json` and
+points at a commit on `main`; both are checked before anything is built. The release workflow calls the lint, format, unit and e2e workflows as reusable workflows, which is
 what their `workflow_call` trigger is for, builds both installers, and publishes a GitHub
 Release with them, a `SHA256SUMS` file and auto-generated notes. The release is a draft until
 every asset is uploaded, and the publish job deletes its own draft when it fails or is

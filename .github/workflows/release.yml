@@ -30,6 +30,20 @@ jobs:
             echo "::error::Tag $TAG does not match package.json version $PKG_VERSION"
             exit 1
           fi
+      - name: Check that the tag is on main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # the compare status places the tag relative to main: behind or
+          # identical means every commit under the tag is already on main
+          STATUS="$(gh api "repos/$REPO/compare/main...$TAG" --jq .status)"
+          if [[ "$STATUS" != "behind" && "$STATUS" != "identical" ]]; then
+            echo "::error::Tag $TAG is not on main (compare status: $STATUS)"
+            exit 1
+          fi
       - name: Refuse to overwrite an existing release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
