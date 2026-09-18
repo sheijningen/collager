@@ -1,25 +1,14 @@
-/* App entry: toolbar button wiring, OS file drag & drop, startup, and the
- * hook the e2e harness drives the app through. Importing the other modules
- * here is what wires their event handlers up. */
+/* App entry: OS file drag & drop, startup, and the hook the e2e harness
+ * drives the app through. Importing the other modules here is what wires
+ * their event handlers up. */
 
 import * as layout from '../core/layout.js';
 import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
-import { state, showToast, persist, reindexItems, countMissing, runOrToast } from './state.js';
+import { state, showToast, persist, reindexItems, countMissing } from './state.js';
 import { describeLibraryProblem, describeStartupNotes } from '../core/text.js';
-// named imports stay live; destructuring the namespace would freeze `columns`
-import {
-  columns,
-  setColumns,
-  shuffle,
-  render,
-  addPaths,
-  clearAll,
-  clearMissing,
-  measureMissingDimensions,
-  queueLibraryOperation
-} from './collage.js';
+import { render, addPaths, measureMissingDimensions, queueLibraryOperation } from './collage.js';
 import * as panelModule from './panel.js';
 import * as ctxmenuModule from './ctxmenu.js';
 import * as tiledragModule from './tiledrag.js';
@@ -61,30 +50,6 @@ window.addEventListener('drop', (event) => {
   }
   addPaths(paths);
 });
-
-/* ---------------- toolbar ---------------- */
-
-document.getElementById('btn-add').addEventListener('click', async () => {
-  const paths = await runOrToast(() => window.api.pickFiles(), 'Could not open the file dialog');
-  if (paths) addPaths(paths);
-});
-document.getElementById('btn-add-folder').addEventListener('click', async () => {
-  const paths = await runOrToast(
-    () => window.api.pickFolders(),
-    'Could not open the folder dialog'
-  );
-  if (paths) addPaths(paths);
-});
-document.getElementById('btn-empty-add').addEventListener('click', (event) => {
-  // a focused button would claim Space and Enter from the shortcuts
-  if (event.detail) event.currentTarget.blur();
-  document.getElementById('btn-add').click();
-});
-document.getElementById('btn-shuffle').addEventListener('click', shuffle);
-document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
-document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
-document.getElementById('btn-clear').addEventListener('click', clearAll);
-document.getElementById('btn-clear-missing').addEventListener('click', clearMissing);
 
 /* ---------------- window resize ---------------- */
 
