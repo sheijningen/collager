@@ -8,6 +8,7 @@
 
 import { targetConsumesKey, normalizeShortcutKey, SCROLL_KEYS } from '../core/keys.js';
 import { state, selected, showToast, runOrToast } from './state.js';
+import { SCROLL_SPEED_STEP } from '../core/autoscroll.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
 import { panelOpen, setPanelOpen, applySelection } from './panel.js';
@@ -20,8 +21,6 @@ import { isFullscreen } from './fullscreen.js';
 export const helpOverlay = document.getElementById('help-overlay');
 export const aboutOverlay = document.getElementById('about-overlay');
 export const shortcutList = document.getElementById('shortcut-list');
-
-const SPEED_KEY_STEP = 10; // matches the slider's step
 
 export const SHORTCUTS = [
   ['Space', 'Start / stop auto-scroll'],
@@ -191,11 +190,11 @@ window.addEventListener('keydown', (event) => {
       if (!event.repeat) setAutoScroll(!autoScroll);
       break;
     case ',':
-      setScrollSpeed(scrollSpeed - SPEED_KEY_STEP);
+      setScrollSpeed(scrollSpeed - SCROLL_SPEED_STEP);
       showToast(`Auto-scroll speed: ${scrollSpeed} px/s`);
       break;
     case '.':
-      setScrollSpeed(scrollSpeed + SPEED_KEY_STEP);
+      setScrollSpeed(scrollSpeed + SCROLL_SPEED_STEP);
       showToast(`Auto-scroll speed: ${scrollSpeed} px/s`);
       break;
     case 's':

@@ -1,6 +1,18 @@
 /* Pure auto-scroll stepping. The ui module owns the animation frame loop and
  * the DOM; this decides where one tick lands. */
 
+export const MIN_SCROLL_SPEED = 10; // px/s
+export const MAX_SCROLL_SPEED = 600;
+export const DEFAULT_SCROLL_SPEED = 80;
+export const SCROLL_SPEED_STEP = 10; // the slider's step, and what , and . move it by
+
+/* The speed kept within the slider's range; an unusable value becomes the
+ * default. */
+export function clampScrollSpeed(value) {
+  if (!Number.isFinite(value)) return DEFAULT_SCROLL_SPEED;
+  return Math.min(MAX_SCROLL_SPEED, Math.max(MIN_SCROLL_SPEED, value));
+}
+
 const MAX_TICK_SECONDS = 0.1; // an unbounded delta after a hidden window would leap to the end
 const MANUAL_SCROLL_TOLERANCE = 2; // px; scrollTop rounds, virtualTop does not
 const END_TOLERANCE = 0.5; // px short of maxScroll that still counts as the end
