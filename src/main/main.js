@@ -4,6 +4,7 @@ const { createLibraryStore } = require('./lib/library');
 const { registerLibraryIpc } = require('./ipc/library');
 const { registerFilesIpc } = require('./ipc/files');
 const { registerWindowIpc } = require('./ipc/window');
+const { buildRelaunchOptions } = require('./lib/relaunch');
 
 const library = createLibraryStore(() => app.getPath('userData'));
 
@@ -52,7 +53,7 @@ app.on('child-process-gone', (_event, details) => {
   gpuCrashes++;
   console.error(`GPU process gone (${details.reason}), crash #${gpuCrashes}`);
   if (gpuCrashes >= 3 && !gpuFallback) {
-    app.relaunch({ args: process.argv.slice(1).concat(noGpuSwitch) });
+    app.relaunch(buildRelaunchOptions(process.argv, process.env.APPIMAGE, noGpuSwitch));
     app.exit(0);
   }
 });

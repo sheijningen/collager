@@ -136,6 +136,8 @@ docs/                README media
 - **GPU fallback**: three GPU process crashes relaunch the app with hardware acceleration
   disabled, passing an internal switch to the new process. Nothing is written to disk and
   there are no user-facing flags, so every normal start tries hardware acceleration again.
+  An AppImage is relaunched through the image named in `APPIMAGE`, because the mount it
+  runs from is gone once the process exits.
 
 ## Conventions
 
