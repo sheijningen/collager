@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag against package.json
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PKG_VERSION" != "$VERSION" ]]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+      - name: Refuse to overwrite an existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if OUTPUT="$(gh release view "$TAG" --repo "$REPO" --json isDraft 2>&1)"; then
+            echo "::error::Release $TAG already exists; refusing to overwrite"
+            exit 1
+          elif ! grep -qi 'release not found' <<<"$OUTPUT"; then
+            echo "::error::Could not check for an existing release: $OUTPUT"
+            exit 1
+          fi
+
+  lint:
+    needs: prepare
+    uses: ./.github/workflows/lint.yml
+
+  format:
+    needs: prepare
+    uses: ./.github/workflows/format.yml
+
+  unit:
+    needs: prepare
+    uses: ./.github/workflows/test.yml
+
+  e2e:
+    needs: prepare
+    uses: ./.github/workflows/e2e.yml
+
+  build:
+    name: build ${{ matrix.name }}
+    needs: [prepare, lint, format, unit, e2e]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            runner: ubuntu-latest
+            script: dist:linux
+            glob: dist/Collager-*.AppImage
+          - name: windows
+            runner: windows-latest
+            script: dist:win
+            glob: dist/Collager-*-setup.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ${{ matrix.script }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+          pattern: installer-*
+      - name: Check that both installers arrived and compute SHA256SUMS
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          cd artifacts
+          # electron-builder spells the architecture per target (x86_64 for
+          # AppImage, x64 for NSIS), so match on the fixed parts only
+          missing=0
+          for pattern in "Collager-${VERSION}-linux-*.AppImage" "Collager-${VERSION}-windows-*-setup.exe"; do
+            if ! compgen -G "$pattern" >/dev/null; then
+              echo "::error::Missing expected artifact: $pattern"
+              missing=1
+            fi
+          done
+          if [[ "$missing" != 0 ]]; then
+            exit 1
+          fi
+          sha256sum Collager-* | LC_ALL=C sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+      - name: Create a draft release
+        run: |
+          set -euo pipefail
+          # Flagged first so a create whose reply got lost is still cleaned up
+          echo "DRAFT_CREATED=1" >> "$GITHUB_ENV"
+          gh release create "$TAG" --repo "$REPO" --title "Collager ${TAG#v}" --generate-notes --draft
+      - name: Upload the installers and publish the release
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" --repo "$REPO" artifacts/Collager-* artifacts/SHA256SUMS
+          gh release edit "$TAG" --repo "$REPO" --draft=false
+      - name: Delete the draft this run left behind
+        if: (failure() || cancelled()) && env.DRAFT_CREATED == '1'
+        run: |
+          set -euo pipefail
+          # Only ever delete a draft: a cancellation can land after the release went public
+          if OUTPUT="$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq .isDraft 2>&1)"; then
+            if [[ "$OUTPUT" == "true" ]] && ! gh release delete "$TAG" --repo "$REPO" --yes; then
+              echo "::error::Could not delete the leftover draft of $TAG; delete it by hand before releasing again"
+              exit 1
+            fi
+          elif ! grep -qi 'release not found' <<<"$OUTPUT"; then
+            echo "::error::Could not check for a leftover draft of $TAG; delete it by hand before releasing again: $OUTPUT"
+            exit 1
+          fi

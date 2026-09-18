@@ -4,11 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   e2e:
     # pinned: the apt package names below are specific to this Ubuntu release
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4 # reads the pnpm version from packageManager

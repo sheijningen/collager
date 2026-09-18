@@ -53,11 +53,13 @@
       "target": "AppImage",
       "category": "Graphics",
       "icon": "build/icon.png",
-      "syncDesktopName": true
+      "syncDesktopName": true,
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-windows-${arch}-setup.${ext}"
     }
   }
 }

@@ -10,27 +10,25 @@ muted.
 <sub>Demo media: public-domain images and video from the NASA image library, plus CC0
 photos from Wikimedia Commons.</sub>
 
-## Run
+## Install
 
-Requires [pnpm](https://pnpm.io/installation).
+Download the latest installer from the
+[releases page](https://github.com/sheijningen/collager/releases/latest):
 
-```bash
-pnpm install
-pnpm start
-```
+- **Linux**: `Collager-<version>-linux-x86_64.AppImage`. Make it executable
+  (`chmod +x`) and run it. No installation needed. AppImages need `libfuse2`,
+  which some current distributions no longer ship by default; without it, run
+  `./Collager-<version>-linux-x86_64.AppImage --appimage-extract-and-run`.
+- **Windows**: `Collager-<version>-windows-x64-setup.exe`. Run the installer;
+  Collager appears in the Start menu. The installer is not code-signed, so
+  Windows shows an "unknown publisher" warning that you have to click through.
 
-Electron downloads its binary on first run, so the first `pnpm start` takes a
-while.
+Every release also carries a `SHA256SUMS` file; `sha256sum -c SHA256SUMS` in the download
+folder checks the installers against it.
 
 After three graphics-process crashes the app restarts with hardware acceleration off and
-stays that way. `collager --gpu` turns it back on; `--no-gpu` turns it off for one run.
-
-Installers:
-
-```bash
-pnpm dist:linux   # AppImage
-pnpm dist:win     # NSIS installer (run on Windows, or via wine)
-```
+stays that way. Starting it with `--gpu` turns it back on; `--no-gpu` turns it off for one
+run.
 
 ## Usage
 
@@ -100,14 +98,43 @@ Press **?** (or F1) in the app for this list.
 
 ## Development
 
+Requires [pnpm](https://pnpm.io/installation).
+
 ```bash
+pnpm install
+pnpm start          # run from source
 pnpm test           # unit tests
 pnpm test:e2e       # boots the real app; needs a display, ffmpeg optional
 pnpm lint           # eslint
 pnpm format         # prettier (format:check to verify)
 ```
 
+Electron downloads its binary on first run, so the first `pnpm start` takes a
+while.
+
+Installers can be built locally too:
+
+```bash
+pnpm dist:linux   # AppImage
+pnpm dist:win     # NSIS installer; on Linux this needs wine
+```
+
 Architecture, design decisions and conventions are in [CLAUDE.md](CLAUDE.md).
+
+### Releasing
+
+Bump `version` in `package.json` on `main`, push that commit, then push a
+matching tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The release workflow checks the tag against `package.json`, runs lint, format,
+unit and e2e tests, builds the Linux AppImage and the Windows installer, and
+publishes a GitHub Release with both plus `SHA256SUMS` and auto-generated
+notes.
 
 ## License
 
