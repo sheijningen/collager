@@ -8,7 +8,7 @@
 import { createPrefs } from '../core/prefs.js';
 
 export const state = {
-  /** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', size?:number, w?:number, h?:number, missing?:boolean}[]} the library, in collage order */
+  /** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', size?:number, w?:number, h?:number, missing?:boolean, unshowable?:boolean}[]} the library, in collage order; `unshowable` is set for the session when a present file fails to decode */
   items: [],
   /** set once the saved library has been loaded into `items` */
   libraryLoaded: false,
@@ -47,6 +47,8 @@ export function countMissing() {
 /* ---------------- toast ---------------- */
 
 let toastTimer = null;
+// long enough to read a two-sentence message without hurrying
+const TOAST_MS = 8000;
 /* A sticky toast has no timer and stays up until another toast replaces it.
  * It is reserved for a warning about a condition that lasts the session (a
  * blocked save). Progress of long-running work goes through startJob in
@@ -59,7 +61,7 @@ export function showToast(message, sticky = false) {
     ? null
     : setTimeout(() => {
         toastEl.hidden = true;
-      }, 2600);
+      }, TOAST_MS);
 }
 
 /* ---------------- persistence ---------------- */

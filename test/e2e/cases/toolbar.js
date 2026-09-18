@@ -74,7 +74,8 @@ module.exports = {
       const label = document.getElementById('panel-toggle-label');
       trigger.click();
       const opened = T.openDropdownId() === 'files-menu';
-      const addShown = document.getElementById('btn-add').offsetParent !== null;
+      const addShown = document.getElementById('btn-add').offsetParent !== null &&
+        document.getElementById('btn-add-folder').offsetParent !== null;
       const saysHide = T.panelOpen && label.textContent.includes('Hide');
       document.getElementById('btn-panel').click();
       const collapsed = !T.panelOpen && document.getElementById('panel').classList.contains('collapsed');
@@ -83,7 +84,7 @@ module.exports = {
       T.setPanelOpen(true);
       return { opened, addShown, saysHide, collapsed, closed, saysShow };
     })()`);
-    check('the Files menu holds the add action', files.opened && files.addShown);
+    check('the Files menu holds both add actions', files.opened && files.addShown);
     check(
       'the panel toggle in the Files menu collapses the panel and closes the menu',
       files.saysHide && files.collapsed && files.closed

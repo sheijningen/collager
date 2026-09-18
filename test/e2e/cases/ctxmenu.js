@@ -182,10 +182,15 @@ module.exports = {
       item.missing = false;
 
       // remove through the menu takes exactly the clicked item
+      const until = async (probe) => {
+        for (let tries = 0; tries < 100 && !probe(); tries++) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+      };
       const before = T.state.items.length;
       rightClick(tile);
       byId('ctx-remove').click();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await until(() => T.state.items.length === before - 1);
       const removed = T.state.items.length === before - 1
         && !T.state.items.some((i) => i.hash === item.hash) && T.ctxMenu.hidden;
 
@@ -196,7 +201,7 @@ module.exports = {
       const beforePair = T.state.items.length;
       rightClick(T.tiles.get(pair[0].hash));
       byId('ctx-remove').click();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await until(() => T.state.items.length === beforePair - 2);
       const pairRemoved = T.state.items.length === beforePair - 2
         && !T.state.items.some((i) => pair.some((p) => p.hash === i.hash))
         && T.selected.size === 0;

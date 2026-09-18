@@ -1,6 +1,5 @@
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const { createLibraryStore } = require('./lib/library');
 const { registerLibraryIpc } = require('./ipc/library');
 const { registerFilesIpc } = require('./ipc/files');
@@ -8,24 +7,33 @@ const { registerWindowIpc } = require('./ipc/window');
 
 const library = createLibraryStore(() => app.getPath('userData'));
 
+/* One instance per library: a second launch (a double double-click, a second
+ * shortcut) would write library.json in turns with the first and lose what
+ * either added. */
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+  return;
+}
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
+
 /* ---------------- GPU crash resilience ----------------
  * Some Windows GPU drivers make Chromium's GPU process crash ("GPU state
  * invalid after WaitForGetOffsetInRange", blank window, hard crash). If the
- * GPU process dies repeatedly, persist a flag and relaunch with hardware
- * acceleration disabled. Delete the flag file (or start with --gpu) to try
- * hardware acceleration again; --no-gpu forces software rendering once.
+ * GPU process dies repeatedly, relaunch with hardware acceleration disabled
+ * so the session keeps working. The switch is passed to the relaunched
+ * process and nothing is written to disk, so every normal start tries
+ * hardware acceleration again: a driver update or a reboot then fixes itself
+ * without the user having to know any of this exists.
  */
 
-const gpuFlagFile = () => path.join(app.getPath('userData'), 'disable-gpu');
+const noGpuSwitch = '--collager-no-gpu';
 
-if (process.argv.includes('--gpu')) {
-  try {
-    fs.unlinkSync(gpuFlagFile());
-  } catch {}
-}
-const gpuFallback =
-  !process.argv.includes('--gpu') &&
-  (process.argv.includes('--no-gpu') || fs.existsSync(gpuFlagFile()));
+const gpuFallback = process.argv.includes(noGpuSwitch);
 if (gpuFallback) app.disableHardwareAcceleration();
 
 let gpuCrashes = 0;
@@ -44,16 +52,15 @@ app.on('child-process-gone', (_event, details) => {
   gpuCrashes++;
   console.error(`GPU process gone (${details.reason}), crash #${gpuCrashes}`);
   if (gpuCrashes >= 3 && !gpuFallback) {
-    try {
-      fs.writeFileSync(
-        gpuFlagFile(),
-        'Written after repeated GPU process crashes. Delete this file (or start with --gpu) to re-enable hardware acceleration.\n'
-      );
-    } catch {}
-    app.relaunch();
+    app.relaunch({ args: process.argv.slice(1).concat(noGpuSwitch) });
     app.exit(0);
   }
 });
+
+// must match build.appId in package.json: electron-builder stamps that id on
+// the Start menu shortcut, and Windows only groups and pins the running window
+// with the shortcut when the process claims the same id
+if (process.platform === 'win32') app.setAppUserModelId('dev.svh.collager');
 
 registerLibraryIpc(library);
 registerFilesIpc();

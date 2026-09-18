@@ -26,28 +26,31 @@ Download the latest installer from the
 Every release also carries a `SHA256SUMS` file; `sha256sum -c SHA256SUMS` in the download
 folder checks the installers against it.
 
-After three graphics-process crashes the app restarts with hardware acceleration off and
-stays that way. Starting it with `--gpu` turns it back on; `--no-gpu` turns it off for one
-run.
+If the graphics driver keeps crashing, Collager restarts itself in a safer display mode
+for the rest of that session. Starting it again always tries the normal mode first.
 
 ## Usage
 
 - **Add media**: drag and drop files or folders anywhere in the window (folders
-  are scanned recursively), or pick **Add media files** from the **Files ▾**
-  menu. Duplicate content is detected by file hash, whatever the file name.
+  are scanned recursively), pick **Add media files** or **Add a folder** from
+  the **Files ▾** menu, or click the **Add media files** button on an empty
+  collage. Duplicate content is detected by file hash, whatever the
+  file name. Media dragged straight out of a web page cannot be added: save it to
+  the computer first.
 - **Remove**: hover a tile and click the ✕.
 - **Reorder**: drag a tile onto another tile to move it there. The order
   persists and is what shuffle randomizes.
-- **Files menu**: **Files ▾** holds **Add media files** and the file panel
-  toggle.
+- **Files menu**: **Files ▾** holds **Add media files**, **Add a folder** and
+  the file panel toggle.
 - **Collage menu**: **Collage ▾** holds **Shuffle**, which re-shuffles and
   re-packs the collage, the **Columns** stepper (1 to 8), and **Clear all**,
   which removes every item after confirmation.
 - **File panel**: a sidebar, hidden until opened from the Files menu or with P,
-  listing every file, sortable by collage order, name, path or type. Clicking
-  an entry scrolls to it; clicking a tile highlights its entry. Ctrl-click
-  toggles, Shift-click selects a range, **Remove (N)** or Delete removes the
-  selection, Escape clears it.
+  listing every file, sortable by collage order, name, path or type. A counter
+  above the list gives the item total and expands on click into the split by
+  file extension. Clicking an entry scrolls to it; clicking a tile highlights
+  its entry. Ctrl-click toggles, Shift-click selects a range, **Remove (N)** or
+  Delete removes the selection, Escape clears it.
 - **Item menu**: right-click a tile or a panel entry to maximize it, open it
   in the system's default app, copy its path (or, for still images, the image
   itself), show it in the file manager, or remove it. For a missing file the
@@ -60,7 +63,10 @@ run.
   **Keep the display awake** while it runs. The Scroll button is highlighted
   while auto-scroll runs. Manual scrolling moves the auto-scroll position.
 - **Maximize**: double-click a tile to view it enlarged. Videos get controls
-  there, so you can unmute. Esc or click to close.
+  there, so you can unmute. The arrow keys step to the previous or next item,
+  and the collage scrolls along, so closing leaves you where you stopped. Once
+  you click a video, the arrows work its own controls instead; close and
+  reopen to go back to stepping. Esc or click to close.
 - **Fullscreen**: the ⛶ button at the right of the toolbar, or F11. Esc also
   exits when nothing else consumes it.
 - **Toolbar**: the chevron in the top-right corner hides and shows the toolbar.
@@ -71,9 +77,14 @@ run.
   a new location repairs the entry. The item menu's **Show in folder** still
   works for one, and opens the folder the file was in; if that folder is gone
   as well, it says so.
+- **Files that cannot be shown** (a video format the built-in player does not
+  support, such as HEVC, or a damaged file) get an amber dashed tile instead.
+  They are not missing: open one with the default app from the item menu to
+  check it, or remove it.
 - **About**: click the "Collager" title or press I.
 
-The collection and all settings persist between launches.
+The collection and all settings persist between launches. Starting Collager while it is
+already running brings the open window forward instead of opening a second one.
 
 ## Keyboard shortcuts
 
@@ -85,6 +96,7 @@ Press **?** (or F1) in the app for this list.
 | `,` / `.`    | Auto-scroll slower / faster                                           |
 | `S`          | Shuffle the collage                                                   |
 | `A`          | Add media files                                                       |
+| `Shift+A`    | Add a folder                                                          |
 | `P`          | Show / hide the file panel                                            |
 | `T`          | Show / hide the toolbar                                               |
 | `-` / `+`    | Fewer / more columns                                                  |
@@ -94,6 +106,7 @@ Press **?** (or F1) in the app for this list.
 | `I`          | About Collager                                                        |
 | `?` / `F1`   | Show the shortcuts overlay                                            |
 | Double-click | Maximize a tile                                                       |
+| `←` / `→`    | Previous / next item while maximized                                  |
 | Right-click  | Item menu: maximize, open, copy path or image, show in folder, remove |
 
 ## Development

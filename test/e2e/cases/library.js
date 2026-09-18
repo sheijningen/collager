@@ -42,6 +42,10 @@ module.exports = {
       'incompatible files in the directory are skipped',
       (await js(`T.state.items.some(i => i.path.endsWith('notes.txt'))`)) === false
     );
+    check(
+      'the toast names the skipped format',
+      (await js('T.toastEl.textContent')).includes('1 unsupported file skipped (.txt)')
+    );
 
     // persistence: the library file holds every item with its dimensions
     const saved = await readLibraryWhen(expected + 2);
@@ -52,7 +56,10 @@ module.exports = {
 
     // clear all, and the removal reaches disk
     await js(`document.getElementById('btn-clear').click(); void 0`);
-    check('clear-all empties the collage', (await js('T.state.items.length')) === 0);
+    check(
+      'clear-all empties the collage',
+      await waitFor(async () => (await js('T.state.items.length')) === 0)
+    );
     check('empty state is shown again', await js(`!document.getElementById('empty-state').hidden`));
     check('clear-all is persisted', (await readLibraryWhen(0)) !== null);
   }

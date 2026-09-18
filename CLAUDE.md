@@ -16,12 +16,14 @@ src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, item menu shape, count text, file list key
+                     menu placement, item menu shape, count text, file list key, empty drop,
+                     lightbox stepping
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
                      test/main/helpers.js holds what the main tests share
-test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js
+test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js,
+                     second-instance.js (a second launch against the harness profile)
 build/               icon (SVG source, PNG export for electron-builder)
 docs/                README media
 ```
@@ -67,21 +69,31 @@ docs/                README media
   removed by hand.
 - **Resource limiting**: tiles are placeholders until within 800px of the viewport; the
   `<img>`/`<video>` is created then and torn down again once far away.
+- **Lightbox**: the arrow keys step to the previous or next item in collage order that can be
+  shown, and the collage scrolls to it, so closing the lightbox lands where the browsing
+  stopped. A focused video keeps the arrows for seeking.
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
-- **Persistence**: `library.json` in `userData` is an array of items, saves serialized and
-  atomic (temp file plus rename). The renderer refuses to save until the saved library has been
-  loaded into its state, so nothing done during startup or after a failed load can overwrite the
-  file with an empty list. An unreadable file is moved to `library.json.corrupt` (a
-  timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
-  When the move fails the file stays in place and saving is refused so it is not overwritten.
-  There is no schema version: a file the current code cannot read counts as unreadable. Only
-  path, hash, size, type and dimensions are stored per item; URL and missing flag are derived at
-  load, and an entry without a hash makes the file unreadable. A size is optional on read, so an
-  entry from before sizes were recorded loads and has one filled in.
+- **Persistence**: `library.json` in `userData` is an array of items, saves serialized and atomic
+  (temp file plus rename). The renderer refuses to save until the saved library has been loaded
+  into its state, so nothing done during startup or after a failed load can overwrite the file
+  with an empty list. An unreadable file is moved to `library.json.corrupt` (a timestamped name
+  when that exists, so no backup is ever overwritten) and the app starts empty. When the move
+  fails the file stays in place and saving is refused so it is not overwritten. There is no
+  schema version: a file the current code cannot read counts as unreadable. Only path, hash,
+  size, type and dimensions are stored per item; URL and missing flag are derived at load, the
+  unshowable flag while the app runs, and an entry without a hash makes the file unreadable. A
+  size is optional on read, so an entry from before sizes were recorded loads and has one filled
+  in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
-- **File panel** starts closed on a fresh profile; the saved preference wins after that.
+- **Unshowable files**: a file that fails to load is missing only when the main process says
+  it is gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and
+  gets an amber dashed tile with its own hint for the session. It is not counted as missing,
+  and its menu keeps every action that does not need to show it.
+- **File panel** always starts closed; its open state is not remembered across restarts.
+  A counter above the list gives the item total and expands on click into the split by
+  file extension, biggest group first.
 - **Item menu**: one context menu (`ui/ctxmenu.js`) serves tiles and file panel entries: maximize
   (the lightbox, which the copy never names), open in the default app, copy the path or (for
   still images) the bitmap, show in the file manager, remove. Actions that need the file are
@@ -93,27 +105,37 @@ docs/                README media
   rebuild of the list for an entry, a re-layout of the collage for a tile. Auto-scroll holds
   while a tile's menu is up and runs on under an entry's.
 - **Settings** live in `localStorage` under the `collager.` prefix via the prefs module.
+- **Removal questions** (clear all, clear missing, remove the selection) are native message
+  boxes whose buttons name the outcome ("Remove all 12 items" / "Keep"); Keep is the default, so
+  Enter and Escape both keep. The renderer asks through the `confirm-removal` channel.
+- **Empty state**: the text on an empty collage carries an Add media files button, the same
+  action as the Files menu entry, so a first start has something to click.
+- **Empty drops**: a drop that resolves to no paths is explained when it carried links or a
+  file with no location on disk (an image dragged out of a browser), and ignored otherwise.
 - **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
   cannot insert the same hash twice.
-- **Toolbar**: three dropdown menus on the left (Files: add and the panel toggle; Collage:
-  shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings), fullscreen and
-  help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens one menu at a
-  time, not modal; a button in a menu closes it unless it or a row above it is marked
-  `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a second row
-  rather than overflow, and media queries drop the hint and counters first.
+- **Toolbar**: three dropdown menus on the left (Files: add files, add a folder, the panel
+  toggle; Collage: shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings),
+  fullscreen and help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens
+  one menu at a time, not modal; a button in a menu closes it unless it or a row above it is
+  marked `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a
+  second row rather than overflow, and media queries drop the hint and counters first.
 - **Escape order**: toolbar dropdown, context menu, lightbox, help/about overlays, selection,
   fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
   layer.
 - **File panel list**: rebuilt only when what it shows changes (sort mode, and each entry's
-  hash, path, type and missing state in order); other renders leave its DOM alone.
+  hash, path, type and file problem in order); other renders leave its DOM alone.
 - **Progress**: long-running work (preparing the library, adding a batch) reports through
   `startJob` in `status.js`, one line per job in the status area stacked above the toast at the
   bottom centre. Toasts carry one-off messages; a sticky toast is reserved for a warning about
   a condition that lasts the session, such as a blocked save, and progress never goes through it.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
-- **GPU fallback**: three GPU process crashes write a `disable-gpu` file to `userData` and
-  relaunch without hardware acceleration. `--gpu` clears it, `--no-gpu` forces it once.
+- **Single instance**: a second launch exits at once and the running instance brings its
+  window forward, so two instances can never take turns writing `library.json`.
+- **GPU fallback**: three GPU process crashes relaunch the app with hardware acceleration
+  disabled, passing an internal switch to the new process. Nothing is written to disk and
+  there are no user-facing flags, so every normal start tries hardware acceleration again.
 
 ## Conventions
 
@@ -125,17 +147,17 @@ docs/                README media
 ## Testing
 
 - `pnpm test`: unit tests with `node:test`, no display needed.
-- `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code
-  (video only when ffmpeg is installed) and drives the renderer via `executeJavaScript`.
-  Each file in `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every
-  case the harness resets the app (empty library, nothing open or selected, two columns, default
-  speed, sort, panels and window size, `confirm()` answering yes), so a case loads what it needs
-  (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
+- `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code (video
+  only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
+  `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the
+  harness resets the app (empty library, nothing open or selected, two columns, default speed,
+  sort, panels and window size, the removal question answering yes), so a case loads what it
+  needs (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
   never cleans up. A case that needs the startup path seeds a saved library and restarts the
-  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named
-  cases, in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e`
-  and `app.js` exposes every module export on `window.collagerTest`, which the snippets reach
-  as `T`; every snippet also gets `press(key)`, which fires a keydown on the window.
+  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named cases,
+  in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e` and
+  `app.js` exposes every module export on `window.collagerTest`, which the snippets reach as `T`;
+  every snippet also gets `press(key)`, which fires a keydown on the window.
 - Run the e2e suite locally as `env -u ELECTRON_RUN_AS_NODE pnpm test:e2e`, straight on the
   desktop: the app window opens and closes on the current display during the run, which is
   fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes
@@ -161,3 +183,7 @@ by hand before the run is retried. The installer file names come from the `artif
 fields; the build job's upload globs and the publish job's patterns match them on everything
 except the architecture part (electron-builder writes `x86_64` for AppImage and `x64` for
 NSIS), and the README spells out the names the x64 runners produce. Change all four together.
+`build.appId` doubles as the Windows AppUserModelID: electron-builder stamps it on the
+shortcuts and `main.js` sets the same literal on the running process, so the taskbar groups
+and pins them together. electron-builder strips the `build` field from the packaged
+`package.json`, so main must not read it back at runtime.

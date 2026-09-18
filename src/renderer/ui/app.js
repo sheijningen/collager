@@ -4,10 +4,11 @@
 
 import * as layout from '../core/layout.js';
 import { basename } from '../core/layout.js';
-import { formatCount } from '../core/text.js';
+import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
 import { state, showToast, persist, reindexItems, countMissing } from './state.js';
+import { formatCount } from '../core/text.js';
 // named imports stay live; destructuring the namespace would freeze `columns`
 import {
   columns,
@@ -15,7 +16,8 @@ import {
   shuffle,
   render,
   addPaths,
-  removeItems,
+  clearAll,
+  clearMissing,
   measureMissingDimensions,
   queueLibraryOperation
 } from './collage.js';
@@ -37,7 +39,7 @@ const dropOverlay = document.getElementById('drop-overlay');
 
 let dragDepth = 0;
 window.addEventListener('dragenter', (event) => {
-  if (event.dataTransfer && [...event.dataTransfer.types].includes('Files')) {
+  if (event.dataTransfer && mayCarryMedia([...event.dataTransfer.types])) {
     dragDepth++;
     dropOverlay.hidden = false;
   }
@@ -53,6 +55,11 @@ window.addEventListener('drop', (event) => {
   dropOverlay.hidden = true;
   const files = [...event.dataTransfer.files];
   const paths = files.map((file) => window.api.pathForFile(file)).filter(Boolean);
+  if (!paths.length) {
+    const explanation = explainEmptyDrop([...event.dataTransfer.types], files.length);
+    if (explanation) showToast(explanation);
+    return;
+  }
   addPaths(paths);
 });
 
@@ -62,23 +69,20 @@ document.getElementById('btn-add').addEventListener('click', async () => {
   const paths = await window.api.pickFiles();
   addPaths(paths);
 });
+document.getElementById('btn-add-folder').addEventListener('click', async () => {
+  const paths = await window.api.pickFolders();
+  addPaths(paths);
+});
+document.getElementById('btn-empty-add').addEventListener('click', (event) => {
+  // a focused button would claim Space and Enter from the shortcuts
+  if (event.detail) event.currentTarget.blur();
+  document.getElementById('btn-add').click();
+});
 document.getElementById('btn-shuffle').addEventListener('click', shuffle);
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
 document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
-document.getElementById('btn-clear').addEventListener('click', () => {
-  const count = state.items.length;
-  if (!count) return;
-  if (!confirm(`Remove all ${formatCount(count, 'item')} from the collage?`)) return;
-  removeItems(() => false);
-  showToast(`Cleared ${formatCount(count, 'item')}`);
-});
-document.getElementById('btn-clear-missing').addEventListener('click', () => {
-  const count = countMissing();
-  if (!count) return;
-  if (!confirm(`Remove all ${formatCount(count, 'missing file')} from the collage?`)) return;
-  removeItems((item) => !item.missing);
-  showToast(`Removed ${formatCount(count, 'missing file')}`);
-});
+document.getElementById('btn-clear').addEventListener('click', clearAll);
+document.getElementById('btn-clear-missing').addEventListener('click', clearMissing);
 
 /* ---------------- window resize ---------------- */
 
@@ -90,7 +94,7 @@ window.addEventListener('resize', () => {
 
 window.api.onGpuFallback(() => {
   showToast(
-    'Hardware acceleration is off after repeated graphics crashes — start with --gpu to retry'
+    'Graphics trouble: Collager restarted in a safer display mode. The next start tries the normal one again.'
   );
 });
 
@@ -168,7 +172,9 @@ queueLibraryOperation(async function init() {
     const notes = [];
     const missingCount = countMissing();
     if (missingCount) {
-      notes.push(`${formatCount(missingCount, 'file')} missing on disk, hover to remove`);
+      notes.push(
+        `${formatCount(missingCount, 'file')} missing on disk, see Collage > ⚠ Clear ${missingCount} missing`
+      );
     }
     if (loaded.collapsed) {
       notes.push(`${formatCount(loaded.collapsed, 'duplicate')} merged`);

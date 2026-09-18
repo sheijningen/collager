@@ -11,6 +11,7 @@
   --fg-dim: #85858f;
   --accent: #4f8cff;
   --danger: #e5484d;
+  --warn: #e0a83a;
   --toolbar-h: 48px;
 }
 
@@ -372,6 +373,47 @@ div.dropdown-row {
   font-size: 12px;
 }
 
+/* the counter reads as a line of text, not a button, until pointed at */
+#panel-count {
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #26262e;
+  color: var(--fg-dim);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#panel-count:not(:disabled):hover {
+  color: var(--fg);
+}
+
+#panel-count:disabled {
+  cursor: default;
+}
+
+#panel-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px 6px;
+  border-bottom: 1px solid #26262e;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+#panel-breakdown li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+#panel-breakdown .ext-count {
+  color: var(--fg);
+}
+
 #file-list {
   flex: 1;
   overflow-y: auto;
@@ -403,6 +445,14 @@ div.dropdown-row {
   background: rgba(229, 72, 77, 0.18);
 }
 
+#file-list li.unshowable {
+  background: rgba(224, 168, 58, 0.1);
+}
+
+#file-list li.unshowable:hover {
+  background: rgba(224, 168, 58, 0.18);
+}
+
 #file-list li.selected {
   background: rgba(79, 140, 255, 0.22);
 }
@@ -415,6 +465,10 @@ div.dropdown-row {
 #file-list li.missing .badge {
   background: #5c1e22;
   color: #ff9b9e;
+}
+
+#file-list li.unshowable .fname {
+  color: var(--warn);
 }
 
 #file-list .fname {
@@ -538,6 +592,14 @@ div.dropdown-row {
   color: var(--danger);
 }
 
+.tile.unshowable {
+  outline: 1px dashed var(--warn);
+}
+
+.tile.unshowable .placeholder-label {
+  color: var(--warn);
+}
+
 .tile.selected {
   outline: 3px solid var(--accent);
   outline-offset: -3px;
@@ -610,6 +672,30 @@ div.dropdown-row {
 
 #empty-state .sub {
   font-size: 13px;
+}
+
+/* the one thing on an empty collage that can be clicked */
+#empty-state button {
+  pointer-events: auto;
+  margin: 8px 0;
+  height: 44px;
+  padding: 0 24px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#empty-state button:hover {
+  background: var(--fg);
+}
+
+#empty-state button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
 }
 
 /* ---------- drag & drop overlay ---------- */
@@ -820,6 +906,7 @@ kbd {
 }
 
 #toast {
+  max-width: min(90vw, 560px);
   background: #26262e;
   color: var(--fg);
   padding: 10px 18px;

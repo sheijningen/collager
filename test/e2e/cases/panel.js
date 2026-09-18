@@ -2,9 +2,29 @@
  * Escape ladder, batch remove. */
 module.exports = {
   name: 'panel',
-  async run({ js, check, readLibraryWhen, expected, loadFixtures }) {
+  async run({ js, check, readLibraryWhen, expected, loadFixtures, restartWith, waitFor }) {
     await loadFixtures();
     check('file panel lists every item', (await js('T.fileList.children.length')) === expected);
+
+    const counter = await js(`(() => {
+      const collapsed = { text: T.panelCount.textContent, hidden: T.panelBreakdown.hidden };
+      T.panelCount.click();
+      const rows = [...T.panelBreakdown.children].map((li) => ({
+        extension: li.firstChild.textContent,
+        count: Number(li.lastChild.textContent)
+      }));
+      T.panelCount.click();
+      return { collapsed, rows, reclosed: T.panelBreakdown.hidden };
+    })()`);
+    check('the counter shows the total', counter.collapsed.text.includes(`${expected} items`));
+    check('the split starts hidden', counter.collapsed.hidden);
+    check(
+      'clicking the counter splits the total by extension',
+      counter.rows.length > 0 &&
+        counter.rows.reduce((sum, row) => sum + row.count, 0) === expected &&
+        counter.rows.every((row) => row.extension.startsWith('.'))
+    );
+    check('clicking the counter again hides the split', counter.reclosed);
 
     // a render that changes nothing the list shows leaves its DOM alone, so an
     // open context menu stays anchored to its entry; a rebuild closes it
@@ -79,12 +99,21 @@ module.exports = {
     check('Escape closes an overlay and keeps the selection', ladder.overlayOnly);
     check('Escape then clears the selection', ladder.selectionCleared);
 
-    await js(`window.confirm = () => true; T.removeSelectedBtn.click(); void 0`);
+    await js('T.removeSelectedBtn.click(); void 0');
     check(
       'batch remove removes the selection',
-      (await js('T.state.items.length')) === expected - 2
+      await waitFor(async () => (await js('T.state.items.length')) === expected - 2)
     );
     check('selection is empty after removal', (await js('T.selected.size')) === 0);
     check('the removal is persisted', (await readLibraryWhen(expected - 2)) !== null);
+
+    // the panel is closed on every start, whatever it was when the app quit
+    await js('T.setPanelOpen(true)');
+    await restartWith([]);
+    const afterRestart = await js(
+      `({ open: T.panelOpen,
+          collapsed: document.getElementById('panel').classList.contains('collapsed') })`
+    );
+    check('the panel starts closed after a restart', !afterRestart.open && afterRestart.collapsed);
   }
 };

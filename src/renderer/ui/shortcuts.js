@@ -14,7 +14,7 @@ import { panelOpen, setPanelOpen, applySelection } from './panel.js';
 import { ctxMenu, closeCtxMenu } from './ctxmenu.js';
 import { toolbarOpen, setToolbarOpen } from './toolbar.js';
 import { openDropdownId, closeDropdown } from './dropdown.js';
-import { lightbox, closeLightbox } from './lightbox.js';
+import { lightbox, closeLightbox, stepLightbox } from './lightbox.js';
 import { isFullscreen } from './fullscreen.js';
 
 export const helpOverlay = document.getElementById('help-overlay');
@@ -22,12 +22,24 @@ export const aboutOverlay = document.getElementById('about-overlay');
 export const shortcutList = document.getElementById('shortcut-list');
 
 const SPEED_KEY_STEP = 10; // matches the slider's step
+const SCROLLING_KEYS = [
+  ' ',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'PageUp',
+  'PageDown',
+  'Home',
+  'End'
+];
 
 export const SHORTCUTS = [
   ['Space', 'Start / stop auto-scroll'],
   [', / .', 'Auto-scroll slower / faster'],
   ['S', 'Shuffle the collage'],
   ['A', 'Add media files'],
+  ['Shift+A', 'Add a folder'],
   ['P', 'Show / hide the file panel'],
   ['T', 'Show / hide the toolbar'],
   ['− / +', 'Fewer / more columns'],
@@ -37,6 +49,7 @@ export const SHORTCUTS = [
   ['I', 'About Collager'],
   ['? / F1', 'Show this help'],
   ['Double-click', 'Maximize a tile'],
+  ['← / →', 'Previous / next item while maximized'],
   ['Right-click', 'Item menu: maximize, open, copy path or image, show in folder, remove']
 ];
 
@@ -79,11 +92,7 @@ async function openAbout() {
     const meta = document.getElementById('about-meta');
     const rows = [
       ['Author', info.author],
-      ['License', info.license],
-      ['Electron', info.electron],
-      ['Chromium', info.chromium],
-      ['Node', info.node],
-      ['Platform', info.platform]
+      ['License', info.license]
     ];
     for (const [term, value] of rows) {
       if (!value) continue;
@@ -156,8 +165,17 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   // the lightbox and the context menu are modal too; Escape left above, so
-  // every remaining key is inert while either is open
-  if (!lightbox.hidden || !ctxMenu.hidden) return;
+  // every remaining key is inert while either is open, bar stepping through
+  // the collage from the lightbox
+  if (!lightbox.hidden) {
+    // the collage behind the backdrop must not scroll away from the shown item
+    if (SCROLLING_KEYS.includes(event.key)) event.preventDefault();
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      stepLightbox(event.key === 'ArrowRight' ? 1 : -1);
+    }
+    return;
+  }
+  if (!ctxMenu.hidden) return;
 
   switch (event.key) {
     case '?':
@@ -184,8 +202,12 @@ window.addEventListener('keydown', (event) => {
       if (!event.repeat && state.items.length) shuffle();
       break;
     case 'a':
-      if (!event.repeat) document.getElementById('btn-add').click();
+    case 'A': {
+      // the modifier, not the letter's case, so caps lock cannot swap the two
+      const button = event.shiftKey ? 'btn-add-folder' : 'btn-add';
+      if (!event.repeat) document.getElementById(button).click();
       break;
+    }
     case 'p':
       if (!event.repeat) setPanelOpen(!panelOpen);
       break;

@@ -43,3 +43,9 @@ test('sliders keep the arrow and paging keys and nothing else', () => {
   assert.equal(targetConsumesKey(slider, ' '), false);
   assert.equal(targetConsumesKey(slider, ','), false);
 });
+
+test('a focused video keeps Space and the arrows for its controls', () => {
+  assert.equal(targetConsumesKey({ tagName: 'VIDEO' }, ' '), true);
+  assert.equal(targetConsumesKey({ tagName: 'VIDEO' }, 'ArrowRight'), true);
+  assert.equal(targetConsumesKey({ tagName: 'VIDEO' }, 'f'), false);
+});

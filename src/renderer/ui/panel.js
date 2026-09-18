@@ -8,9 +8,16 @@
 import { sortItems, basename } from '../core/layout.js';
 import { clickSelection } from '../core/selection.js';
 import { buildListKey } from '../core/listkey.js';
-import { formatCount } from '../core/text.js';
+import { countByExtension } from '../core/counts.js';
+import { formatCount, fileProblem } from '../core/text.js';
 import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
-import { render, removeItems, MISSING_FILE_HINT } from './collage.js';
+import {
+  render,
+  removeItems,
+  askRemoval,
+  MISSING_FILE_HINT,
+  UNSHOWABLE_FILE_HINT
+} from './collage.js';
 import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
@@ -20,12 +27,15 @@ const panel = document.getElementById('panel');
 export const fileList = document.getElementById('file-list');
 export const sortSelect = document.getElementById('sort-select');
 export const removeSelectedBtn = document.getElementById('btn-remove-selected');
+export const panelCount = document.getElementById('panel-count');
+export const panelBreakdown = document.getElementById('panel-breakdown');
 
 /** hash -> list <li> element */
 export const listEntries = new Map();
 let sortMode = prefs.string('sort', 'added');
-export let panelOpen = prefs.bool('panel', false);
+export let panelOpen = false; // always starts closed, never remembered
 let renderedListKey = null; // what the list currently shows, or null while hidden
+let breakdownOpen = false;
 
 function sortedItems() {
   return sortItems(state.items, sortMode);
@@ -37,6 +47,7 @@ export function renderList() {
     renderedListKey = null; // rebuilt on reopen (setPanelOpen → render)
     return;
   }
+  renderCounts();
   const items = sortedItems();
   const key = buildListKey(items, sortMode);
   if (key === renderedListKey) return; // selection classes are already current
@@ -46,8 +57,11 @@ export function renderList() {
   listEntries.clear();
   for (const item of items) {
     const li = document.createElement('li');
-    li.className = (selected.has(item.hash) ? 'selected' : '') + (item.missing ? ' missing' : '');
-    li.title = item.missing ? `${item.path}\n\n${MISSING_FILE_HINT}` : item.path;
+    const problem = fileProblem(item);
+    li.className = (selected.has(item.hash) ? 'selected' : '') + (problem ? ` ${problem}` : '');
+    li.title = item.path;
+    if (problem === 'missing') li.title += `\n\n${MISSING_FILE_HINT}`;
+    if (problem === 'unshowable') li.title += `\n\n${UNSHOWABLE_FILE_HINT}`;
 
     const badge = document.createElement('span');
     badge.className = `badge ${item.type}`;
@@ -68,6 +82,34 @@ export function renderList() {
     listEntries.set(item.hash, li);
   }
   updateRemoveSelectedBtn();
+}
+
+/* The total, and under it the split by extension while it is expanded. */
+function renderCounts() {
+  const { total, extensions } = countByExtension(state.items);
+  panelCount.textContent = `${breakdownOpen ? '\u25BE' : '\u25B8'} ${formatCount(total, 'item')}`;
+  panelCount.title = breakdownOpen ? 'Hide the split by file type' : 'Split the count by file type';
+  panelCount.disabled = total === 0;
+  panelCount.setAttribute('aria-expanded', String(breakdownOpen));
+
+  panelBreakdown.hidden = !breakdownOpen || total === 0;
+  panelBreakdown.textContent = '';
+  if (panelBreakdown.hidden) return;
+  for (const { extension, count } of extensions) {
+    const row = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = extension;
+    const value = document.createElement('span');
+    value.className = 'ext-count';
+    value.textContent = String(count);
+    row.append(name, value);
+    panelBreakdown.appendChild(row);
+  }
+}
+
+export function setBreakdownOpen(open) {
+  breakdownOpen = open;
+  renderCounts();
 }
 
 export function handleSelectClick(hash, event, source) {
@@ -103,23 +145,25 @@ function updateRemoveSelectedBtn() {
   removeSelectedBtn.disabled = selected.size === 0;
 }
 
-function scrollCollageTo(hash) {
+export function scrollCollageTo(hash) {
   const pos = lastPositions.get(hash);
   if (!pos) return;
   const top = Math.max(0, pos.y - 40);
   // with auto-scroll running a smooth scroll cannot survive: the next tick
   // would treat the moving position as manual scrolling, adopt it and cancel
-  // the animation — so jump instantly and hand the tick the new position
+  // the animation — so jump instantly and hand the tick the new position.
+  // Behind the lightbox nobody sees the animation, and it would hydrate
+  // every tile it passes.
   setAutoScrollPosition(top);
-  scroller.scrollTo({ top, behavior: autoScroll ? 'auto' : 'smooth' });
+  const instant = autoScroll || !lightbox.hidden;
+  scroller.scrollTo({ top, behavior: instant ? 'auto' : 'smooth' });
 }
 
-export function removeSelected() {
+export async function removeSelected() {
   if (!selected.size) return;
-  const count = selected.size;
-  if (!confirm(`Remove ${formatCount(count, 'selected item')} from the collage?`)) return;
-  removeItems((item) => !selected.has(item.hash));
-  showToast(`Removed ${formatCount(count, 'item')}`);
+  if (!(await askRemoval(formatCount(selected.size, 'selected item')))) return;
+  const removed = removeItems((item) => !selected.has(item.hash));
+  showToast(`Removed ${formatCount(removed, 'item')}`);
 }
 
 const panelToggleLabel = document.getElementById('panel-toggle-label');
@@ -133,11 +177,11 @@ function applyPanelOpen(open) {
 
 export function setPanelOpen(open) {
   applyPanelOpen(open);
-  prefs.set('panel', open);
   render(); // collage width changed
 }
 
 removeSelectedBtn.addEventListener('click', removeSelected);
+panelCount.addEventListener('click', () => setBreakdownOpen(!breakdownOpen));
 document.getElementById('btn-panel').addEventListener('click', () => setPanelOpen(!panelOpen));
 sortSelect.value = sortMode;
 sortSelect.addEventListener('change', () => {

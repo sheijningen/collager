@@ -14,7 +14,8 @@ const RANGE_INPUT_KEYS = [
 /**
  * Whether the focused element needs this key for itself, so a global
  * shortcut must not steal it: typing in a text field, Space or Enter on a
- * button, Space on a checkbox or radio, arrows and paging on a slider.
+ * button, Space on a checkbox or radio, arrows and paging on a slider, Space
+ * and arrows on a focused video (play, pause and seek in its controls).
  *
  * @param {{tagName?: string, type?: string} | null} target the event target
  * @param {string} key the KeyboardEvent key
@@ -24,6 +25,7 @@ export function targetConsumesKey(target, key) {
   const tag = target.tagName;
   if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
   if (tag === 'BUTTON') return key === ' ' || key === 'Enter';
+  if (tag === 'VIDEO') return key === ' ' || RANGE_INPUT_KEYS.includes(key);
   if (tag === 'INPUT') {
     const type = target.type;
     if (type === 'checkbox' || type === 'radio') return key === ' ';

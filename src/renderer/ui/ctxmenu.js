@@ -9,7 +9,7 @@
 
 import { clampMenuPosition } from '../core/menuposition.js';
 import { menuActsOnSelection, menuHeader, removeLabel } from '../core/itemmenu.js';
-import { formatCount } from '../core/text.js';
+import { formatCount, fileProblem } from '../core/text.js';
 import { selected, scroller, showToast } from './state.js';
 import { removeItems } from './collage.js';
 import { fileList, removeSelected } from './panel.js';
@@ -55,11 +55,13 @@ export function openCtxMenu(item, x, y, source) {
   for (const button of [ctxOpenBtn, ctxOpenExternalBtn, ctxCopyBtn, ctxRevealBtn]) {
     button.hidden = wholeSelection;
   }
-  ctxOpenBtn.disabled = Boolean(item.missing);
+  const showable = fileProblem(item) === null;
+  ctxOpenBtn.disabled = !showable;
+  // an unshowable file still opens in the default app, which may decode it
   ctxOpenExternalBtn.disabled = Boolean(item.missing);
   // only still images can be put on the clipboard as a bitmap
   ctxCopyImageBtn.hidden = wholeSelection || item.type !== 'image';
-  ctxCopyImageBtn.disabled = Boolean(item.missing);
+  ctxCopyImageBtn.disabled = !showable;
   ctxRemoveBtn.textContent = removeLabel(selected.size, wholeSelection);
   // measure at a neutral position (stale left/top from a previous opening
   // would cap shrink-to-fit width and skew the measurement), then clamp
@@ -90,7 +92,7 @@ export function closeCtxMenu() {
 ctxOpenBtn.addEventListener('click', () => {
   const item = ctxItem;
   closeCtxMenu();
-  if (item && !item.missing) openLightbox(item);
+  if (item && !fileProblem(item)) openLightbox(item);
 });
 
 ctxOpenExternalBtn.addEventListener('click', async () => {
@@ -154,7 +156,7 @@ function loadImageAsPngBlob(url) {
 ctxCopyImageBtn.addEventListener('click', async () => {
   const item = ctxItem;
   closeCtxMenu();
-  if (!item || item.missing) return;
+  if (!item || fileProblem(item)) return;
   try {
     const blob = await loadImageAsPngBlob(item.url);
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
