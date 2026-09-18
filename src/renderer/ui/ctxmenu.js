@@ -74,29 +74,38 @@ export function closeCtxMenu() {
   ctxScrollAtOpen = null;
 }
 
-ctxOpenBtn.addEventListener('click', () => {
-  const item = ctxItem;
-  closeCtxMenu();
-  if (item && !fileProblem(item)) openLightbox(item);
-});
+/* Wires a menu button. The click closes the menu first, then `run` gets the
+ * item the menu was opened on and whether it acts on the whole selection; a
+ * click that finds the menu already closed does nothing. */
+function onMenuAction(button, run) {
+  button.addEventListener('click', () => {
+    const item = ctxItem;
+    const wholeSelection = ctxActsOnSelection();
+    closeCtxMenu();
+    if (item) run(item, wholeSelection);
+  });
+}
 
-ctxOpenExternalBtn.addEventListener('click', async () => {
-  const item = ctxItem;
-  closeCtxMenu();
-  if (!item || item.missing) return;
+/* Sends a request to the shell and toasts when it comes back with a reason
+ * or fails outright; `action` names what could not be done. */
+async function requestFromShell(request, action) {
   try {
-    const error = await window.api.openExternally(item.path);
-    if (error) showToast(`Could not open the file: ${error}`);
+    const error = await request();
+    if (error) showToast(`Could not ${action}: ${error}`);
   } catch {
-    showToast('Could not open the file');
+    showToast(`Could not ${action}`);
   }
+}
+
+onMenuAction(ctxOpenBtn, (item) => {
+  if (!fileProblem(item)) openLightbox(item);
 });
 
-ctxRemoveBtn.addEventListener('click', () => {
-  const item = ctxItem;
-  const wholeSelection = ctxActsOnSelection();
-  closeCtxMenu();
-  if (!item) return;
+onMenuAction(ctxOpenExternalBtn, (item) => {
+  if (!item.missing) requestFromShell(() => window.api.openExternally(item.path), 'open the file');
+});
+
+onMenuAction(ctxRemoveBtn, (item, wholeSelection) => {
   if (wholeSelection) {
     removeSelected();
   } else {
@@ -105,10 +114,7 @@ ctxRemoveBtn.addEventListener('click', () => {
   }
 });
 
-ctxCopyBtn.addEventListener('click', async () => {
-  const item = ctxItem;
-  closeCtxMenu();
-  if (!item) return;
+onMenuAction(ctxCopyBtn, async (item) => {
   try {
     await navigator.clipboard.writeText(item.path);
     showToast('Path copied to clipboard');
@@ -138,10 +144,8 @@ function loadImageAsPngBlob(url) {
   });
 }
 
-ctxCopyImageBtn.addEventListener('click', async () => {
-  const item = ctxItem;
-  closeCtxMenu();
-  if (!item || fileProblem(item)) return;
+onMenuAction(ctxCopyImageBtn, async (item) => {
+  if (fileProblem(item)) return;
   try {
     const blob = await loadImageAsPngBlob(item.url);
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -153,16 +157,8 @@ ctxCopyImageBtn.addEventListener('click', async () => {
 
 // a missing file has no entry to select, so the main process opens the folder
 // it was in instead, and says so when that folder has gone too
-ctxRevealBtn.addEventListener('click', async () => {
-  const item = ctxItem;
-  closeCtxMenu();
-  if (!item) return;
-  try {
-    const error = await window.api.revealFile(item.path);
-    if (error) showToast(`Could not show the file: ${error}`);
-  } catch {
-    showToast('Could not show the file');
-  }
+onMenuAction(ctxRevealBtn, (item) => {
+  requestFromShell(() => window.api.revealFile(item.path), 'show the file');
 });
 
 // dismiss on outside click, focus loss, scroll or resize: the menu is
