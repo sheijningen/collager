@@ -425,7 +425,9 @@ async function addPathsUnderJob(paths, job) {
   await measureMissingDimensions(fresh, (done, total) => {
     job.update(`reading dimensions ${done}/${total}`);
   });
-  state.items.push(...fresh);
+  // one at a time: spreading a batch of some hundred thousand entries into
+  // one push call overflows the call stack
+  for (const entry of fresh) state.items.push(entry);
   render();
   persist();
 
