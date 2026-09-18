@@ -1,7 +1,7 @@
 /* The file panel's media counter: how many items there are in total and how
  * that total splits over file extensions. */
 
-import { basename } from './layout.js';
+import { basename } from './paths.js';
 
 /* ".png", ".mp4": the extension of a file name, lowercased. A name with no
  * dot, or one that only starts with one, has no extension. */

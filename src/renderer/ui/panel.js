@@ -5,7 +5,8 @@
  * a tile highlights its list entry. Ctrl toggles, Shift selects a range.
  */
 
-import { sortItems, basename } from '../core/layout.js';
+import { sortItems } from '../core/layout.js';
+import { basename } from '../core/paths.js';
 import { clickSelection } from '../core/selection.js';
 import { buildListKey } from '../core/listkey.js';
 import { countByExtension } from '../core/counts.js';

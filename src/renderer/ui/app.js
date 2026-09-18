@@ -3,7 +3,7 @@
  * here is what wires their event handlers up. */
 
 import * as layout from '../core/layout.js';
-import { basename } from '../core/layout.js';
+import { basename } from '../core/paths.js';
 import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';

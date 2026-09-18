@@ -1,6 +1,8 @@
 /* Pure layout & sorting logic for the collage. No DOM access in here; the
  * renderer imports it and the unit tests require() it under Node. */
 
+import { basename } from './paths.js';
+
 export const GAP = 4; // px between tiles
 export const MISSING_W = 260; // fallback tile size for missing/unmeasured files
 export const MISSING_H = 140;
@@ -40,10 +42,6 @@ export function packItems(list, containerWidth, columns) {
     colHeights[col] += tileHeight + GAP;
   }
   return { positions, height: Math.max(0, Math.max(0, ...colHeights) - GAP) };
-}
-
-export function basename(filePath) {
-  return filePath.split(/[\\/]/).pop();
 }
 
 /* Reorder for drag & drop: the moved item takes the target's place —

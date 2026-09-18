@@ -5,7 +5,6 @@
 import {
   packItems,
   clampColumns,
-  basename,
   GAP,
   MISSING_W,
   MISSING_H,
@@ -13,6 +12,7 @@ import {
   MAX_COLUMNS,
   DEFAULT_COLUMNS
 } from '../core/layout.js';
+import { basename } from '../core/paths.js';
 import {
   formatCount,
   describeAddOutcome,

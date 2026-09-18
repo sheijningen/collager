@@ -4,13 +4,13 @@ const {
   packItems,
   sortItems,
   clampColumns,
-  basename,
   reorderByHash,
   GAP,
   MISSING_W,
   MISSING_H,
   DEFAULT_COLUMNS
 } = require('../../src/renderer/core/layout.js');
+const { basename } = require('../../src/renderer/core/paths.js');
 
 function item(overrides = {}) {
   return {
@@ -88,12 +88,6 @@ test('clampColumns: clamps to [1, 8] and defaults non-numbers', () => {
   assert.equal(clampColumns(2.9), 2);
   assert.equal(clampColumns(NaN), DEFAULT_COLUMNS);
   assert.equal(clampColumns(undefined), DEFAULT_COLUMNS);
-});
-
-test('basename handles unix and windows separators', () => {
-  assert.equal(basename('/home/user/pic.png'), 'pic.png');
-  assert.equal(basename('C:\\Users\\user\\pic.png'), 'pic.png');
-  assert.equal(basename('pic.png'), 'pic.png');
 });
 
 test('sortItems: by name is case-insensitive and does not mutate input', () => {
