@@ -143,7 +143,18 @@ function createLibraryStore(getDir) {
         .then(async () => {
           await fsp.mkdir(getDir(), { recursive: true });
           const tmp = libraryFile() + '.tmp';
-          await fsp.writeFile(tmp, JSON.stringify(persisted, null, 1), 'utf8');
+          // synced before the rename, or a power cut could commit the rename
+          // with the content still in the page cache and leave a short file;
+          // a filesystem that refuses the sync still gets the atomic rename
+          const handle = await fsp.open(tmp, 'w');
+          try {
+            await handle.writeFile(JSON.stringify(persisted, null, 1), 'utf8');
+            try {
+              await handle.sync();
+            } catch {}
+          } finally {
+            await handle.close();
+          }
           await fsp.rename(tmp, libraryFile());
         });
       return saveChain;
