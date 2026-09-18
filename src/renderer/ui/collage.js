@@ -13,6 +13,7 @@ import {
   DEFAULT_COLUMNS
 } from '../core/layout.js';
 import { basename } from '../core/paths.js';
+import { runWithConcurrency } from '../core/concurrency.js';
 import {
   formatCount,
   describeAddOutcome,
@@ -70,6 +71,7 @@ export function setColumns(count) {
 const HYDRATE_MARGIN = '800px'; // how far outside the viewport media stays loaded
 const MIN_LAYOUT_WIDTH = 100; // px; a collapsed window still gets a layout
 const DRAG_CLICK_WINDOW_MS = 400; // a click this soon after a drag is part of it
+const MEASURE_CONCURRENCY = 8; // metadata loads in flight at once
 
 const observer = new IntersectionObserver(
   (entries) => {
@@ -317,20 +319,16 @@ function measureItem(item) {
  * anything was measured, i.e. whether the caller should persist. */
 export async function measureMissingDimensions(list, onProgress = null) {
   const pending = list.filter((item) => !item.missing && (!item.w || !item.h));
-  const CONCURRENCY = 8;
-  let cursor = 0;
-  let done = 0;
-  async function worker() {
-    while (cursor < pending.length) {
-      const item = pending[cursor++];
+  await runWithConcurrency(
+    pending,
+    MEASURE_CONCURRENCY,
+    async (item) => {
       const dims = await measureItem(item);
       item.w = dims.w;
       item.h = dims.h;
-      done++;
-      if (onProgress) onProgress(done, pending.length);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, worker));
+    },
+    onProgress
+  );
   return pending.length > 0;
 }
 
