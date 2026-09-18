@@ -16,7 +16,7 @@ const {
   probeFiles,
   SAMPLE_BYTES
 } = require('../../src/main/lib/scan.js');
-const { skipWithoutPermissionBits } = require('./helpers.js');
+const { createTempDir, skipWithoutPermissionBits } = require('./helpers.js');
 
 const SAMPLED_HASH = /^sampled-[0-9a-f]{64}$/;
 
@@ -53,8 +53,10 @@ function makeTree(spec, base) {
   }
 }
 
-function tmpTree(spec) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-scan-'));
+/* A temp directory holding the files and folders `spec` describes, removed
+ * when the test ends. */
+function tmpTree(t, spec) {
+  const dir = createTempDir(t, 'scan');
   makeTree(spec, dir);
   return dir;
 }
@@ -71,8 +73,13 @@ test('typeForPath maps extensions case-insensitively', () => {
 });
 
 test('collectMediaPaths keeps supported files, skips others', async (t) => {
-  const dir = tmpTree({ 'a.png': 'x', 'b.MP4': 'x', 'c.txt': 'x', 'd.webm': 'x', 'e.tiff': 'x' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, {
+    'a.png': 'x',
+    'b.MP4': 'x',
+    'c.txt': 'x',
+    'd.webm': 'x',
+    'e.tiff': 'x'
+  });
   const { found, unsupported, unreadable } = await collectMediaPaths([
     path.join(dir, 'a.png'),
     path.join(dir, 'b.MP4'),
@@ -86,11 +93,10 @@ test('collectMediaPaths keeps supported files, skips others', async (t) => {
 });
 
 test('collectMediaPaths recurses into directories', async (t) => {
-  const dir = tmpTree({
+  const dir = tmpTree(t, {
     'top.png': 'x',
     sub: { 'nested.gif': 'x', deeper: { 'deep.jpg': 'x', 'skip.doc': 'x' } }
   });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const { found, unsupported } = await collectMediaPaths([dir]);
   assert.deepEqual(found.map((p) => path.basename(p)).sort(), [
     'deep.jpg',
@@ -113,20 +119,20 @@ test('collectMediaPaths reports nonexistent paths as unreadable, not unsupported
 
 test('collectMediaPaths reports a directory it cannot list as unreadable', async (t) => {
   if (skipWithoutPermissionBits(t)) return;
-  const dir = tmpTree({ 'a.png': 'x', locked: { 'b.png': 'x' } });
+  const dir = tmpTree(t, { 'a.png': 'x', locked: { 'b.png': 'x' } });
   const locked = path.join(dir, 'locked');
-  t.after(() => {
-    fs.chmodSync(locked, 0o700);
-    fs.rmSync(dir, { recursive: true, force: true });
-  });
   fs.chmodSync(locked, 0);
-  const { found, unsupported, unreadable } = await collectMediaPaths([dir]);
-  assert.deepEqual(
-    found.map((p) => path.basename(p)),
-    ['a.png']
-  );
-  assert.deepEqual(unsupported, []);
-  assert.deepEqual(unreadable, [locked]);
+  try {
+    const { found, unsupported, unreadable } = await collectMediaPaths([dir]);
+    assert.deepEqual(
+      found.map((p) => path.basename(p)),
+      ['a.png']
+    );
+    assert.deepEqual(unsupported, []);
+    assert.deepEqual(unreadable, [locked]);
+  } finally {
+    fs.chmodSync(locked, 0o700); // or the directory could not be removed
+  }
 });
 
 test('summarizeExtensions: lower-cased, commonest first, ties alphabetical', () => {
@@ -145,8 +151,7 @@ test('summarizeExtensions: lower-cased, commonest first, ties alphabetical', () 
 });
 
 test('collectMediaPaths survives symlink cycles without duplicates', async (t) => {
-  const dir = tmpTree({ sub: { 'pic.png': 'x' } });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { sub: { 'pic.png': 'x' } });
   try {
     fs.symlinkSync(dir, path.join(dir, 'sub', 'loop'), 'dir');
   } catch {
@@ -161,8 +166,11 @@ test('collectMediaPaths survives symlink cycles without duplicates', async (t) =
 });
 
 test('hashFile: identical content hashes equal, different content differs', async (t) => {
-  const dir = tmpTree({ 'one.png': 'same-bytes', 'two.png': 'same-bytes', 'three.png': 'other' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, {
+    'one.png': 'same-bytes',
+    'two.png': 'same-bytes',
+    'three.png': 'other'
+  });
   const [h1, h2, h3] = await Promise.all(
     ['one.png', 'two.png', 'three.png'].map((f) => fullHashOf(path.join(dir, f)))
   );
@@ -216,14 +224,13 @@ test('runWithConcurrency: an empty list runs nothing and reports nothing', async
 });
 
 test('probeFiles: hashes concurrently, keeps discovery order, types entries', async (t) => {
-  const dir = tmpTree({
+  const dir = tmpTree(t, {
     'a.png': 'aaa',
     'b.gif': 'bbb',
     'c.mp4': 'ccc',
     'skip.txt': 'x',
     README: 'x'
   });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const probed = await probeFiles([dir]);
   const entries = probed.entries;
   assert.deepEqual(
@@ -247,8 +254,7 @@ test('probeFiles: hashes concurrently, keeps discovery order, types entries', as
 });
 
 test('probeFiles: reports progress once per file, ending at total', async (t) => {
-  const dir = tmpTree({ 'a.png': 'aa', 'b.png': 'bb', 'c.gif': 'cc' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'a.png': 'aa', 'b.png': 'bb', 'c.gif': 'cc' });
   const calls = [];
   await probeFiles([dir], 2, (done, total) => calls.push([done, total]));
   assert.equal(calls.length, 3);
@@ -258,8 +264,7 @@ test('probeFiles: reports progress once per file, ending at total', async (t) =>
 
 test('probeFiles: unreadable file counts as unreadable, not a rejection', async (t) => {
   if (skipWithoutPermissionBits(t)) return;
-  const dir = tmpTree({ 'ok.png': 'x', 'locked.png': 'x', 'notes.txt': 'x' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'ok.png': 'x', 'locked.png': 'x', 'notes.txt': 'x' });
   fs.chmodSync(path.join(dir, 'locked.png'), 0);
   const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } = await probeFiles([
     dir
@@ -274,8 +279,7 @@ test('probeFiles: unreadable file counts as unreadable, not a rejection', async 
 });
 
 test('hashFileSampled: same bytes hash equal, prefix marks the scheme', async (t) => {
-  const dir = tmpTree({ 'a.mp4': largeVideoBytes(), 'b.mp4': largeVideoBytes() });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'a.mp4': largeVideoBytes(), 'b.mp4': largeVideoBytes() });
   const [a, b] = await Promise.all(['a.mp4', 'b.mp4'].map((f) => sampledHashOf(path.join(dir, f))));
   assert.equal(a, b);
   assert.match(a, SAMPLED_HASH);
@@ -293,14 +297,13 @@ test('hashFileSampled: a change inside any sample or in the size changes the has
   const inEnd = largeVideoBytes();
   inEnd[base.length - 10] = 1;
   const longer = Buffer.concat([base, Buffer.from([7])]);
-  const dir = tmpTree({
+  const dir = tmpTree(t, {
     'base.mp4': base,
     'start.mp4': inStart,
     'middle.mp4': inMiddle,
     'end.mp4': inEnd,
     'longer.mp4': longer
   });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const hashes = await Promise.all(
     ['base.mp4', 'start.mp4', 'middle.mp4', 'end.mp4', 'longer.mp4'].map((f) =>
       sampledHashOf(path.join(dir, f))
@@ -313,8 +316,7 @@ test('hashFileSampled: bytes outside the samples do not take part', async (t) =>
   const base = largeVideoBytes();
   const outside = largeVideoBytes();
   outside[SAMPLE_BYTES + 100] = 1; // between the start and middle samples
-  const dir = tmpTree({ 'base.mp4': base, 'outside.mp4': outside });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'base.mp4': base, 'outside.mp4': outside });
   assert.equal(
     await sampledHashOf(path.join(dir, 'base.mp4')),
     await sampledHashOf(path.join(dir, 'outside.mp4'))
@@ -325,8 +327,7 @@ test('hashFileSampled: small files are hashed whole', async (t) => {
   const small = Buffer.alloc(SAMPLE_BYTES * 2, 3);
   const changed = Buffer.from(small);
   changed[SAMPLE_BYTES + 100] = 1; // would fall outside the samples of a large file
-  const dir = tmpTree({ 'small.mp4': small, 'changed.mp4': changed, 'empty.mp4': '' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'small.mp4': small, 'changed.mp4': changed, 'empty.mp4': '' });
   assert.notEqual(
     await sampledHashOf(path.join(dir, 'small.mp4')),
     await sampledHashOf(path.join(dir, 'changed.mp4'))
@@ -341,13 +342,12 @@ test('hashFileSampled: files up to three samples long are hashed whole, longer o
   const over = Buffer.alloc(SAMPLE_BYTES * 3 + 1, 5);
   const overChanged = Buffer.from(over);
   overChanged[SAMPLE_BYTES * 2] = 1; // the single byte between the middle and end samples
-  const dir = tmpTree({
+  const dir = tmpTree(t, {
     'exact.mp4': exact,
     'exact-changed.mp4': exactChanged,
     'over.mp4': over,
     'over-changed.mp4': overChanged
   });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const hashOf = (name) => sampledHashOf(path.join(dir, name));
   assert.notEqual(await hashOf('exact.mp4'), await hashOf('exact-changed.mp4'));
   assert.equal(await hashOf('over.mp4'), await hashOf('over-changed.mp4'));
@@ -355,16 +355,14 @@ test('hashFileSampled: files up to three samples long are hashed whole, longer o
 
 test('hashFile and hashFileSampled report the byte size the hash covers', async (t) => {
   const large = largeVideoBytes();
-  const dir = tmpTree({ 'pic.png': 'seven b', 'clip.mp4': large, 'small.mp4': 'tiny' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'pic.png': 'seven b', 'clip.mp4': large, 'small.mp4': 'tiny' });
   assert.equal((await hashFile(path.join(dir, 'pic.png'))).size, 7);
   assert.equal((await hashFileSampled(path.join(dir, 'clip.mp4'))).size, large.length);
   assert.equal((await hashFileSampled(path.join(dir, 'small.mp4'))).size, 4);
 });
 
 test('readExactly fills the whole range and rejects when the file runs out', async (t) => {
-  const dir = tmpTree({ 'ten.bin': '0123456789' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'ten.bin': '0123456789' });
   const handle = await fs.promises.open(path.join(dir, 'ten.bin'), 'r');
   t.after(() => handle.close());
   assert.equal((await readExactly(handle, 2, 5)).toString(), '23456');
@@ -378,8 +376,7 @@ test('hashFileSampled rejects for unreadable files', async () => {
 });
 
 test('rehashStaleItems: rehashes present videos with a full hash, leaves the rest', async (t) => {
-  const dir = tmpTree({ 'clip.mp4': 'video bytes', 'pic.png': 'image bytes' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'clip.mp4': 'video bytes', 'pic.png': 'image bytes' });
   const clip = path.join(dir, 'clip.mp4');
   const legacy = await fullHashOf(clip);
   const already = await sampledHashOf(clip);
@@ -411,8 +408,7 @@ test('rehashStaleItems: nothing to do reports no work', async () => {
 
 test('rehashStaleItems: an unreadable video keeps its hash while the others move', async (t) => {
   if (skipWithoutPermissionBits(t)) return;
-  const dir = tmpTree({ 'ok.mp4': 'fine', 'locked.mp4': 'locked' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'ok.mp4': 'fine', 'locked.mp4': 'locked' });
   fs.chmodSync(path.join(dir, 'locked.mp4'), 0);
   const items = [
     { path: path.join(dir, 'locked.mp4'), hash: 'full-locked', type: 'video', missing: false },
@@ -426,8 +422,7 @@ test('rehashStaleItems: an unreadable video keeps its hash while the others move
 });
 
 test('rehashStaleItems: only rehashed videos collapse, other duplicate hashes are kept', async (t) => {
-  const dir = tmpTree({ 'clip.mp4': 'video bytes' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'clip.mp4': 'video bytes' });
   const items = [
     { path: '/a.png', hash: 'same-image', type: 'image', missing: false },
     { path: '/b.png', hash: 'same-image', type: 'image', missing: false },
@@ -439,8 +434,7 @@ test('rehashStaleItems: only rehashed videos collapse, other duplicate hashes ar
 });
 
 test('rehashStaleItems: entries that collide after rehashing collapse to one', async (t) => {
-  const dir = tmpTree({ 'one.mp4': 'same video', 'two.mp4': 'same video' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'one.mp4': 'same video', 'two.mp4': 'same video' });
   const one = path.join(dir, 'one.mp4');
   const two = path.join(dir, 'two.mp4');
   const items = [
@@ -455,8 +449,7 @@ test('rehashStaleItems: entries that collide after rehashing collapse to one', a
 });
 
 test('rehashStaleItems: a legacy entry that rehashes onto a sampled entry collapses, the earlier one stays', async (t) => {
-  const dir = tmpTree({ 'one.mp4': 'same video', 'two.mp4': 'same video' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'one.mp4': 'same video', 'two.mp4': 'same video' });
   const one = path.join(dir, 'one.mp4');
   const two = path.join(dir, 'two.mp4');
   const legacy = () => ({ path: one, hash: 'full-one', type: 'video', missing: false });
@@ -485,8 +478,7 @@ test('rehashStaleItems: a legacy entry that rehashes onto a sampled entry collap
 });
 
 test('rehashStaleItems: a rehash that lands on a missing entry keeps the present one, in either order', async (t) => {
-  const dir = tmpTree({ 'done.mp4': 'the finished copy' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'done.mp4': 'the finished copy' });
   const done = path.join(dir, 'done.mp4');
   const finished = await sampledHashOf(done);
   const movedAway = () => ({
@@ -523,8 +515,7 @@ test('rehashStaleItems: a rehash that lands on a missing entry keeps the present
 });
 
 test('rehashStaleItems: an item whose size moved is rehashed, one whose size holds is not', async (t) => {
-  const dir = tmpTree({ 'grown.png': 'now longer', 'same.png': 'steady' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'grown.png': 'now longer', 'same.png': 'steady' });
   const grown = path.join(dir, 'grown.png');
   const same = path.join(dir, 'same.png');
   const items = [
@@ -541,8 +532,7 @@ test('rehashStaleItems: an item whose size moved is rehashed, one whose size hol
 });
 
 test('rehashStaleItems: a video whose size moved is rehashed under the sampled scheme', async (t) => {
-  const dir = tmpTree({ 'clip.mp4': largeVideoBytes() });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'clip.mp4': largeVideoBytes() });
   const clip = path.join(dir, 'clip.mp4');
   const items = [
     { path: clip, hash: 'sampled-' + 'a'.repeat(64), type: 'video', size: 12, missing: false }
@@ -554,8 +544,7 @@ test('rehashStaleItems: a video whose size moved is rehashed under the sampled s
 });
 
 test('rehashStaleItems: entries saved before sizes were recorded get one without rehashing', async (t) => {
-  const dir = tmpTree({ 'pic.png': 'bytes', 'gone.png': 'x' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'pic.png': 'bytes', 'gone.png': 'x' });
   const pic = path.join(dir, 'pic.png');
   const items = [
     { path: pic, hash: 'kept', type: 'image', missing: false },
@@ -571,8 +560,7 @@ test('rehashStaleItems: entries saved before sizes were recorded get one without
 
 test('rehashStaleItems: a failed rehash keeps the old size so the next start retries', async (t) => {
   if (skipWithoutPermissionBits(t)) return;
-  const dir = tmpTree({ 'locked.png': 'much longer than claimed' });
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = tmpTree(t, { 'locked.png': 'much longer than claimed' });
   fs.chmodSync(path.join(dir, 'locked.png'), 0);
   const items = [
     { path: path.join(dir, 'locked.png'), hash: 'stale', type: 'image', size: 2, missing: false }

@@ -1,15 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { isMediaFile, existingMediaFolder } = require('../../src/main/lib/mediapath.js');
+const { createTempDir } = require('./helpers.js');
 
-function tmpDir(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-mediapath-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  return dir;
-}
+const tmpDir = (t) => createTempDir(t, 'mediapath');
 
 test('accepts an existing regular file with a media extension', async (t) => {
   const dir = tmpDir(t);

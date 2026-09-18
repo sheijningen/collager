@@ -1,18 +1,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const {
   createLibraryStore,
   readLibraryItems,
   loadAndRepairLibrary
 } = require('../../src/main/lib/library.js');
-const { skipWithoutPermissionBits } = require('./helpers.js');
+const { createTempDir, skipWithoutPermissionBits } = require('./helpers.js');
 
 function tmpStore(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-lib-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = createTempDir(t, 'lib');
   return { dir, store: createLibraryStore(() => dir) };
 }
 
@@ -259,8 +257,7 @@ test('concurrent saves serialize; last write wins and file stays valid', async (
 });
 
 test('save creates the directory if it does not exist yet', async (t) => {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-lib-'));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const base = createTempDir(t, 'lib');
   const dir = path.join(base, 'not', 'yet', 'created');
   const store = createLibraryStore(() => dir);
   await store.save([]);
