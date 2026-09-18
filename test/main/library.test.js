@@ -280,8 +280,8 @@ test('saves are atomic: no tmp file left, content is valid JSON', async (t) => {
 
 test('concurrent saves serialize; last write wins and file stays valid', async (t) => {
   const { dir, store } = tmpStore(t);
-  const batches = Array.from({ length: 20 }, (_, i) =>
-    Array.from({ length: i + 1 }, (_, j) => entry(`h${j}`))
+  const batches = Array.from({ length: 20 }, (_batch, batchIndex) =>
+    Array.from({ length: batchIndex + 1 }, (_slot, index) => entry(`h${index}`))
   );
   await Promise.all(batches.map((b) => store.save(b)));
   const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
