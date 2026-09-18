@@ -4,13 +4,13 @@ const {
   packItems,
   sortItems,
   clampColumns,
-  basename,
   reorderByHash,
   GAP,
   MISSING_W,
   MISSING_H,
   DEFAULT_COLUMNS
 } = require('../../src/renderer/core/layout.js');
+const { basename } = require('../../src/renderer/core/paths.js');
 
 function item(overrides = {}) {
   return {
@@ -90,12 +90,6 @@ test('clampColumns: clamps to [1, 8] and defaults non-numbers', () => {
   assert.equal(clampColumns(undefined), DEFAULT_COLUMNS);
 });
 
-test('basename handles unix and windows separators', () => {
-  assert.equal(basename('/home/user/pic.png'), 'pic.png');
-  assert.equal(basename('C:\\Users\\user\\pic.png'), 'pic.png');
-  assert.equal(basename('pic.png'), 'pic.png');
-});
-
 test('sortItems: by name is case-insensitive and does not mutate input', () => {
   const list = [
     item({ path: '/z/Bravo.png' }),
@@ -167,4 +161,14 @@ test('sortItems: added mode keeps collage order', () => {
     sortItems(list, 'added').map((i) => i.path),
     ['/c.png', '/a.png', '/b.png']
   );
+});
+
+test('packItems: a present item without dimensions gets the fallback size', () => {
+  const colWidth = Math.floor((1000 - GAP) / 2);
+  const { positions } = packItems(
+    [item({ w: 0, h: 0 }), item({ w: undefined, h: undefined })],
+    1000,
+    2
+  );
+  for (const pos of positions) assert.equal(pos.h, Math.round(MISSING_H * (colWidth / MISSING_W)));
 });

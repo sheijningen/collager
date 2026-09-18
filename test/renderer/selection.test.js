@@ -61,6 +61,12 @@ test('shift-click without a usable anchor falls back to a plain click', () => {
   assert.deepEqual([...staleAnchor.selected], ['c']);
 });
 
+test('shift-click on an item outside the order selects just that item', () => {
+  const next = click(state(['a'], 'a'), 'gone', { shift: true });
+  assert.deepEqual([...next.selected], ['gone']);
+  assert.equal(next.anchor, 'gone');
+});
+
 test('the input Set is never mutated', () => {
   const s = state(['a', 'b'], 'a');
   click(s, 'e');

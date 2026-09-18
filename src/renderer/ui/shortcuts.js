@@ -6,8 +6,9 @@
  * and the actual bindings can't drift apart.
  */
 
-import { targetConsumesKey } from '../core/keys.js';
-import { state, selected, showToast } from './state.js';
+import { targetConsumesKey, normalizeShortcutKey, SCROLL_KEYS } from '../core/keys.js';
+import { state, selected, showToast, runOrToast } from './state.js';
+import { SCROLL_SPEED_STEP } from '../core/autoscroll.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
 import { panelOpen, setPanelOpen, applySelection } from './panel.js';
@@ -20,19 +21,6 @@ import { isFullscreen } from './fullscreen.js';
 export const helpOverlay = document.getElementById('help-overlay');
 export const aboutOverlay = document.getElementById('about-overlay');
 export const shortcutList = document.getElementById('shortcut-list');
-
-const SPEED_KEY_STEP = 10; // matches the slider's step
-const SCROLLING_KEYS = [
-  ' ',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'PageUp',
-  'PageDown',
-  'Home',
-  'End'
-];
 
 export const SHORTCUTS = [
   ['Space', 'Start / stop auto-scroll'],
@@ -79,30 +67,40 @@ export function closeOverlays() {
   aboutOverlay.hidden = true;
 }
 
-/* about: filled from package.json metadata (via the main process) once */
-let aboutLoaded = false;
+/* about: filled from package.json metadata (via the main process) once. The
+ * fill in flight is kept, so a second opening before it lands shares it
+ * instead of appending the rows twice. */
+let aboutFill = null;
+async function fillAbout() {
+  const info = await window.api.getAppInfo();
+  document.getElementById('about-name').textContent = info.name;
+  document.getElementById('about-version').textContent = `version ${info.version}`;
+  document.getElementById('about-desc').textContent = info.description;
+  const meta = document.getElementById('about-meta');
+  meta.textContent = ''; // a retry after a failure starts from no rows
+  const rows = [
+    ['Author', info.author],
+    ['License', info.license]
+  ];
+  for (const [term, value] of rows) {
+    if (!value) continue;
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    meta.append(dt, dd);
+  }
+  return true;
+}
+
 async function openAbout() {
   closeOverlays();
   closeDropdown();
-  if (!aboutLoaded) {
-    const info = await window.api.getAppInfo();
-    document.getElementById('about-name').textContent = info.name;
-    document.getElementById('about-version').textContent = `version ${info.version}`;
-    document.getElementById('about-desc').textContent = info.description;
-    const meta = document.getElementById('about-meta');
-    const rows = [
-      ['Author', info.author],
-      ['License', info.license]
-    ];
-    for (const [term, value] of rows) {
-      if (!value) continue;
-      const dt = document.createElement('dt');
-      dt.textContent = term;
-      const dd = document.createElement('dd');
-      dd.textContent = value;
-      meta.append(dt, dd);
-    }
-    aboutLoaded = true;
+  if (aboutFill === null) aboutFill = fillAbout();
+  const filled = await runOrToast(() => aboutFill, 'Could not load the About information');
+  if (!filled) {
+    aboutFill = null; // the next opening asks again
+    return;
   }
   aboutOverlay.hidden = false;
 }
@@ -158,10 +156,11 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (targetConsumesKey(event.target, event.key)) return;
+  const key = normalizeShortcutKey(event.key);
 
   // overlays are modal: their toggles close them, all else is inert
   if (anyOverlayOpen()) {
-    if (['?', 'F1', 'i'].includes(event.key)) closeOverlays();
+    if (['?', 'F1', 'i'].includes(key)) closeOverlays();
     return;
   }
   // the lightbox and the context menu are modal too; Escape left above, so
@@ -169,7 +168,7 @@ window.addEventListener('keydown', (event) => {
   // the collage from the lightbox
   if (!lightbox.hidden) {
     // the collage behind the backdrop must not scroll away from the shown item
-    if (SCROLLING_KEYS.includes(event.key)) event.preventDefault();
+    if (SCROLL_KEYS.includes(event.key)) event.preventDefault();
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       stepLightbox(event.key === 'ArrowRight' ? 1 : -1);
     }
@@ -177,7 +176,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (!ctxMenu.hidden) return;
 
-  switch (event.key) {
+  switch (key) {
     case '?':
     case 'F1':
       event.preventDefault();
@@ -191,18 +190,17 @@ window.addEventListener('keydown', (event) => {
       if (!event.repeat) setAutoScroll(!autoScroll);
       break;
     case ',':
-      setScrollSpeed(scrollSpeed - SPEED_KEY_STEP);
+      setScrollSpeed(scrollSpeed - SCROLL_SPEED_STEP);
       showToast(`Auto-scroll speed: ${scrollSpeed} px/s`);
       break;
     case '.':
-      setScrollSpeed(scrollSpeed + SPEED_KEY_STEP);
+      setScrollSpeed(scrollSpeed + SCROLL_SPEED_STEP);
       showToast(`Auto-scroll speed: ${scrollSpeed} px/s`);
       break;
     case 's':
       if (!event.repeat && state.items.length) shuffle();
       break;
-    case 'a':
-    case 'A': {
+    case 'a': {
       // the modifier, not the letter's case, so caps lock cannot swap the two
       const button = event.shiftKey ? 'btn-add-folder' : 'btn-add';
       if (!event.repeat) document.getElementById(button).click();

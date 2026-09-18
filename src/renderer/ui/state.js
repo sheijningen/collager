@@ -64,6 +64,19 @@ export function showToast(message, sticky = false) {
       }, TOAST_MS);
 }
 
+/* Runs `action` and turns a failure into `message` on the toast and the
+ * console, instead of a rejection nobody handles. Resolves to the action's
+ * result, or undefined after a failure. */
+export async function runOrToast(action, message) {
+  try {
+    return await action();
+  } catch (err) {
+    console.error(message, err);
+    showToast(message);
+    return undefined;
+  }
+}
+
 /* ---------------- persistence ---------------- */
 
 /* Refuses to write until the saved library is in `state.items`: an action

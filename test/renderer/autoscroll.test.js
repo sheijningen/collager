@@ -63,3 +63,17 @@ test('with nothing to scroll the position is adopted but never stepped', () => {
     scrollable: false
   });
 });
+
+const {
+  clampScrollSpeed,
+  MIN_SCROLL_SPEED,
+  MAX_SCROLL_SPEED,
+  DEFAULT_SCROLL_SPEED
+} = require('../../src/renderer/core/autoscroll.js');
+
+test('clampScrollSpeed keeps the speed within the slider range', () => {
+  assert.equal(clampScrollSpeed(MIN_SCROLL_SPEED - 5), MIN_SCROLL_SPEED);
+  assert.equal(clampScrollSpeed(MAX_SCROLL_SPEED + 5), MAX_SCROLL_SPEED);
+  assert.equal(clampScrollSpeed(120), 120);
+  assert.equal(clampScrollSpeed(NaN), DEFAULT_SCROLL_SPEED);
+});

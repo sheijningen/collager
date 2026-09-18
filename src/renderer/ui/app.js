@@ -1,26 +1,14 @@
-/* App entry: toolbar button wiring, OS file drag & drop, startup, and the
- * hook the e2e harness drives the app through. Importing the other modules
- * here is what wires their event handlers up. */
+/* App entry: OS file drag & drop, startup, and the hook the e2e harness
+ * drives the app through. Importing the other modules here is what wires
+ * their event handlers up. */
 
 import * as layout from '../core/layout.js';
-import { basename } from '../core/layout.js';
 import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
 import { state, showToast, persist, reindexItems, countMissing } from './state.js';
-import { formatCount } from '../core/text.js';
-// named imports stay live; destructuring the namespace would freeze `columns`
-import {
-  columns,
-  setColumns,
-  shuffle,
-  render,
-  addPaths,
-  clearAll,
-  clearMissing,
-  measureMissingDimensions,
-  queueLibraryOperation
-} from './collage.js';
+import { describeLibraryProblem, describeStartupNotes } from '../core/text.js';
+import { render, addPaths, measureMissingDimensions, queueLibraryOperation } from './collage.js';
 import * as panelModule from './panel.js';
 import * as ctxmenuModule from './ctxmenu.js';
 import * as tiledragModule from './tiledrag.js';
@@ -62,27 +50,6 @@ window.addEventListener('drop', (event) => {
   }
   addPaths(paths);
 });
-
-/* ---------------- toolbar ---------------- */
-
-document.getElementById('btn-add').addEventListener('click', async () => {
-  const paths = await window.api.pickFiles();
-  addPaths(paths);
-});
-document.getElementById('btn-add-folder').addEventListener('click', async () => {
-  const paths = await window.api.pickFolders();
-  addPaths(paths);
-});
-document.getElementById('btn-empty-add').addEventListener('click', (event) => {
-  // a focused button would claim Space and Enter from the shortcuts
-  if (event.detail) event.currentTarget.blur();
-  document.getElementById('btn-add').click();
-});
-document.getElementById('btn-shuffle').addEventListener('click', shuffle);
-document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
-document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
-document.getElementById('btn-clear').addEventListener('click', clearAll);
-document.getElementById('btn-clear-missing').addEventListener('click', clearMissing);
 
 /* ---------------- window resize ---------------- */
 
@@ -141,15 +108,6 @@ if (new URLSearchParams(location.search).has('e2e')) {
 
 render(); // empty state and toolbar geometry before the library arrives
 
-/* Toast for a library file that could not be loaded. It was moved aside,
- * or, when even that failed, saving is off so it is not overwritten. */
-function describeLibraryProblem({ backup }) {
-  const where = backup
-    ? `It was kept as ${basename(backup)}.`
-    : 'It could not be moved aside, so saving is off to protect it.';
-  return `The library file was unreadable, starting empty. ${where}`;
-}
-
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
 queueLibraryOperation(async function init() {
@@ -169,17 +127,11 @@ queueLibraryOperation(async function init() {
     });
     render();
     if (measured) persist();
-    const notes = [];
-    const missingCount = countMissing();
-    if (missingCount) {
-      notes.push(
-        `${formatCount(missingCount, 'file')} missing on disk, see Collage > ⚠ Clear ${missingCount} missing`
-      );
-    }
-    if (loaded.collapsed) {
-      notes.push(`${formatCount(loaded.collapsed, 'duplicate')} merged`);
-    }
-    if (notes.length) showToast(notes.join(' · '));
+    const notes = describeStartupNotes({
+      missingCount: countMissing(),
+      collapsed: loaded.collapsed
+    });
+    if (notes) showToast(notes);
   } catch (err) {
     console.error('Failed to load the library', err);
     render();

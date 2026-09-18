@@ -15,10 +15,12 @@ and Windows. macOS is not a target; the `darwin` branches only keep the app quit
 src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
-src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, item menu shape, count text, file list key, empty drop,
-                     lightbox stepping
-src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
+src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
+                     range, key rules, menu placement, item menu shape, count text, file list
+                     key, empty drop, lightbox stepping, path names, user-facing text, a
+                     bounded worker pool
+src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job
+                     progress, popup.js places the context menu and the toolbar dropdowns
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
                      test/main/helpers.js holds what the main tests share
@@ -79,10 +81,12 @@ docs/                README media
   into its state, so nothing done during startup or after a failed load can overwrite the file
   with an empty list. An unreadable file is moved to `library.json.corrupt` (a timestamped name
   when that exists, so no backup is ever overwritten) and the app starts empty. When the move
-  fails the file stays in place and saving is refused so it is not overwritten. There is no
+  fails, or the file is there but cannot be read at all (permissions, a directory in its place),
+  the file stays in place and saving is refused so it is not overwritten. There is no
   schema version: a file the current code cannot read counts as unreadable. Only path, hash,
   size, type and dimensions are stored per item; URL and missing flag are derived at load, the
-  unshowable flag while the app runs, and an entry without a hash makes the file unreadable. A
+  unshowable flag while the app runs, and an entry without a hash or a media type makes the file
+  unreadable; a save carrying such an entry is refused so that file is never written. A
   size is optional on read, so an entry from before sizes were recorded loads and has one filled
   in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
@@ -136,6 +140,8 @@ docs/                README media
 - **GPU fallback**: three GPU process crashes relaunch the app with hardware acceleration
   disabled, passing an internal switch to the new process. Nothing is written to disk and
   there are no user-facing flags, so every normal start tries hardware acceleration again.
+  An AppImage is relaunched through the image named in `APPIMAGE`, because the mount it
+  runs from is gone once the process exits.
 
 ## Conventions
 
@@ -150,11 +156,13 @@ docs/                README media
 - `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code (video
   only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
   `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the
-  harness resets the app (empty library, nothing open or selected, two columns, default speed,
-  sort, panels and window size, the removal question answering yes), so a case loads what it
-  needs (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
-  never cleans up. A case that needs the startup path seeds a saved library and restarts the
-  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named cases,
+  harness resets the app (empty library, nothing open or selected, two columns, default speed
+  and Scroll settings, sort, panels with the count breakdown closed, window size, the removal
+  question answering yes), so a case loads what it needs (`ctx.loadFixtures()`), turns waits into
+  checks (`ctx.waitFor` resolves to a boolean) and never cleans up. A case that needs the startup
+  path seeds a saved library and restarts the renderer with `ctx.restartWith(library)`, which
+  takes an item list or a string written as the file's raw content; `ctx.reloadRenderer()`
+  restarts against whatever is on disk. `pnpm test:e2e panel drag` runs only the named cases,
   in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e` and
   `app.js` exposes every module export on `window.collagerTest`, which the snippets reach as `T`;
   every snippet also gets `press(key)`, which fires a keydown on the window.
@@ -172,10 +180,14 @@ electron-builder config is the `build` field in `package.json`: AppImage and NSI
 `src/**` bundled, icon from `build/icon.png`. `desktopName` plus `syncDesktopName` keeps the
 Linux desktop entry matched to the running window.
 
-Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json`. The
-release workflow calls the lint, format, unit and e2e workflows as reusable workflows, which is
+Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json` and
+points at a commit on `main`; both are checked before anything is built. The release workflow calls the lint, format, unit and e2e workflows as reusable workflows, which is
 what their `workflow_call` trigger is for, builds both installers, and publishes a GitHub
-Release with them, a `SHA256SUMS` file and auto-generated notes. The release is a draft until
+Release with them, a `SHA256SUMS` file and auto-generated notes. The Linux build job also starts
+the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`, which makes
+main exit 0 once the renderer has loaded the library and 1 after a minute without, so a path
+that only breaks inside the packaged app fails the release before anything is uploaded. The
+Windows installer gets no such run. The release is a draft until
 every asset is uploaded, and the publish job deletes its own draft when it fails or is
 cancelled, so a failed run normally leaves nothing behind but the tag. A tag that already has a
 release, draft included, is refused, so a draft left behind by a lost runner has to be deleted

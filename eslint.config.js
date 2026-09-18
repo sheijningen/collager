@@ -7,10 +7,22 @@ module.exports = [
   { ignores: ['dist/'] },
   js.configs.recommended,
 
-  // `try { ... } catch {}` is the codebase idiom for best-effort cleanup
+  // `try { ... } catch {}` is the codebase idiom for best-effort cleanup; the
+  // rest are conventions the code already follows, kept from drifting
   {
     rules: {
-      'no-empty': ['error', { allowEmptyCatch: true }]
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      eqeqeq: 'error',
+      'no-var': 'error',
+      'prefer-const': 'error',
+      'no-shadow': 'error',
+      'no-param-reassign': 'error',
+      'no-throw-literal': 'error',
+      'prefer-promise-reject-errors': 'error',
+      'no-else-return': 'error',
+      'object-shorthand': 'error',
+      'no-lonely-if': 'error',
+      'consistent-return': 'error'
     }
   },
 

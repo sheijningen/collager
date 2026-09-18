@@ -8,7 +8,8 @@
  * - shift (with a valid anchor): select the range anchor..clicked in the
  *   given display order; with ctrl also held the range is added to the
  *   existing selection instead of replacing it. The anchor stays put.
- * - shift without a usable anchor falls back to a plain click.
+ * - shift without a usable anchor, or on an item outside the order, falls
+ *   back to a plain click.
  *
  * @param {{selected: Set<string>, anchor: string|null, hash: string,
  *          ctrl: boolean, shift: boolean, order: string[]}} input
@@ -17,7 +18,7 @@
  */
 export function clickSelection({ selected, anchor, hash, ctrl, shift, order }) {
   const next = new Set(selected);
-  if (shift && anchor !== null && order.includes(anchor)) {
+  if (shift && anchor !== null && order.includes(anchor) && order.includes(hash)) {
     const anchorIndex = order.indexOf(anchor);
     const clickedIndex = order.indexOf(hash);
     if (!ctrl) next.clear();

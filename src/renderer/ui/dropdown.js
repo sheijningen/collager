@@ -5,7 +5,9 @@
  * while watching the effect. At most one popup is open at a time.
  */
 
-import { clampMenuPosition } from '../core/menuposition.js';
+import { showPopupAt } from './popup.js';
+
+const DROPDOWN_GAP = 4; // px between the button and its popup
 
 const triggers = [...document.querySelectorAll('#toolbar [data-menu]')];
 const popups = new Map(triggers.map((trigger) => [trigger, popupFor(trigger)]));
@@ -23,31 +25,16 @@ export function openDropdownId() {
   return openTrigger ? openTrigger.dataset.menu : null;
 }
 
-export function openDropdown(trigger) {
+function openDropdown(trigger) {
   closeDropdown();
   const popup = popups.get(trigger);
   openTrigger = trigger;
   trigger.classList.add('open');
   trigger.setAttribute('aria-expanded', 'true');
-  // measure at a neutral position (stale left/top from a previous opening
-  // would cap shrink-to-fit width and skew the measurement), then hang the
-  // popup off the button's bottom-left corner, shifted up or left as far as
-  // needed to stay on screen (a very short window gets a scrolling popup)
-  popup.style.left = '0px';
-  popup.style.top = '0px';
-  popup.hidden = false;
+  // the popup hangs off the button's bottom-left corner (a very short window
+  // gets a scrolling popup)
   const anchor = trigger.getBoundingClientRect();
-  const rect = popup.getBoundingClientRect();
-  const { left, top } = clampMenuPosition({
-    x: anchor.left,
-    y: anchor.bottom + 4,
-    width: rect.width,
-    height: rect.height,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight
-  });
-  popup.style.left = `${left}px`;
-  popup.style.top = `${top}px`;
+  showPopupAt(popup, anchor.left, anchor.bottom + DROPDOWN_GAP);
   // focus the popup itself, not its first control: a focused button would
   // claim Space and Enter, which the shortcuts are meant to keep
   popup.focus();
@@ -71,7 +58,7 @@ export function closeDropdown({ keepFocus = true } = {}) {
   openTrigger = null;
 }
 
-export function toggleDropdown(trigger) {
+function toggleDropdown(trigger) {
   if (openTrigger === trigger) closeDropdown();
   else openDropdown(trigger);
 }
@@ -110,5 +97,6 @@ window.addEventListener('pointerdown', (event) => {
   if (openTrigger.contains(event.target) || popups.get(openTrigger).contains(event.target)) return;
   closeDropdown();
 });
-window.addEventListener('blur', closeDropdown);
-window.addEventListener('resize', closeDropdown);
+// the handlers take no event: closeDropdown reads an options object
+window.addEventListener('blur', () => closeDropdown());
+window.addEventListener('resize', () => closeDropdown());

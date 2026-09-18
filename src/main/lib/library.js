@@ -1,11 +1,26 @@
 const fsp = require('fs').promises;
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { rehashStaleItems } = require('./scan');
+const { MEDIA_EXTS, rehashStaleItems } = require('./scan');
+
+const MEDIA_TYPES = new Set(Object.values(MEDIA_EXTS));
+
+/* Whether `item` is an entry the library can hold: a path, a hash (the item
+ * identity everywhere) and one of the media types. */
+function isLibraryEntry(item) {
+  return Boolean(
+    item &&
+    typeof item === 'object' &&
+    typeof item.path === 'string' &&
+    item.path &&
+    typeof item.hash === 'string' &&
+    item.hash &&
+    MEDIA_TYPES.has(item.type)
+  );
+}
 
 /* Parses a library file into its items. Every way the file can be unusable
- * throws, so the caller moves the file aside exactly when this does. Entries
- * need a path and a hash (the hash is the item identity everywhere); a
+ * throws, so the caller moves the file aside exactly when this does; a
  * repeated hash keeps its first entry only. */
 function readLibraryItems(raw) {
   const parsed = JSON.parse(raw);
@@ -13,14 +28,7 @@ function readLibraryItems(raw) {
   const seen = new Set();
   const items = [];
   for (const item of parsed) {
-    const valid =
-      item &&
-      typeof item === 'object' &&
-      typeof item.path === 'string' &&
-      item.path &&
-      typeof item.hash === 'string' &&
-      item.hash;
-    if (!valid) throw new Error('malformed library entry');
+    if (!isLibraryEntry(item)) throw new Error('malformed library entry');
     if (seen.has(item.hash)) continue;
     seen.add(item.hash);
     items.push(item);
@@ -34,8 +42,9 @@ function readLibraryItems(raw) {
  * Saves are serialized and written atomically (tmp file + rename) so a
  * crash mid-write or two overlapping saves can never truncate the library.
  * An unreadable file is moved aside under a name that is never reused, so no
- * later problem can overwrite it. When the move fails the file stays in
- * place and saving is refused so it is not overwritten.
+ * later problem can overwrite it. When the move fails, or the file cannot be
+ * read at all, it stays in place and saving is refused so it is not
+ * overwritten.
  */
 function createLibraryStore(getDir) {
   const libraryFile = () => path.join(getDir(), 'library.json');
@@ -70,13 +79,21 @@ function createLibraryStore(getDir) {
      * item whose file is present, from the one stat that also decides
      * `missing`), and `problem`: null when the file loaded (or did not exist
      * yet), otherwise `{ backup }` with the backup path, or null when the
-     * file could not be moved and stays in place, which also blocks saving. */
+     * file stays in place because it could not be moved or not be read at
+     * all, which also blocks saving. */
     async load() {
       let raw;
       try {
         raw = await fsp.readFile(libraryFile(), 'utf8');
-      } catch {
-        return { items: [], sizeOnDisk: new Map(), problem: null }; // no library yet
+      } catch (err) {
+        if (err && err.code === 'ENOENT') {
+          saveBlockedBy = null;
+          return { items: [], sizeOnDisk: new Map(), problem: null }; // no library yet
+        }
+        // a file that is there but cannot be read (permissions, a directory
+        // in its place, a failing disk) holds a library, so it is left alone
+        saveBlockedBy = libraryFile();
+        return { items: [], sizeOnDisk: new Map(), problem: { backup: null } };
       }
       let items;
       try {
@@ -108,6 +125,11 @@ function createLibraryStore(getDir) {
           new Error(`not saving: the library at ${saveBlockedBy} must stay as it is`)
         );
       }
+      // the rule the load applies, so a renderer bug cannot write a file that
+      // the next start would move aside as unreadable
+      if (!items.every(isLibraryEntry)) {
+        return Promise.reject(new Error('not saving: malformed library entry'));
+      }
       const persisted = items.map(({ path: filePath, hash, type, size, w, h }) => ({
         path: filePath,
         hash,
@@ -121,7 +143,18 @@ function createLibraryStore(getDir) {
         .then(async () => {
           await fsp.mkdir(getDir(), { recursive: true });
           const tmp = libraryFile() + '.tmp';
-          await fsp.writeFile(tmp, JSON.stringify(persisted, null, 1), 'utf8');
+          // synced before the rename, or a power cut could commit the rename
+          // with the content still in the page cache and leave a short file;
+          // a filesystem that refuses the sync still gets the atomic rename
+          const handle = await fsp.open(tmp, 'w');
+          try {
+            await handle.writeFile(JSON.stringify(persisted, null, 1), 'utf8');
+            try {
+              await handle.sync();
+            } catch {}
+          } finally {
+            await handle.close();
+          }
           await fsp.rename(tmp, libraryFile());
         });
       return saveChain;

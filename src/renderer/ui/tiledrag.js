@@ -5,7 +5,8 @@
  * drop target's place in the collage order, which is what persists.
  */
 
-import { reorderByHash, basename } from '../core/layout.js';
+import { reorderByHash } from '../core/layout.js';
+import { basename } from '../core/paths.js';
 import { state, itemsByHash, tiles, collage, persist } from './state.js';
 import { render } from './collage.js';
 

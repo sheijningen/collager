@@ -1,11 +1,10 @@
 /* The collage itself: masonry rendering, tile lifecycle, viewport-based
- * media hydration, dimension measuring, and the library operations that
- * mutate the items (add/remove/shuffle). */
+ * media hydration, dimension measuring, the library operations that mutate
+ * the items (add/remove/shuffle) and the toolbar buttons that trigger them. */
 
 import {
   packItems,
   clampColumns,
-  basename,
   GAP,
   MISSING_W,
   MISSING_H,
@@ -13,12 +12,16 @@ import {
   MAX_COLUMNS,
   DEFAULT_COLUMNS
 } from '../core/layout.js';
+import { basename } from '../core/paths.js';
+import { runWithConcurrency } from '../core/concurrency.js';
 import {
   formatCount,
   describeAddOutcome,
   describeRemoval,
   fileProblem,
-  tileLabel
+  tileLabel,
+  hintForFileProblem,
+  clearMissingLabel
 } from '../core/text.js';
 import {
   state,
@@ -34,7 +37,8 @@ import {
   prefs,
   showToast,
   persist,
-  countMissing
+  countMissing,
+  runOrToast
 } from './state.js';
 import { createMediaElement, releaseMedia } from './media.js';
 import { handleSelectClick, renderList } from './panel.js';
@@ -65,28 +69,9 @@ export function setColumns(count) {
  */
 
 const HYDRATE_MARGIN = '800px'; // how far outside the viewport media stays loaded
-
-/* Tooltip for tiles whose file can't be read (shared with the file panel). */
-export const MISSING_FILE_HINT = [
-  'This file could not be loaded. Likely causes:',
-  '• it was moved or renamed',
-  '• it was deleted',
-  '• it is on an external drive or network share that is not connected',
-  '',
-  'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
-].join('\n');
-
-/* Tooltip for files that are on disk but cannot be decoded. */
-export const UNSHOWABLE_FILE_HINT = [
-  'This file is on disk but Collager cannot show it. Likely causes:',
-  '• its format is not supported by the built-in player (HEVC/H.265 video, for example)',
-  '• the file is damaged',
-  '• it could not be read just now (a network drive that dropped out, for example)',
-  '',
-  'Open it with the default app from the right-click menu to check, or click ✕ to remove it.'
-].join('\n');
-
-const FILE_HINTS = { missing: MISSING_FILE_HINT, unshowable: UNSHOWABLE_FILE_HINT };
+const MIN_LAYOUT_WIDTH = 100; // px; a collapsed window still gets a layout
+const DRAG_CLICK_WINDOW_MS = 400; // a click this soon after a drag is part of it
+const MEASURE_CONCURRENCY = 8; // metadata loads in flight at once
 
 const observer = new IntersectionObserver(
   (entries) => {
@@ -120,10 +105,15 @@ function hydrate(tile) {
  * one. The render rebuilds the tile, the panel entry and the missing count. */
 async function recordLoadFailure(item) {
   const failedPath = item.path;
-  let present = false;
+  let present;
   try {
     present = await window.api.mediaFileExists(failedPath);
-  } catch {}
+  } catch {
+    // without an answer the file is not declared missing, since that tile
+    // offers to clear an entry whose file may well be on disk; unshowable
+    // keeps every action that does not decode it and lasts this session only
+    present = true;
+  }
   // removed, repaired or already judged while the question was out
   if (itemsByHash.get(item.hash) !== item) return;
   if (item.path !== failedPath || fileProblem(item)) return;
@@ -155,7 +145,7 @@ export function discardTile(hash) {
 export function render() {
   reindexItems();
   const width = scroller.clientWidth - GAP * 2;
-  const { positions, height } = packItems(state.items, Math.max(width, 100), columns);
+  const { positions, height } = packItems(state.items, Math.max(width, MIN_LAYOUT_WIDTH), columns);
   collage.style.height = `${height + GAP}px`;
 
   const seen = new Set();
@@ -201,7 +191,7 @@ const missingBadge = document.getElementById('missing-badge');
 function updateClearMissingBtn() {
   const count = countMissing();
   clearMissingBtn.hidden = count === 0;
-  clearMissingBtn.textContent = `⚠ Clear ${count} missing`;
+  clearMissingBtn.textContent = clearMissingLabel(count);
   // the button sits in the Collage menu, so the menu button carries the warning
   missingBadge.hidden = count === 0;
   if (count) missingBadge.title = `${formatCount(count, 'file')} missing`;
@@ -219,7 +209,7 @@ function createTile(item) {
   label.className = 'placeholder-label';
   label.textContent = tileLabel(item, basename(item.path));
   tile.appendChild(label);
-  if (problem) tile.title = FILE_HINTS[problem];
+  if (problem) tile.title = hintForFileProblem(problem);
 
   const remove = document.createElement('button');
   remove.className = 'btn-remove';
@@ -239,11 +229,35 @@ function createTile(item) {
   tile.addEventListener('dblclick', () => {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox
-    if (performance.now() - lastDragEndAt < 400) return;
+    if (performance.now() - lastDragEndAt < DRAG_CLICK_WINDOW_MS) return;
     if (!fileProblem(item)) openLightbox(item);
   });
   return tile;
 }
+
+/* ---------------- toolbar buttons ---------------- */
+
+document.getElementById('btn-add').addEventListener('click', async () => {
+  const paths = await runOrToast(() => window.api.pickFiles(), 'Could not open the file dialog');
+  if (paths) addPaths(paths);
+});
+document.getElementById('btn-add-folder').addEventListener('click', async () => {
+  const paths = await runOrToast(
+    () => window.api.pickFolders(),
+    'Could not open the folder dialog'
+  );
+  if (paths) addPaths(paths);
+});
+document.getElementById('btn-empty-add').addEventListener('click', (event) => {
+  // a focused button would claim Space and Enter from the shortcuts
+  if (event.detail) event.currentTarget.blur();
+  document.getElementById('btn-add').click();
+});
+document.getElementById('btn-shuffle').addEventListener('click', () => shuffle());
+document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));
+document.getElementById('btn-col-plus').addEventListener('click', () => setColumns(columns + 1));
+document.getElementById('btn-clear').addEventListener('click', () => clearAll());
+clearMissingBtn.addEventListener('click', () => clearMissing());
 
 /* ---------------- library operations ---------------- */
 
@@ -259,13 +273,18 @@ export function removeItems(keep) {
 
 /* Asks before removing `subject` ("all 12 items"). One question at a time:
  * the box does not block input until it is mapped, and a second click in
- * that gap would ask again over an already emptied selection. */
+ * that gap would ask again over an already emptied selection. A question
+ * that cannot be asked counts as answered no. */
 let removalQuestionOpen = false;
 export async function askRemoval(subject) {
   if (removalQuestionOpen) return false;
   removalQuestionOpen = true;
   try {
-    return await window.api.confirmRemoval(describeRemoval(subject));
+    const answer = await runOrToast(
+      () => window.api.confirmRemoval(describeRemoval(subject)),
+      'Could not ask before removing, so nothing was removed'
+    );
+    return answer === true;
   } finally {
     removalQuestionOpen = false;
   }
@@ -324,20 +343,16 @@ function measureItem(item) {
  * anything was measured, i.e. whether the caller should persist. */
 export async function measureMissingDimensions(list, onProgress = null) {
   const pending = list.filter((item) => !item.missing && (!item.w || !item.h));
-  const CONCURRENCY = 8;
-  let cursor = 0;
-  let done = 0;
-  async function worker() {
-    while (cursor < pending.length) {
-      const item = pending[cursor++];
+  await runWithConcurrency(
+    pending,
+    MEASURE_CONCURRENCY,
+    async (item) => {
       const dims = await measureItem(item);
       item.w = dims.w;
       item.h = dims.h;
-      done++;
-      if (onProgress) onProgress(done, pending.length);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, worker));
+    },
+    onProgress
+  );
   return pending.length > 0;
 }
 
@@ -420,7 +435,9 @@ async function addPathsUnderJob(paths, job) {
   await measureMissingDimensions(fresh, (done, total) => {
     job.update(`reading dimensions ${done}/${total}`);
   });
-  state.items.push(...fresh);
+  // one at a time: spreading a batch of some hundred thousand entries into
+  // one push call overflows the call stack
+  for (const entry of fresh) state.items.push(entry);
   render();
   persist();
 

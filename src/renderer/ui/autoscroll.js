@@ -5,7 +5,14 @@
  * as the new position instead of being fought.
  */
 
-import { advanceAutoScroll } from '../core/autoscroll.js';
+import {
+  advanceAutoScroll,
+  clampScrollSpeed,
+  MIN_SCROLL_SPEED,
+  MAX_SCROLL_SPEED,
+  DEFAULT_SCROLL_SPEED,
+  SCROLL_SPEED_STEP
+} from '../core/autoscroll.js';
 import { scroller, prefs } from './state.js';
 import { shuffle } from './collage.js';
 import { lightbox } from './lightbox.js';
@@ -20,13 +27,22 @@ const autoScrollLabel = document.getElementById('autoscroll-label');
 const scrollMenuBtn = document.getElementById('btn-scroll-menu');
 const scrollState = document.getElementById('scroll-state');
 export const speedSlider = document.getElementById('scroll-speed');
+// the range lives in core with the clamp, so the slider takes it from there
+speedSlider.min = String(MIN_SCROLL_SPEED);
+speedSlider.max = String(MAX_SCROLL_SPEED);
+speedSlider.step = String(SCROLL_SPEED_STEP);
 const speedValue = document.getElementById('scroll-speed-value');
 const loopCheckbox = document.getElementById('scroll-loop');
 const shuffleCheckbox = document.getElementById('scroll-shuffle');
 const awakeCheckbox = document.getElementById('scroll-awake');
 
 export let autoScroll = false;
-export let scrollSpeed = prefs.int('scrollSpeed', 80, 10, 600);
+export let scrollSpeed = prefs.int(
+  'scrollSpeed',
+  DEFAULT_SCROLL_SPEED,
+  MIN_SCROLL_SPEED,
+  MAX_SCROLL_SPEED
+);
 let restartAtEnd = prefs.bool('scrollRestart', true);
 let shuffleOnRestart = prefs.bool('scrollShuffle', false);
 let keepAwake = prefs.bool('keepAwake', true);
@@ -118,7 +134,7 @@ showAutoScrollState(autoScroll);
 /* single setter for the speed, so the slider, the ,/. shortcuts and the
  * saved pref can never disagree */
 export function setScrollSpeed(value) {
-  scrollSpeed = Math.max(Number(speedSlider.min), Math.min(Number(speedSlider.max), value));
+  scrollSpeed = clampScrollSpeed(value);
   showScrollSpeed();
   prefs.set('scrollSpeed', scrollSpeed);
 }

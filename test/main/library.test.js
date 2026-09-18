@@ -1,18 +1,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const {
   createLibraryStore,
   readLibraryItems,
   loadAndRepairLibrary
 } = require('../../src/main/lib/library.js');
-const { skipWithoutPermissionBits } = require('./helpers.js');
+const { createTempDir, skipWithoutPermissionBits } = require('./helpers.js');
 
 function tmpStore(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-lib-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const dir = createTempDir(t, 'lib');
   return { dir, store: createLibraryStore(() => dir) };
 }
 
@@ -82,6 +80,16 @@ test('unreadable content is moved aside and reported as unreadable', async (t) =
   );
 });
 
+test('a library file that cannot be read stays in place and blocks saving', async (t) => {
+  const { dir, store } = tmpStore(t);
+  fs.mkdirSync(path.join(dir, 'library.json')); // exists, but reading it fails
+  const { items, problem } = await store.load();
+  assert.deepEqual(items, []);
+  assert.deepEqual(problem, { backup: null });
+  await assert.rejects(store.save([entry('h1')]), /must stay as it is/);
+  assert.ok(fs.statSync(path.join(dir, 'library.json')).isDirectory(), 'left alone');
+});
+
 test('later unreadable files never overwrite an earlier backup', async (t) => {
   const { dir, store } = tmpStore(t);
   const contents = ['{first', '{second', '{third'];
@@ -118,6 +126,25 @@ test('when the unreadable file cannot be moved, saving is refused until a clean 
   assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'))[0].hash, 'h3');
 });
 
+test('with every backup name taken the file stays and saving is refused', async (t) => {
+  const { dir, store } = tmpStore(t);
+  const stamp = 1700000000000;
+  t.mock.method(Date, 'now', () => stamp);
+  const base = path.join(dir, 'library.json.corrupt');
+  const taken = [
+    base,
+    `${base}.${stamp}`,
+    ...Array.from({ length: 8 }, (_, index) => `${base}.${stamp}-${index + 2}`)
+  ];
+  for (const name of taken) fs.writeFileSync(name, 'older backup');
+  fs.writeFileSync(path.join(dir, 'library.json'), '{not json');
+  const { problem } = await store.load();
+  assert.deepEqual(problem, { backup: null });
+  assert.equal(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'), '{not json', 'untouched');
+  for (const name of taken) assert.equal(fs.readFileSync(name, 'utf8'), 'older backup');
+  await assert.rejects(store.save([entry('h1')]), /must stay as it is/);
+});
+
 test('readLibraryItems rejects anything but an array of entries', () => {
   for (const bad of ['{"a":1}', '"str"', '42', 'null', '{not json']) {
     assert.throws(() => readLibraryItems(bad), Error, bad);
@@ -125,13 +152,15 @@ test('readLibraryItems rejects anything but an array of entries', () => {
   assert.deepEqual(readLibraryItems('[]'), []);
 });
 
-test('entries need a path and a hash; a repeated hash keeps its first entry', () => {
+test('entries need a path, a hash and a media type; a repeated hash keeps its first entry', () => {
   for (const bad of [
     '[null]',
     '[{"hash":"x"}]',
     '[{"path":42,"hash":"x"}]',
     '[{"path":"/a"}]',
     '[{"path":"/a","hash":""}]',
+    '[{"path":"/a","hash":"x"}]',
+    '[{"path":"/a","hash":"x","type":"audio"}]',
     '["str"]'
   ]) {
     assert.throws(() => readLibraryItems(bad), /malformed/, bad);
@@ -147,6 +176,17 @@ test('entries need a path and a hash; a repeated hash keeps its first entry', ()
     ]
   );
   assert.equal(items[0].size, undefined, 'a size is optional on read');
+});
+
+test('save refuses an entry the next load would reject and leaves the file as it is', async (t) => {
+  const { dir, store } = tmpStore(t);
+  await store.save([entry('h1')]);
+  await assert.rejects(store.save([entry('h2'), { path: '/x.png', hash: 'h3' }]), /malformed/);
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
+  assert.deepEqual(
+    onDisk.map((item) => item.hash),
+    ['h1']
+  );
 });
 
 test('loadAndRepairLibrary brings stale entries up to date and saves them', async (t) => {
@@ -240,8 +280,8 @@ test('saves are atomic: no tmp file left, content is valid JSON', async (t) => {
 
 test('concurrent saves serialize; last write wins and file stays valid', async (t) => {
   const { dir, store } = tmpStore(t);
-  const batches = Array.from({ length: 20 }, (_, i) =>
-    Array.from({ length: i + 1 }, (_, j) => entry(`h${j}`))
+  const batches = Array.from({ length: 20 }, (_batch, batchIndex) =>
+    Array.from({ length: batchIndex + 1 }, (_slot, index) => entry(`h${index}`))
   );
   await Promise.all(batches.map((b) => store.save(b)));
   const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
@@ -249,8 +289,7 @@ test('concurrent saves serialize; last write wins and file stays valid', async (
 });
 
 test('save creates the directory if it does not exist yet', async (t) => {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'collager-lib-'));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const base = createTempDir(t, 'lib');
   const dir = path.join(base, 'not', 'yet', 'created');
   const store = createLibraryStore(() => dir);
   await store.save([]);

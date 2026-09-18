@@ -22,10 +22,8 @@ module.exports = {
       version: document.getElementById('about-version').textContent
     }))()`);
     check(
-      'about shows package.json metadata',
-      aboutOk.open &&
-        aboutOk.name === ((pkg.build && pkg.build.productName) || pkg.name) &&
-        aboutOk.version === `version ${pkg.version}`
+      'about shows the app name and the package.json version',
+      aboutOk.open && aboutOk.name === 'Collager' && aboutOk.version === `version ${pkg.version}`
     );
     await js('T.closeOverlays(); void 0');
   }
