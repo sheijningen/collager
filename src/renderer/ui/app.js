@@ -142,12 +142,13 @@ if (new URLSearchParams(location.search).has('e2e')) {
 render(); // empty state and toolbar geometry before the library arrives
 
 /* Toast for a library file that could not be loaded. It was moved aside,
- * or, when even that failed, saving is off so it is not overwritten. */
+ * or, when that failed or it could not be read at all, it stays where it is
+ * and saving is off so it is not overwritten. */
 function describeLibraryProblem({ backup }) {
   const where = backup
     ? `It was kept as ${basename(backup)}.`
-    : 'It could not be moved aside, so saving is off to protect it.';
-  return `The library file was unreadable, starting empty. ${where}`;
+    : 'It stays where it is and saving is off to protect it.';
+  return `The library file could not be read, starting empty. ${where}`;
 }
 
 // runs as the first job on the op queue, so a drop that arrives during

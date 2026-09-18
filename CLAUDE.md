@@ -79,7 +79,8 @@ docs/                README media
   into its state, so nothing done during startup or after a failed load can overwrite the file
   with an empty list. An unreadable file is moved to `library.json.corrupt` (a timestamped name
   when that exists, so no backup is ever overwritten) and the app starts empty. When the move
-  fails the file stays in place and saving is refused so it is not overwritten. There is no
+  fails, or the file is there but cannot be read at all (permissions, a directory in its place),
+  the file stays in place and saving is refused so it is not overwritten. There is no
   schema version: a file the current code cannot read counts as unreadable. Only path, hash,
   size, type and dimensions are stored per item; URL and missing flag are derived at load, the
   unshowable flag while the app runs, and an entry without a hash makes the file unreadable. A

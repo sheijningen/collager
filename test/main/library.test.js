@@ -82,6 +82,16 @@ test('unreadable content is moved aside and reported as unreadable', async (t) =
   );
 });
 
+test('a library file that cannot be read stays in place and blocks saving', async (t) => {
+  const { dir, store } = tmpStore(t);
+  fs.mkdirSync(path.join(dir, 'library.json')); // exists, but reading it fails
+  const { items, problem } = await store.load();
+  assert.deepEqual(items, []);
+  assert.deepEqual(problem, { backup: null });
+  await assert.rejects(store.save([entry('h1')]), /must stay as it is/);
+  assert.ok(fs.statSync(path.join(dir, 'library.json')).isDirectory(), 'left alone');
+});
+
 test('later unreadable files never overwrite an earlier backup', async (t) => {
   const { dir, store } = tmpStore(t);
   const contents = ['{first', '{second', '{third'];
