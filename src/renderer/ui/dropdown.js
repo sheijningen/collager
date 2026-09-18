@@ -25,7 +25,7 @@ export function openDropdownId() {
   return openTrigger ? openTrigger.dataset.menu : null;
 }
 
-export function openDropdown(trigger) {
+function openDropdown(trigger) {
   closeDropdown();
   const popup = popups.get(trigger);
   openTrigger = trigger;
@@ -58,7 +58,7 @@ export function closeDropdown({ keepFocus = true } = {}) {
   openTrigger = null;
 }
 
-export function toggleDropdown(trigger) {
+function toggleDropdown(trigger) {
   if (openTrigger === trigger) closeDropdown();
   else openDropdown(trigger);
 }

@@ -68,6 +68,8 @@ export function setColumns(count) {
  */
 
 const HYDRATE_MARGIN = '800px'; // how far outside the viewport media stays loaded
+const MIN_LAYOUT_WIDTH = 100; // px; a collapsed window still gets a layout
+const DRAG_CLICK_WINDOW_MS = 400; // a click this soon after a drag is part of it
 
 const observer = new IntersectionObserver(
   (entries) => {
@@ -141,7 +143,7 @@ export function discardTile(hash) {
 export function render() {
   reindexItems();
   const width = scroller.clientWidth - GAP * 2;
-  const { positions, height } = packItems(state.items, Math.max(width, 100), columns);
+  const { positions, height } = packItems(state.items, Math.max(width, MIN_LAYOUT_WIDTH), columns);
   collage.style.height = `${height + GAP}px`;
 
   const seen = new Set();
@@ -225,7 +227,7 @@ function createTile(item) {
   tile.addEventListener('dblclick', () => {
     // a drag's synthetic click counts toward double-click detection; don't
     // let drag-then-quick-click open the lightbox
-    if (performance.now() - lastDragEndAt < 400) return;
+    if (performance.now() - lastDragEndAt < DRAG_CLICK_WINDOW_MS) return;
     if (!fileProblem(item)) openLightbox(item);
   });
   return tile;
