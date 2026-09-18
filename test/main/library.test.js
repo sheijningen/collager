@@ -126,6 +126,25 @@ test('when the unreadable file cannot be moved, saving is refused until a clean 
   assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'))[0].hash, 'h3');
 });
 
+test('with every backup name taken the file stays and saving is refused', async (t) => {
+  const { dir, store } = tmpStore(t);
+  const stamp = 1700000000000;
+  t.mock.method(Date, 'now', () => stamp);
+  const base = path.join(dir, 'library.json.corrupt');
+  const taken = [
+    base,
+    `${base}.${stamp}`,
+    ...Array.from({ length: 8 }, (_, index) => `${base}.${stamp}-${index + 2}`)
+  ];
+  for (const name of taken) fs.writeFileSync(name, 'older backup');
+  fs.writeFileSync(path.join(dir, 'library.json'), '{not json');
+  const { problem } = await store.load();
+  assert.deepEqual(problem, { backup: null });
+  assert.equal(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'), '{not json', 'untouched');
+  for (const name of taken) assert.equal(fs.readFileSync(name, 'utf8'), 'older backup');
+  await assert.rejects(store.save([entry('h1')]), /must stay as it is/);
+});
+
 test('readLibraryItems rejects anything but an array of entries', () => {
   for (const bad of ['{"a":1}', '"str"', '42', 'null', '{not json']) {
     assert.throws(() => readLibraryItems(bad), Error, bad);

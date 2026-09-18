@@ -162,3 +162,13 @@ test('sortItems: added mode keeps collage order', () => {
     ['/c.png', '/a.png', '/b.png']
   );
 });
+
+test('packItems: a present item without dimensions gets the fallback size', () => {
+  const colWidth = Math.floor((1000 - GAP) / 2);
+  const { positions } = packItems(
+    [item({ w: 0, h: 0 }), item({ w: undefined, h: undefined })],
+    1000,
+    2
+  );
+  for (const pos of positions) assert.equal(pos.h, Math.round(MISSING_H * (colWidth / MISSING_W)));
+});

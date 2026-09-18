@@ -422,10 +422,11 @@ test('rehashStaleItems: an unreadable video keeps its hash while the others move
 });
 
 test('rehashStaleItems: only rehashed videos collapse, other duplicate hashes are kept', async (t) => {
-  const dir = tmpTree(t, { 'clip.mp4': 'video bytes' });
+  // both images are present and up to date, so only the video is rehashed
+  const dir = tmpTree(t, { 'clip.mp4': 'video bytes', 'a.png': 'same', 'b.png': 'same' });
   const items = [
-    { path: '/a.png', hash: 'same-image', type: 'image', missing: false },
-    { path: '/b.png', hash: 'same-image', type: 'image', missing: false },
+    { path: path.join(dir, 'a.png'), hash: 'same-image', type: 'image', size: 4, missing: false },
+    { path: path.join(dir, 'b.png'), hash: 'same-image', type: 'image', size: 4, missing: false },
     { path: path.join(dir, 'clip.mp4'), hash: 'full-clip', type: 'video', missing: false }
   ];
   const { items: kept, collapsed } = await rehashStaleItems(items, measureOnDisk(items));
@@ -570,4 +571,26 @@ test('rehashStaleItems: a failed rehash keeps the old size so the next start ret
   assert.equal(changed, false);
   assert.equal(items[0].hash, 'stale');
   assert.equal(items[0].size, 2);
+});
+
+test('runWithConcurrency: a rejecting task fails the run before it completes', async () => {
+  const progress = [];
+  await assert.rejects(
+    runWithConcurrency(
+      [0, 1, 2, 3, 4],
+      2,
+      async (_element, index) => {
+        if (index === 1) throw new Error('boom');
+      },
+      (done) => progress.push(done)
+    ),
+    /boom/
+  );
+  assert.ok(!progress.includes(5), 'the run never reports completion');
+});
+
+test('collectMediaPaths lists a directory dropped twice once', async (t) => {
+  const dir = tmpTree(t, { 'a.png': 'x', 'b.mp4': 'y' });
+  const { found } = await collectMediaPaths([dir, dir]);
+  assert.deepEqual(found.map((p) => path.basename(p)).sort(), ['a.png', 'b.mp4']);
 });
