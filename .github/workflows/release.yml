@@ -84,7 +84,8 @@ jobs:
       matrix:
         include:
           - name: linux
-            runner: ubuntu-latest
+            # pinned: the apt package names in the smoke run are specific to this release
+            runner: ubuntu-24.04
             script: dist:linux
             glob: dist/Collager-*.AppImage
           - name: windows
@@ -101,6 +102,23 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm ${{ matrix.script }} --publish never
+      - name: Install a virtual display and Electron's runtime libraries
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgtk-3-0t64 libnss3 libasound2t64 libgbm1 libxss1 libatk-bridge2.0-0t64
+      - name: Start the packaged app once
+        if: matrix.name == 'linux'
+        env:
+          COLLAGER_SMOKE: '1'
+        run: |
+          set -euo pipefail
+          cd dist
+          # extracted rather than mounted so the runner needs no libfuse2; the
+          # sandbox helper is skipped because it only works root-owned
+          ./Collager-*.AppImage --appimage-extract >/dev/null
+          XDG_CONFIG_HOME="$(mktemp -d)" xvfb-run -a squashfs-root/AppRun --no-sandbox
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.name }}

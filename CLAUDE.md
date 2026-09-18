@@ -177,7 +177,11 @@ Linux desktop entry matched to the running window.
 Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json` and
 points at a commit on `main`; both are checked before anything is built. The release workflow calls the lint, format, unit and e2e workflows as reusable workflows, which is
 what their `workflow_call` trigger is for, builds both installers, and publishes a GitHub
-Release with them, a `SHA256SUMS` file and auto-generated notes. The release is a draft until
+Release with them, a `SHA256SUMS` file and auto-generated notes. The Linux build job also starts
+the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`, which makes
+main exit 0 once the renderer has loaded the library and 1 after a minute without, so a path
+that only breaks inside the packaged app fails the release before anything is uploaded. The
+Windows installer gets no such run. The release is a draft until
 every asset is uploaded, and the publish job deletes its own draft when it fails or is
 cancelled, so a failed run normally leaves nothing behind but the tag. A tag that already has a
 release, draft included, is refused, so a draft left behind by a lost runner has to be deleted
