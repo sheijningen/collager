@@ -7,13 +7,13 @@
  * On a multi-selection only remove is offered, since the rest name one file.
  */
 
-import { clampMenuPosition } from '../core/menuposition.js';
 import { menuActsOnSelection, menuHeader, removeLabel } from '../core/itemmenu.js';
 import { formatCount, fileProblem } from '../core/text.js';
 import { selected, scroller, showToast } from './state.js';
 import { removeItems } from './collage.js';
 import { fileList, removeSelected } from './panel.js';
 import { openLightbox } from './lightbox.js';
+import { showPopupAt } from './popup.js';
 
 export const ctxMenu = document.getElementById('ctx-menu');
 const ctxPath = document.getElementById('ctx-path');
@@ -63,23 +63,8 @@ export function openCtxMenu(item, x, y, source) {
   ctxCopyImageBtn.hidden = wholeSelection || item.type !== 'image';
   ctxCopyImageBtn.disabled = !showable;
   ctxRemoveBtn.textContent = removeLabel(selected.size, wholeSelection);
-  // measure at a neutral position (stale left/top from a previous opening
-  // would cap shrink-to-fit width and skew the measurement), then clamp
-  ctxMenu.style.left = '0px';
-  ctxMenu.style.top = '0px';
-  ctxMenu.hidden = false;
+  showPopupAt(ctxMenu, x, y);
   ctxScrollAtOpen = anchorScroller().scrollTop;
-  const rect = ctxMenu.getBoundingClientRect();
-  const { left, top } = clampMenuPosition({
-    x,
-    y,
-    width: rect.width,
-    height: rect.height,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight
-  });
-  ctxMenu.style.left = `${left}px`;
-  ctxMenu.style.top = `${top}px`;
 }
 
 export function closeCtxMenu() {
