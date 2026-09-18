@@ -15,10 +15,12 @@ and Windows. macOS is not a target; the `darwin` branches only keep the app quit
 src/main/            main process: window, menu, GPU fallback, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
-src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step, key rules,
-                     menu placement, item menu shape, count text, file list key, empty drop,
-                     lightbox stepping
-src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job progress
+src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
+                     range, key rules, menu placement, item menu shape, count text, file list
+                     key, empty drop, lightbox stepping, path names, user-facing text, a
+                     bounded worker pool
+src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job
+                     progress, popup.js places the context menu and the toolbar dropdowns
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
 test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
                      test/main/helpers.js holds what the main tests share
@@ -154,11 +156,13 @@ docs/                README media
 - `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code (video
   only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
   `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the
-  harness resets the app (empty library, nothing open or selected, two columns, default speed,
-  sort, panels and window size, the removal question answering yes), so a case loads what it
-  needs (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and
-  never cleans up. A case that needs the startup path seeds a saved library and restarts the
-  renderer with `ctx.restartWith(library)`. `pnpm test:e2e panel drag` runs only the named cases,
+  harness resets the app (empty library, nothing open or selected, two columns, default speed
+  and Scroll settings, sort, panels with the count breakdown closed, window size, the removal
+  question answering yes), so a case loads what it needs (`ctx.loadFixtures()`), turns waits into
+  checks (`ctx.waitFor` resolves to a boolean) and never cleans up. A case that needs the startup
+  path seeds a saved library and restarts the renderer with `ctx.restartWith(library)`, which
+  takes an item list or a string written as the file's raw content; `ctx.reloadRenderer()`
+  restarts against whatever is on disk. `pnpm test:e2e panel drag` runs only the named cases,
   in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e` and
   `app.js` exposes every module export on `window.collagerTest`, which the snippets reach as `T`;
   every snippet also gets `press(key)`, which fires a keydown on the window.
