@@ -1,6 +1,11 @@
 const { ipcMain, BrowserWindow, dialog, powerSaveBlocker } = require('electron');
 const path = require('path');
 
+/* What the user sees the app called. electron-builder strips the `build`
+ * field from the packaged package.json, so build.productName cannot be read
+ * back at runtime and this literal has to match it. */
+const APP_NAME = 'Collager';
+
 /* Window and app-level channels: fullscreen, the display-sleep blocker, the
  * removal question and the metadata shown in the About overlay. */
 function registerWindowIpc() {
@@ -10,7 +15,7 @@ function registerWindowIpc() {
     const win = BrowserWindow.fromWebContents(event.sender);
     const { response } = await dialog.showMessageBox(win, {
       type: 'question',
-      title: 'Collager',
+      title: APP_NAME,
       message,
       buttons: [confirmLabel, 'Keep'],
       defaultId: 1,
@@ -47,7 +52,7 @@ function registerWindowIpc() {
   ipcMain.handle('get-app-info', () => {
     const pkg = require(path.join(__dirname, '..', '..', '..', 'package.json'));
     return {
-      name: (pkg.build && pkg.build.productName) || pkg.name,
+      name: APP_NAME,
       version: pkg.version,
       description: pkg.description,
       author: typeof pkg.author === 'object' ? pkg.author.name : pkg.author,
