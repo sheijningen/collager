@@ -119,7 +119,9 @@ export function handleSelectClick(hash, event, source) {
     hash,
     ctrl: event.ctrlKey || event.metaKey,
     shift: event.shiftKey,
-    order: sortedItems().map((item) => item.hash)
+    // a range runs along the surface that was clicked: the sorted list for an
+    // entry, the collage for a tile
+    order: (source === 'list' ? sortedItems() : state.items).map((item) => item.hash)
   });
   selected.clear();
   for (const selectedHash of next.selected) selected.add(selectedHash);
