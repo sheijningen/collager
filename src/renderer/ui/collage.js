@@ -120,10 +120,15 @@ function hydrate(tile) {
  * one. The render rebuilds the tile, the panel entry and the missing count. */
 async function recordLoadFailure(item) {
   const failedPath = item.path;
-  let present = false;
+  let present;
   try {
     present = await window.api.mediaFileExists(failedPath);
-  } catch {}
+  } catch {
+    // without an answer the file is not declared missing, since that tile
+    // offers to clear an entry whose file may well be on disk; unshowable
+    // keeps every action that does not decode it and lasts this session only
+    present = true;
+  }
   // removed, repaired or already judged while the question was out
   if (itemsByHash.get(item.hash) !== item) return;
   if (item.path !== failedPath || fileProblem(item)) return;
