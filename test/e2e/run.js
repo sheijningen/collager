@@ -110,6 +110,16 @@ async function run() {
     return matched ? library : null;
   }
 
+  /* Reloads the renderer and resolves once init has taken the saved library,
+   * so a case observes the startup path against whatever is on disk. */
+  async function reloadRenderer() {
+    const finished = new Promise((resolve) => wc.once('did-finish-load', resolve));
+    wc.reload();
+    await finished;
+    const ready = await waitFor(() => js('T.state.libraryLoaded'));
+    if (!ready) throw new Error('the renderer did not finish loading the library');
+  }
+
   /* Shared by every case. Cases need not clean up: resetApp runs first. */
   const ctx = {
     js,
@@ -128,22 +138,25 @@ async function run() {
       const loaded = await waitFor(async () => (await js('T.state.items.length')) >= expected);
       if (!loaded) throw new Error('fixtures did not load');
     },
-    /* writes `library` as the saved library and restarts the renderer, so a
-     * case observes the startup path: the repair pass in the main process
-     * and init in the renderer. Resolves once init has taken the result. */
+    libraryFile,
+    reloadRenderer,
+    /* writes `library` (an item list, or a string taken as the file's raw
+     * content) as the saved library and restarts the renderer, so a case
+     * observes the startup path: the repair pass in the main process and
+     * init in the renderer. */
     async restartWith(library) {
-      fs.writeFileSync(libraryFile, JSON.stringify(library));
-      const finished = new Promise((resolve) => wc.once('did-finish-load', resolve));
-      wc.reload();
-      await finished;
-      const ready = await waitFor(() => js('T.state.libraryLoaded'));
-      if (!ready) throw new Error('the renderer did not finish loading the library');
+      fs.writeFileSync(
+        libraryFile,
+        typeof library === 'string' ? library : JSON.stringify(library)
+      );
+      await reloadRenderer();
     }
   };
 
   /* Puts the app back to a known state: empty library, no selection, nothing
-   * open, auto-scroll off, two columns, collage order, default speed, panel
-   * and toolbar shown, not fullscreen, the starting window size, scrolled to
+   * open, auto-scroll off with its settings at their defaults, two columns,
+   * collage order, default speed, panel and toolbar shown with the count
+   * breakdown closed, not fullscreen, the starting window size, scrolled to
    * the top, and the removal question answering yes. Library work still in flight from
    * the previous case (a startup dimension pass, an add) finishes first, so it
    * cannot push into the emptied library or leave its job line behind. */
@@ -160,7 +173,14 @@ async function run() {
       T.setColumns(2);
       T.setScrollSpeed(80);
       T.setPanelOpen(true);
+      T.setBreakdownOpen(false);
       T.setToolbarOpen(true);
+      for (const [id, checked] of [['scroll-loop', true], ['scroll-shuffle', false], ['scroll-awake', true]]) {
+        const box = document.getElementById(id);
+        if (box.checked === checked) continue;
+        box.checked = checked;
+        box.dispatchEvent(new Event('change'));
+      }
       if (T.isFullscreen) window.api.toggleFullscreen();
       T.sortSelect.value = 'added';
       T.sortSelect.dispatchEvent(new Event('change'));
