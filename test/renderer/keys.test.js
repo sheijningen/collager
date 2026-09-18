@@ -1,6 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { targetConsumesKey } = require('../../src/renderer/core/keys.js');
+const {
+  targetConsumesKey,
+  normalizeShortcutKey,
+  SCROLL_KEYS,
+  RANGE_INPUT_KEYS
+} = require('../../src/renderer/core/keys.js');
 
 test('no target or a plain element consumes nothing', () => {
   assert.equal(targetConsumesKey(null, ' '), false);
@@ -48,4 +53,17 @@ test('a focused video keeps Space and the arrows for its controls', () => {
   assert.equal(targetConsumesKey({ tagName: 'VIDEO' }, ' '), true);
   assert.equal(targetConsumesKey({ tagName: 'VIDEO' }, 'ArrowRight'), true);
   assert.equal(targetConsumesKey({ tagName: 'VIDEO' }, 'f'), false);
+});
+
+test('normalizeShortcutKey lowercases letters and leaves named keys alone', () => {
+  assert.equal(normalizeShortcutKey('S'), 's');
+  assert.equal(normalizeShortcutKey('s'), 's');
+  assert.equal(normalizeShortcutKey('?'), '?');
+  assert.equal(normalizeShortcutKey('F1'), 'F1');
+  assert.equal(normalizeShortcutKey('Escape'), 'Escape');
+});
+
+test('SCROLL_KEYS is Space plus every key a slider consumes', () => {
+  assert.equal(SCROLL_KEYS[0], ' ');
+  assert.deepEqual(SCROLL_KEYS.slice(1), RANGE_INPUT_KEYS);
 });

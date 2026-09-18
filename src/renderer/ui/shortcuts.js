@@ -6,7 +6,7 @@
  * and the actual bindings can't drift apart.
  */
 
-import { targetConsumesKey } from '../core/keys.js';
+import { targetConsumesKey, normalizeShortcutKey, SCROLL_KEYS } from '../core/keys.js';
 import { state, selected, showToast } from './state.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
@@ -22,17 +22,6 @@ export const aboutOverlay = document.getElementById('about-overlay');
 export const shortcutList = document.getElementById('shortcut-list');
 
 const SPEED_KEY_STEP = 10; // matches the slider's step
-const SCROLLING_KEYS = [
-  ' ',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'PageUp',
-  'PageDown',
-  'Home',
-  'End'
-];
 
 export const SHORTCUTS = [
   ['Space', 'Start / stop auto-scroll'],
@@ -158,10 +147,11 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (targetConsumesKey(event.target, event.key)) return;
+  const key = normalizeShortcutKey(event.key);
 
   // overlays are modal: their toggles close them, all else is inert
   if (anyOverlayOpen()) {
-    if (['?', 'F1', 'i'].includes(event.key)) closeOverlays();
+    if (['?', 'F1', 'i'].includes(key)) closeOverlays();
     return;
   }
   // the lightbox and the context menu are modal too; Escape left above, so
@@ -169,7 +159,7 @@ window.addEventListener('keydown', (event) => {
   // the collage from the lightbox
   if (!lightbox.hidden) {
     // the collage behind the backdrop must not scroll away from the shown item
-    if (SCROLLING_KEYS.includes(event.key)) event.preventDefault();
+    if (SCROLL_KEYS.includes(event.key)) event.preventDefault();
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       stepLightbox(event.key === 'ArrowRight' ? 1 : -1);
     }
@@ -177,7 +167,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (!ctxMenu.hidden) return;
 
-  switch (event.key) {
+  switch (key) {
     case '?':
     case 'F1':
       event.preventDefault();
@@ -201,8 +191,7 @@ window.addEventListener('keydown', (event) => {
     case 's':
       if (!event.repeat && state.items.length) shuffle();
       break;
-    case 'a':
-    case 'A': {
+    case 'a': {
       // the modifier, not the letter's case, so caps lock cannot swap the two
       const button = event.shiftKey ? 'btn-add-folder' : 'btn-add';
       if (!event.repeat) document.getElementById(button).click();

@@ -1,6 +1,6 @@
 /* Pure keyboard rules for the global shortcuts. */
 
-const RANGE_INPUT_KEYS = [
+export const RANGE_INPUT_KEYS = [
   'ArrowLeft',
   'ArrowRight',
   'ArrowUp',
@@ -10,6 +10,20 @@ const RANGE_INPUT_KEYS = [
   'PageUp',
   'PageDown'
 ];
+
+/** The keys that scroll a page: Space plus the arrows, paging, Home and End. */
+export const SCROLL_KEYS = [' ', ...RANGE_INPUT_KEYS];
+
+/**
+ * The key a letter shortcut is matched on: a single character is lowercased,
+ * so Caps Lock does not switch the letter shortcuts off, while named keys
+ * (F1, Escape) pass unchanged. Shift is read from the modifier flag instead.
+ *
+ * @param {string} key the KeyboardEvent key
+ */
+export function normalizeShortcutKey(key) {
+  return key.length === 1 ? key.toLowerCase() : key;
+}
 
 /**
  * Whether the focused element needs this key for itself, so a global
