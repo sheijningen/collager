@@ -18,7 +18,9 @@ import {
   describeAddOutcome,
   describeRemoval,
   fileProblem,
-  tileLabel
+  tileLabel,
+  hintForFileProblem,
+  clearMissingLabel
 } from '../core/text.js';
 import {
   state,
@@ -66,28 +68,6 @@ export function setColumns(count) {
  */
 
 const HYDRATE_MARGIN = '800px'; // how far outside the viewport media stays loaded
-
-/* Tooltip for tiles whose file can't be read (shared with the file panel). */
-export const MISSING_FILE_HINT = [
-  'This file could not be loaded. Likely causes:',
-  '• it was moved or renamed',
-  '• it was deleted',
-  '• it is on an external drive or network share that is not connected',
-  '',
-  'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
-].join('\n');
-
-/* Tooltip for files that are on disk but cannot be decoded. */
-export const UNSHOWABLE_FILE_HINT = [
-  'This file is on disk but Collager cannot show it. Likely causes:',
-  '• its format is not supported by the built-in player (HEVC/H.265 video, for example)',
-  '• the file is damaged',
-  '• it could not be read just now (a network drive that dropped out, for example)',
-  '',
-  'Open it with the default app from the right-click menu to check, or click ✕ to remove it.'
-].join('\n');
-
-const FILE_HINTS = { missing: MISSING_FILE_HINT, unshowable: UNSHOWABLE_FILE_HINT };
 
 const observer = new IntersectionObserver(
   (entries) => {
@@ -207,7 +187,7 @@ const missingBadge = document.getElementById('missing-badge');
 function updateClearMissingBtn() {
   const count = countMissing();
   clearMissingBtn.hidden = count === 0;
-  clearMissingBtn.textContent = `⚠ Clear ${count} missing`;
+  clearMissingBtn.textContent = clearMissingLabel(count);
   // the button sits in the Collage menu, so the menu button carries the warning
   missingBadge.hidden = count === 0;
   if (count) missingBadge.title = `${formatCount(count, 'file')} missing`;
@@ -225,7 +205,7 @@ function createTile(item) {
   label.className = 'placeholder-label';
   label.textContent = tileLabel(item, basename(item.path));
   tile.appendChild(label);
-  if (problem) tile.title = FILE_HINTS[problem];
+  if (problem) tile.title = hintForFileProblem(problem);
 
   const remove = document.createElement('button');
   remove.className = 'btn-remove';

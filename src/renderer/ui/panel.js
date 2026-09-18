@@ -10,15 +10,9 @@ import { basename } from '../core/paths.js';
 import { clickSelection } from '../core/selection.js';
 import { buildListKey } from '../core/listkey.js';
 import { countByExtension } from '../core/counts.js';
-import { formatCount, fileProblem } from '../core/text.js';
+import { formatCount, fileProblem, hintForFileProblem, badgeLabel } from '../core/text.js';
 import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
-import {
-  render,
-  removeItems,
-  askRemoval,
-  MISSING_FILE_HINT,
-  UNSHOWABLE_FILE_HINT
-} from './collage.js';
+import { render, removeItems, askRemoval } from './collage.js';
 import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
@@ -61,12 +55,11 @@ export function renderList() {
     const problem = fileProblem(item);
     li.className = (selected.has(item.hash) ? 'selected' : '') + (problem ? ` ${problem}` : '');
     li.title = item.path;
-    if (problem === 'missing') li.title += `\n\n${MISSING_FILE_HINT}`;
-    if (problem === 'unshowable') li.title += `\n\n${UNSHOWABLE_FILE_HINT}`;
+    if (problem) li.title += `\n\n${hintForFileProblem(problem)}`;
 
     const badge = document.createElement('span');
     badge.className = `badge ${item.type}`;
-    badge.textContent = item.type === 'image' ? 'IMG' : item.type === 'gif' ? 'GIF' : 'VID';
+    badge.textContent = badgeLabel(item.type);
     li.appendChild(badge);
 
     const name = document.createElement('span');

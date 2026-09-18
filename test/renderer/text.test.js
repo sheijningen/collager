@@ -90,3 +90,44 @@ test('tileLabel prefixes the name with the problem', () => {
   assert.equal(tileLabel({ missing: true }, 'a.png'), 'missing: a.png');
   assert.equal(tileLabel({ unshowable: true }, 'a.mp4'), 'cannot be shown: a.mp4');
 });
+
+const {
+  hintForFileProblem,
+  badgeLabel,
+  clearMissingLabel,
+  describeLibraryProblem,
+  describeStartupNotes
+} = require('../../src/renderer/core/text.js');
+
+test('hintForFileProblem explains each problem and is silent without one', () => {
+  assert.match(hintForFileProblem('missing'), /moved or renamed/);
+  assert.match(hintForFileProblem('unshowable'), /cannot show it/);
+  assert.equal(hintForFileProblem(null), '');
+});
+
+test('badgeLabel names the three media types', () => {
+  assert.equal(badgeLabel('image'), 'IMG');
+  assert.equal(badgeLabel('gif'), 'GIF');
+  assert.equal(badgeLabel('video'), 'VID');
+});
+
+test('describeLibraryProblem names the backup, or says the file stays put', () => {
+  assert.equal(
+    describeLibraryProblem({ backup: '/home/me/.config/collager/library.json.corrupt' }),
+    'The library file could not be read, starting empty. It was kept as library.json.corrupt.'
+  );
+  assert.match(describeLibraryProblem({ backup: null }), /stays where it is and saving is off/);
+});
+
+test('describeStartupNotes points at the menu entry with its exact label', () => {
+  assert.equal(describeStartupNotes({ missingCount: 0, collapsed: 0 }), '');
+  assert.equal(
+    describeStartupNotes({ missingCount: 2, collapsed: 0 }),
+    `2 files missing on disk, see Collage > ${clearMissingLabel(2)}`
+  );
+  assert.equal(describeStartupNotes({ missingCount: 0, collapsed: 1 }), '1 duplicate merged');
+  assert.match(
+    describeStartupNotes({ missingCount: 1, collapsed: 3 }),
+    /missing on disk.* · 3 duplicates merged$/
+  );
+});

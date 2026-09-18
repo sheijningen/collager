@@ -3,12 +3,11 @@
  * here is what wires their event handlers up. */
 
 import * as layout from '../core/layout.js';
-import { basename } from '../core/paths.js';
 import { mayCarryMedia, explainEmptyDrop } from '../core/drop.js';
 import * as stateModule from './state.js';
 import * as collageModule from './collage.js';
 import { state, showToast, persist, reindexItems, countMissing, runOrToast } from './state.js';
-import { formatCount } from '../core/text.js';
+import { describeLibraryProblem, describeStartupNotes } from '../core/text.js';
 // named imports stay live; destructuring the namespace would freeze `columns`
 import {
   columns,
@@ -144,16 +143,6 @@ if (new URLSearchParams(location.search).has('e2e')) {
 
 render(); // empty state and toolbar geometry before the library arrives
 
-/* Toast for a library file that could not be loaded. It was moved aside,
- * or, when that failed or it could not be read at all, it stays where it is
- * and saving is off so it is not overwritten. */
-function describeLibraryProblem({ backup }) {
-  const where = backup
-    ? `It was kept as ${basename(backup)}.`
-    : 'It stays where it is and saving is off to protect it.';
-  return `The library file could not be read, starting empty. ${where}`;
-}
-
 // runs as the first job on the op queue, so a drop that arrives during
 // startup is applied after the saved library has loaded, never lost
 queueLibraryOperation(async function init() {
@@ -173,17 +162,11 @@ queueLibraryOperation(async function init() {
     });
     render();
     if (measured) persist();
-    const notes = [];
-    const missingCount = countMissing();
-    if (missingCount) {
-      notes.push(
-        `${formatCount(missingCount, 'file')} missing on disk, see Collage > ⚠ Clear ${missingCount} missing`
-      );
-    }
-    if (loaded.collapsed) {
-      notes.push(`${formatCount(loaded.collapsed, 'duplicate')} merged`);
-    }
-    if (notes.length) showToast(notes.join(' · '));
+    const notes = describeStartupNotes({
+      missingCount: countMissing(),
+      collapsed: loaded.collapsed
+    });
+    if (notes) showToast(notes);
   } catch (err) {
     console.error('Failed to load the library', err);
     render();
