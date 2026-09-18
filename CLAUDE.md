@@ -83,7 +83,8 @@ docs/                README media
   the file stays in place and saving is refused so it is not overwritten. There is no
   schema version: a file the current code cannot read counts as unreadable. Only path, hash,
   size, type and dimensions are stored per item; URL and missing flag are derived at load, the
-  unshowable flag while the app runs, and an entry without a hash makes the file unreadable. A
+  unshowable flag while the app runs, and an entry without a hash or a media type makes the file
+  unreadable; a save carrying such an entry is refused so that file is never written. A
   size is optional on read, so an entry from before sizes were recorded loads and has one filled
   in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a

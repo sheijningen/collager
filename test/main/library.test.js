@@ -133,13 +133,15 @@ test('readLibraryItems rejects anything but an array of entries', () => {
   assert.deepEqual(readLibraryItems('[]'), []);
 });
 
-test('entries need a path and a hash; a repeated hash keeps its first entry', () => {
+test('entries need a path, a hash and a media type; a repeated hash keeps its first entry', () => {
   for (const bad of [
     '[null]',
     '[{"hash":"x"}]',
     '[{"path":42,"hash":"x"}]',
     '[{"path":"/a"}]',
     '[{"path":"/a","hash":""}]',
+    '[{"path":"/a","hash":"x"}]',
+    '[{"path":"/a","hash":"x","type":"audio"}]',
     '["str"]'
   ]) {
     assert.throws(() => readLibraryItems(bad), /malformed/, bad);
@@ -155,6 +157,17 @@ test('entries need a path and a hash; a repeated hash keeps its first entry', ()
     ]
   );
   assert.equal(items[0].size, undefined, 'a size is optional on read');
+});
+
+test('save refuses an entry the next load would reject and leaves the file as it is', async (t) => {
+  const { dir, store } = tmpStore(t);
+  await store.save([entry('h1')]);
+  await assert.rejects(store.save([entry('h2'), { path: '/x.png', hash: 'h3' }]), /malformed/);
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
+  assert.deepEqual(
+    onDisk.map((item) => item.hash),
+    ['h1']
+  );
 });
 
 test('loadAndRepairLibrary brings stale entries up to date and saves them', async (t) => {

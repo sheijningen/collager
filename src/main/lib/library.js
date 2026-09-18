@@ -1,11 +1,26 @@
 const fsp = require('fs').promises;
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { rehashStaleItems } = require('./scan');
+const { MEDIA_EXTS, rehashStaleItems } = require('./scan');
+
+const MEDIA_TYPES = new Set(Object.values(MEDIA_EXTS));
+
+/* Whether `item` is an entry the library can hold: a path, a hash (the item
+ * identity everywhere) and one of the media types. */
+function isLibraryEntry(item) {
+  return Boolean(
+    item &&
+    typeof item === 'object' &&
+    typeof item.path === 'string' &&
+    item.path &&
+    typeof item.hash === 'string' &&
+    item.hash &&
+    MEDIA_TYPES.has(item.type)
+  );
+}
 
 /* Parses a library file into its items. Every way the file can be unusable
- * throws, so the caller moves the file aside exactly when this does. Entries
- * need a path and a hash (the hash is the item identity everywhere); a
+ * throws, so the caller moves the file aside exactly when this does; a
  * repeated hash keeps its first entry only. */
 function readLibraryItems(raw) {
   const parsed = JSON.parse(raw);
@@ -13,14 +28,7 @@ function readLibraryItems(raw) {
   const seen = new Set();
   const items = [];
   for (const item of parsed) {
-    const valid =
-      item &&
-      typeof item === 'object' &&
-      typeof item.path === 'string' &&
-      item.path &&
-      typeof item.hash === 'string' &&
-      item.hash;
-    if (!valid) throw new Error('malformed library entry');
+    if (!isLibraryEntry(item)) throw new Error('malformed library entry');
     if (seen.has(item.hash)) continue;
     seen.add(item.hash);
     items.push(item);
@@ -116,6 +124,11 @@ function createLibraryStore(getDir) {
         return Promise.reject(
           new Error(`not saving: the library at ${saveBlockedBy} must stay as it is`)
         );
+      }
+      // the rule the load applies, so a renderer bug cannot write a file that
+      // the next start would move aside as unreadable
+      if (!items.every(isLibraryEntry)) {
+        return Promise.reject(new Error('not saving: malformed library entry'));
       }
       const persisted = items.map(({ path: filePath, hash, type, size, w, h }) => ({
         path: filePath,
