@@ -12,9 +12,11 @@ and Windows. macOS is not a target; the `darwin` branches only keep the app quit
 ## Layout
 
 ```
-src/main/            main process: window, menu, GPU fallback, IPC registration
+src/main/            main process: window, menu, single instance, GPU fallback, smoke exit,
+                     IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
-src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks
+src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks,
+                     the relaunch options of the GPU fallback
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
                      range, key rules, menu placement, item menu shape, count text, file list
                      key, empty drop, lightbox stepping, path names, user-facing text, a
@@ -77,18 +79,17 @@ docs/                README media
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
 - **Persistence**: `library.json` in `userData` is an array of items, saves serialized and atomic
-  (temp file plus rename). The renderer refuses to save until the saved library has been loaded
-  into its state, so nothing done during startup or after a failed load can overwrite the file
-  with an empty list. An unreadable file is moved to `library.json.corrupt` (a timestamped name
-  when that exists, so no backup is ever overwritten) and the app starts empty. When the move
-  fails, or the file is there but cannot be read at all (permissions, a directory in its place),
-  the file stays in place and saving is refused so it is not overwritten. There is no
-  schema version: a file the current code cannot read counts as unreadable. Only path, hash,
-  size, type and dimensions are stored per item; URL and missing flag are derived at load, the
-  unshowable flag while the app runs, and an entry without a hash or a media type makes the file
-  unreadable; a save carrying such an entry is refused so that file is never written. A
-  size is optional on read, so an entry from before sizes were recorded loads and has one filled
-  in.
+  (temp file, synced, then renamed into place). The renderer refuses to save until the saved
+  library has been loaded into its state, so nothing done during startup or after a failed load can
+  overwrite the file with an empty list. An unreadable file is moved to `library.json.corrupt` (a
+  timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
+  When the move fails, or the file is there but cannot be read at all (permissions, a directory in
+  its place), the file stays in place and saving is refused so it is not overwritten. There is no
+  schema version: a file the current code cannot read counts as unreadable. Only path, hash, size,
+  type and dimensions are stored per item; URL and missing flag are derived at load, the unshowable
+  flag while the app runs, and an entry without a hash or a media type makes the file unreadable; a
+  save carrying such an entry is refused so that file is never written. A size is optional on read,
+  so an entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
 - **Unshowable files**: a file that fails to load is missing only when the main process says
@@ -156,10 +157,12 @@ docs/                README media
 - `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code (video
   only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
   `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the
-  harness resets the app (empty library, nothing open or selected, two columns, default speed
-  and Scroll settings, sort, panels with the count breakdown closed, window size, the removal
-  question answering yes), so a case loads what it needs (`ctx.loadFixtures()`), turns waits into
-  checks (`ctx.waitFor` resolves to a boolean) and never cleans up. A case that needs the startup
+  harness waits for library work the previous case left in flight, then resets the app (empty
+  library, nothing open or selected, two columns, collage order, default speed and Scroll
+  settings, the file panel and toolbar shown with the count breakdown closed, not fullscreen,
+  the starting window size, scrolled to the top, the removal question answering yes), so a case
+  loads what it needs (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to
+  a boolean) and never cleans up. A case that needs the startup
   path seeds a saved library and restarts the renderer with `ctx.restartWith(library)`, which
   takes an item list or a string written as the file's raw content; `ctx.reloadRenderer()`
   restarts against whatever is on disk. `pnpm test:e2e panel drag` runs only the named cases,
@@ -186,9 +189,11 @@ electron-builder config is the `build` field in `package.json`: AppImage and NSI
 Linux desktop entry matched to the running window.
 
 Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json` and
-points at a commit on `main`; both are checked before anything is built. The release workflow calls the lint, format, unit and e2e workflows as reusable workflows, which is
-what their `workflow_call` trigger is for, builds both installers, and publishes a GitHub
-Release with them, a `SHA256SUMS` file and auto-generated notes. The Linux build job also starts
+points at a commit on `main`; both are checked before anything is built. The workflow's tag
+filter takes those three numbers only, so a suffixed tag such as `v0.2.0-rc1` starts nothing. The release workflow
+calls the lint, format, unit and e2e workflows as reusable workflows, which is what their
+`workflow_call` trigger is for, builds both installers, and publishes a GitHub Release with
+them, a `SHA256SUMS` file and auto-generated notes. The Linux build job also starts
 the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`, which makes
 main exit 0 once the renderer has loaded the library and 1 after a minute without, so a path
 that only breaks inside the packaged app fails the release before anything is uploaded. The
