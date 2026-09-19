@@ -226,3 +226,16 @@ window.addEventListener('keydown', (event) => {
       break;
   }
 });
+
+/* ---------------- focus after a pointer click ----------------
+ * A clicked control keeps focus, and a focused button or checkbox claims
+ * Space and Enter for itself, so every later Space would press that control
+ * again instead of running its shortcut. A pointer click expects no focus
+ * back, so it is dropped again; keyboard activation (no detail count) keeps
+ * it, so tabbing through the toolbar still works. */
+const SPACE_CLAIMING_CONTROLS = 'button, input[type="checkbox"], input[type="radio"]';
+window.addEventListener('click', (event) => {
+  if (event.detail === 0) return;
+  const focused = document.activeElement;
+  if (focused && focused.matches(SPACE_CLAIMING_CONTROLS)) focused.blur();
+});
