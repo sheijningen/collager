@@ -88,7 +88,9 @@ function hydrate(tile) {
   const item = itemsByHash.get(tile.dataset.hash);
   if (!item || fileProblem(item)) return;
   const media = createMediaElement(item);
-  if (item.type === 'video') media.playsInline = true;
+  if (media.tagName === 'VIDEO') media.playsInline = true;
+  // a tile image may appear a frame late rather than hold the frame while it decodes
+  if (media.tagName === 'IMG') media.decoding = 'async';
   media.draggable = false;
   media.addEventListener('error', () => {
     dehydrate(tile);
