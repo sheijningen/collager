@@ -553,6 +553,10 @@ div.dropdown-row {
   position: absolute;
   background: var(--bg-tile);
   overflow: hidden;
+  /* the layout gives every tile an explicit width and height, so size
+     containment cannot collapse it and a change inside one tile does
+     not invalidate the layout or paint of the rest */
+  contain: strict;
   border-radius: 3px;
   user-select: none; /* placeholder labels must not drag-select mid-reorder */
   touch-action: none; /* let pointer-drag win over touch scrolling */
