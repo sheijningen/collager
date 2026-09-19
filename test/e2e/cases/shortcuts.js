@@ -25,6 +25,40 @@ module.exports = {
     })()`)
     );
 
+    const clicked = await js(`(() => {
+      // a real key press targets whatever has focus, which press() cannot do
+      const pressOn = (el, key) =>
+        el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      const mouseClick = (el) => {
+        el.focus(); // what the browser does on the press itself
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      };
+      const button = document.getElementById('btn-toolbar-toggle');
+      mouseClick(button);
+      const buttonBlurred = document.activeElement !== button;
+      pressOn(document.activeElement, ' ');
+      const scrollsAfterClick = T.autoScroll;
+      T.setAutoScroll(false);
+      T.setToolbarOpen(true);
+
+      const box = document.getElementById('scroll-loop');
+      mouseClick(box);
+      const boxBlurred = document.activeElement !== box;
+      mouseClick(box); // back to the setting the case started with
+
+      button.focus();
+      pressOn(button, ' ');
+      const keyboardKeepsSpace = !T.autoScroll;
+      button.blur();
+      return { buttonBlurred, scrollsAfterClick, boxBlurred, keyboardKeepsSpace };
+    })()`);
+    check(
+      'a clicked button hands Space back to auto-scroll',
+      clicked.buttonBlurred && clicked.scrollsAfterClick
+    );
+    check('a clicked checkbox drops focus too', clicked.boxBlurred);
+    check('a button focused by keyboard keeps Space for itself', clicked.keyboardKeepsSpace);
+
     check(
       '-/+ change the column count',
       await js(`(() => {
