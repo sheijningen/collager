@@ -82,12 +82,21 @@ module.exports = {
     );
     check('the copied video shows first', hydrated);
     if (!hydrated) return;
-    fs.unlinkSync(gone);
-    await js(`(() => {
-      const item = T.state.items.find((i) => i.path.endsWith('gone.mp4'));
-      T.discardTile(item.hash);
-      T.render();
-    })()`);
+    // the tile goes before the file: Windows refuses to delete a file the
+    // video element still holds open, and the player lets go a moment after
+    // the element is removed, hence the retries
+    await js(`T.discardTile(T.state.items.find((i) => i.path.endsWith('gone.mp4')).hash)`);
+    const deleted = await waitFor(() => {
+      try {
+        fs.unlinkSync(gone);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    check('the copied video can be deleted once its tile is gone', deleted);
+    if (!deleted) return;
+    await js('T.render()');
     const missing = await waitFor(() =>
       js(`(() => {
         const item = T.state.items.find((i) => i.path.endsWith('gone.mp4'));

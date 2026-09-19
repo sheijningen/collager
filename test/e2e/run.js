@@ -204,6 +204,9 @@ async function run() {
   }
 
   console.log(`# ${counter - failures}/${counter} checks passed`);
-  fs.rmSync(workDir, { recursive: true, force: true });
+  // best effort: on Windows this process still holds the profile's files open
+  try {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  } catch {}
   app.exit(failures ? 1 : 0);
 }
