@@ -171,8 +171,13 @@ docs/                README media
   fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes
   `require('electron')` return a path. `xvfb-run -a` is only for headless machines and CI, and
   is not installed on development machines.
-- The CI e2e job makes Chromium's setuid sandbox helper root-owned because Ubuntu 24.04
-  runners restrict unprivileged user namespaces.
+- CI runs the suite on an Ubuntu runner under `xvfb-run` and on a Windows runner, where the
+  app opens on the runner's desktop session and ffmpeg comes from Chocolatey. The Linux job
+  makes Chromium's setuid sandbox helper root-owned because Ubuntu 24.04 runners restrict
+  unprivileged user namespaces. A case that deletes a file first discards the tile showing it
+  and retries the delete: Windows refuses to remove a file the video element still holds open,
+  and the profile directory stays locked the same way, so the harness treats its own cleanup
+  as best effort.
 
 ## Packaging
 
@@ -187,7 +192,8 @@ Release with them, a `SHA256SUMS` file and auto-generated notes. The Linux build
 the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`, which makes
 main exit 0 once the renderer has loaded the library and 1 after a minute without, so a path
 that only breaks inside the packaged app fails the release before anything is uploaded. The
-Windows installer gets no such run. The release is a draft until
+Windows build job does the same with the unpacked build in `dist/win-unpacked`, which is what
+the installer packs; the installer itself is not run. The release is a draft until
 every asset is uploaded, and the publish job deletes its own draft when it fails or is
 cancelled, so a failed run normally leaves nothing behind but the tag. A tag that already has a
 release, draft included, is refused, so a draft left behind by a lost runner has to be deleted

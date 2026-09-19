@@ -119,6 +119,19 @@ jobs:
           # sandbox helper is skipped because it only works root-owned
           ./Collager-*.AppImage --appimage-extract >/dev/null
           XDG_CONFIG_HOME="$(mktemp -d)" xvfb-run -a squashfs-root/AppRun --no-sandbox
+      - name: Start the packaged app once
+        if: matrix.name == 'windows'
+        env:
+          COLLAGER_SMOKE: '1'
+        # the unpacked build the installer is packed from; the installer itself
+        # is not run. Start-Process -Wait also waits for the child processes
+        # Electron spawns, and a GUI process gives nothing but its exit code
+        run: |
+          $app = Start-Process -FilePath dist\win-unpacked\Collager.exe -PassThru -Wait
+          if ($app.ExitCode -ne 0) {
+            Write-Error "the smoke run exited with $($app.ExitCode)"
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.name }}

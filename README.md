@@ -147,7 +147,7 @@ git push origin v0.2.0
 Only `vX.Y.Z` tags start a release; a tag with a suffix such as `v0.2.0-rc1`
 is ignored. The release workflow checks that the tag matches `package.json`
 and points at a commit on `main`, runs lint, format, unit and e2e tests,
-builds the Linux AppImage and the Windows installer, starts the AppImage once
+builds the Linux AppImage and the Windows installer, starts each build once
 to see it come up, and publishes a GitHub Release with both plus `SHA256SUMS`
 and auto-generated notes.
 
