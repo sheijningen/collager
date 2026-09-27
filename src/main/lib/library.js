@@ -77,7 +77,8 @@ function createLibraryStore(getDir) {
   return {
     /* Resolves to the items, `sizeOnDisk` (the current byte size of every
      * item whose file is present, from the one stat that also decides
-     * `missing`), and `problem`: null when the file loaded (or did not exist
+     * `missing` and, for a missing item, fills `loadError` with the stat's
+     * message), and `problem`: null when the file loaded (or did not exist
      * yet), otherwise `{ backup }` with the backup path, or null when the
      * file stays in place because it could not be moved or not be read at
      * all, which also blocks saving. */
@@ -110,8 +111,9 @@ function createLibraryStore(getDir) {
           try {
             sizeOnDisk.set(item, (await fsp.stat(item.path)).size);
             item.missing = false;
-          } catch {
+          } catch (err) {
             item.missing = true;
+            item.loadError = err.message; // the hint on the tile shows it
           }
           item.url = pathToFileURL(item.path).href;
         })

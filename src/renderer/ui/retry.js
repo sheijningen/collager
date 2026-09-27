@@ -202,6 +202,7 @@ async function showAgain(item, triedPath, report) {
   // a file that is back as it was is shown, not saved again
   const changed = item.size !== report.size || item.w !== dimensions?.w || item.h !== dimensions?.h;
   item.missing = false;
+  delete item.loadError;
   item.size = report.size;
   setDimensions(item, dimensions);
   showChanged(item.hash, changed);
@@ -219,6 +220,7 @@ function stillFailing(item, triedPath) {
 function turnMissing(item) {
   item.unshowable = false;
   item.missing = true;
+  delete item.loadError; // described the decode failure, and the hint now says the file is gone
   showChanged(item.hash, false);
 }
 
@@ -293,6 +295,7 @@ function replaceContent(item, triedPath, hash, file) {
   reindexItems();
   if (shown) {
     shown.missing = false;
+    delete shown.loadError;
     shown.size = file.size;
     setDimensions(shown, file.dimensions);
   }

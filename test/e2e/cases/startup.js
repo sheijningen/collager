@@ -43,6 +43,21 @@ module.exports = {
       'the missing file stayed',
       await js(`T.state.items.some((i) => i.path.endsWith('gone.png') && i.missing)`)
     );
+    // the first render comes after the dimension pass, so the tile may not be there yet
+    const goneTile = await waitFor(() =>
+      js(`T.tiles.has(T.state.items.find((i) => i.path.endsWith('gone.png')).hash)`)
+    );
+    const goneHint = goneTile
+      ? await js(`(() => {
+          const item = T.state.items.find((i) => i.path.endsWith('gone.png'));
+          return T.tiles.get(item.hash).title.split('Details:\\n')[1];
+        })()`)
+      : null;
+    check(
+      'its hint ends with the stat error',
+      typeof goneHint === 'string' && /^ENOENT: .*gone\.png'$/.test(goneHint),
+      goneHint
+    );
 
     const saved = await readLibraryWhen(count);
     check('the repaired library reached disk', saved !== null);

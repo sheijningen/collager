@@ -36,7 +36,9 @@ module.exports = {
         tile: tile.classList.contains('unshowable') && !tile.classList.contains('missing'),
         label: tile.querySelector('.placeholder-label').textContent,
         hint: tile.title.includes('cannot show'),
+        details: tile.title.split('Details:\\n')[1],
         entry: li.classList.contains('unshowable') && li.title.includes('cannot show'),
+        entryDetails: li.title.includes('Details:'),
         clearMissingHidden: byId('btn-clear-missing').hidden,
         menu,
         lightboxStaysShut
@@ -45,6 +47,12 @@ module.exports = {
     check('the tile and the panel entry say it cannot be shown', shown.tile && shown.entry);
     check('the label names the problem', shown.label === 'cannot be shown: broken.png');
     check('the hint explains it', shown.hint);
+    check(
+      'the hint ends with what the file holds',
+      /^16 bytes, starts with 6e 6f 74 20 61 20 70 6e \(text\)$/.test(shown.details) &&
+        shown.entryDetails,
+      shown.details
+    );
     check('it does not count as missing', shown.notMissing && shown.clearMissingHidden);
     check(
       'the menu keeps open in default app and show in folder',
@@ -105,5 +113,15 @@ module.exports = {
       })()`)
     );
     check('a file that is gone is marked missing', missing);
+    if (!missing) return;
+    const goneHint = await js(`(() => {
+      const item = T.state.items.find((i) => i.path.endsWith('gone.mp4'));
+      return T.tiles.get(item.hash).title.split('Details:\\n')[1];
+    })()`);
+    check(
+      'its hint ends with what the player said and the stat error',
+      typeof goneHint === 'string' && /^\S.*\nENOENT: .*gone\.mp4'$/.test(goneHint),
+      goneHint
+    );
   }
 };

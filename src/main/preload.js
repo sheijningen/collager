@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   confirmRemoval: (question) => ipcRenderer.invoke('confirm-removal', question),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   revealFile: (filePath) => ipcRenderer.invoke('reveal-file', filePath),
-  mediaFileExists: (filePath) => ipcRenderer.invoke('media-file-exists', filePath),
+  inspectMediaFile: (filePath) => ipcRenderer.invoke('inspect-media-file', filePath),
   openExternally: (filePath) => ipcRenderer.invoke('open-externally', filePath),
   toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
   setKeepAwake: (on) => ipcRenderer.send('keep-awake', on),

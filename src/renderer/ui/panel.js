@@ -55,7 +55,7 @@ export function renderList() {
     const problem = fileProblem(item);
     li.className = (selected.has(item.hash) ? 'selected' : '') + (problem ? ` ${problem}` : '');
     li.title = item.path;
-    if (problem) li.title += `\n\n${hintForFileProblem(problem)}`;
+    if (problem) li.title += `\n\n${hintForFileProblem(problem, item.loadError)}`;
 
     const badge = document.createElement('span');
     badge.className = `badge ${item.type}`;
