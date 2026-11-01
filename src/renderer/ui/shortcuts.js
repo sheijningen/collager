@@ -6,7 +6,12 @@
  * and the actual bindings can't drift apart.
  */
 
-import { targetConsumesKey, normalizeShortcutKey, SCROLL_KEYS } from '../core/keys.js';
+import {
+  targetConsumesKey,
+  normalizeShortcutKey,
+  fullscreenKeyLabel,
+  SCROLL_KEYS
+} from '../core/keys.js';
 import { state, selected, showToast, runOrToast } from './state.js';
 import { SCROLL_SPEED_STEP } from '../core/autoscroll.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
@@ -31,7 +36,7 @@ export const SHORTCUTS = [
   ['P', 'Show / hide the file panel'],
   ['T', 'Show / hide the toolbar'],
   ['− / +', 'Fewer / more columns'],
-  ['F / F11', 'Toggle fullscreen'],
+  [`F / ${fullscreenKeyLabel(window.api.platform)}`, 'Toggle fullscreen'],
   ['Del', 'Remove the selected items'],
   ['Esc', 'Close overlays / clear the selection / exit fullscreen'],
   ['I', 'About Collager'],

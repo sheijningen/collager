@@ -2,7 +2,8 @@
  * A collapsible sidebar listing every loaded file, sortable by collage
  * order, name, path or type. Selection is shared between the list and the
  * collage: clicking a list entry scrolls the collage to that tile, clicking
- * a tile highlights its list entry. Ctrl toggles, Shift selects a range.
+ * a tile highlights its list entry. Ctrl (Cmd on macOS) toggles, Shift
+ * selects a range.
  */
 
 import { sortItems } from '../core/layout.js';
@@ -10,7 +11,14 @@ import { basename } from '../core/paths.js';
 import { clickSelection } from '../core/selection.js';
 import { buildListKey } from '../core/listkey.js';
 import { countByExtension } from '../core/counts.js';
-import { formatCount, fileProblem, hintForFileProblem, badgeLabel } from '../core/text.js';
+import {
+  formatCount,
+  fileProblem,
+  hintForFileProblem,
+  badgeLabel,
+  selectionHint
+} from '../core/text.js';
+import { isRemoveKey } from '../core/keys.js';
 import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
 import { render, removeItems, askRemoval } from './collage.js';
 import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
@@ -186,10 +194,11 @@ sortSelect.addEventListener('change', () => {
   renderList();
 });
 applyPanelOpen(panelOpen);
+document.getElementById('panel-hint').textContent = selectionHint(window.api.platform);
 
 // Delete removes the selection; Escape belongs to the ladder in shortcuts.js
 window.addEventListener('keydown', (event) => {
-  if (event.key !== 'Delete' || !selected.size) return;
+  if (!isRemoveKey(event.key, window.api.platform) || !selected.size) return;
   if (!lightbox.hidden || anyOverlayOpen()) return;
   removeSelected();
 });

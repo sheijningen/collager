@@ -1,22 +1,22 @@
 # Collager
 
-Desktop media collage viewer for Linux and Windows: images (PNG/JPEG/WebP), GIFs and videos
+Desktop media collage viewer for Linux, Windows and macOS: images (PNG/JPEG/WebP), GIFs and videos
 (MP4/WebM) as one scrollable masonry collage.
 
 ## Stack
 
 Electron plus plain JS, HTML and CSS. No bundler, no framework, no runtime dependencies beyond
-Electron. Keep it that way. Electron because Chromium ships identical media codecs on Linux
-and Windows. macOS is not a target; the `darwin` branches only keep the app quittable there.
+Electron. Keep it that way. Electron because Chromium ships identical media codecs on Linux,
+Windows and macOS.
 
 ## Layout
 
 ```
 src/main/            main process: window, menu, single instance, GPU fallback, smoke exit,
-                     IPC registration
+                     paths macOS asks to open, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks,
-                     the relaunch options of the GPU fallback
+                     the relaunch options of the GPU fallback, the macOS menu template
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
                      range, key rules, menu placement, item menu shape, count text, file list
                      key, empty drop, lightbox stepping, path names, user-facing text, a
@@ -28,7 +28,7 @@ test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/co
                      test/main/helpers.js holds what the main tests share
 test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js,
                      second-instance.js (a second launch against the harness profile)
-build/               icon (SVG source, PNG export for electron-builder)
+build/               icon (SVG source, PNG export for electron-builder), the afterPack hook
 docs/                README media
 ```
 
@@ -48,10 +48,12 @@ docs/                README media
   the `ui/` module keeps only the DOM reads and writes around it.
 - The renderer is isolated (`contextIsolation`, no `nodeIntegration`, CSP in `index.html`).
   Main-process capabilities are exposed only through an IPC channel plus a `window.api` entry
-  in the preload script. Handlers live in `src/main/ipc/`, one module per concern with a
-  `register*Ipc` function that `main.js` calls once. A path the renderer sends back to be handed
-  to the shell must pass the checks in `lib/mediapath.js` first (a supported media extension plus
-  an existing regular file, or an existing folder for the reveal of a missing entry).
+  in the preload script. The one value it exposes without a channel is `window.api.platform`,
+  which key handling and the help text need before anything could answer. Handlers live in
+  `src/main/ipc/`, one module per concern with a `register*Ipc` function that `main.js` calls
+  once. A path the renderer sends back to be handed to the shell must pass the checks in
+  `lib/mediapath.js` first (a supported media extension plus an existing regular file, or an
+  existing folder for the reveal of a missing entry).
 
 ## Design decisions
 
@@ -107,10 +109,10 @@ docs/                README media
   its volume (slower than five seconds and found nothing: parked for five minutes) until that file
   is due again, so an unplugged drive costs one question per folder and a dropping share one answer
   per five minutes; a share mounted outside the known volume roots (drive letters, UNC shares,
-  /media/<user>, /run/media/<user>, /mnt) is covered per folder. An attempt that never settles keeps
-  its place for the session. Changes are shown and saved per round, never per file. The spacing
-  lives in `core/retry.js`, the rounds in `ui/retry.js`, the file check in `recheckMediaFile` in
-  `lib/scan.js`.
+  /media/<user>, /run/media/<user>, /mnt, /Volumes) is covered per folder. An attempt that never
+  settles keeps its place for the session. Changes are shown and saved per round, never per
+  file. The spacing lives in `core/retry.js`, the rounds in `ui/retry.js`, the file check in
+  `recheckMediaFile` in `lib/scan.js`.
 - **Unshowable files**: a file that fails to load is missing only when the main process says it is
   gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and gets an amber
   dashed tile with its own hint until a retry decodes it. It is not counted as missing, and its menu
@@ -165,10 +167,23 @@ docs/                README media
   covers the whole drop and never grows; a drop with no media skips the reading line. The main
   process sends the first event of each phase and the last read, and at most one other per
   100 ms, so a drop of hundreds of thousands of files does not flood the renderer.
-- **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
-  devtools when unpackaged.
+- **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). macOS keeps
+  a minimal one from `lib/appmenu.js`: the app menu (about, hide, quit), Edit with the standard
+  roles so Cmd+C, V and A work in text fields, and Window (minimize, zoom, close). It has no View
+  menu, so fullscreen and every other shortcut stay with the renderer. F12 opens devtools when
+  unpackaged.
+- **Platform keys**: on macOS Cmd toggles a click into the selection (Ctrl+click is a right-click
+  there), Ctrl+Cmd+F toggles fullscreen next to F11, and Backspace, the key labelled delete,
+  removes the selection like Delete. The help, the fullscreen tooltip and the panel hint name the
+  keys of the running platform; the rules are in `core/keys.js` and `core/text.js`.
+- **Opening from Finder**: files and folders dropped on the Dock icon or opened with the app
+  from Finder arrive in main as `open-file` events, possibly before the window exists. Main holds
+  them until a page has loaded and sends each Finder action's paths over `open-paths` as one
+  batch, which the renderer adds like a drop, and the window comes forward. The app outlives its
+  last window as macOS apps do; the Dock icon or such a drop opens a new one.
 - **Single instance**: a second launch exits at once and the running instance brings its
-  window forward, so two instances can never take turns writing `library.json`.
+  window forward (or opens one when it has none), so two instances can never take turns writing
+  `library.json`.
 - **GPU fallback**: three GPU process crashes relaunch the app with hardware acceleration
   disabled, passing an internal switch to the new process. Nothing is written to disk and
   there are no user-facing flags, so every normal start tries hardware acceleration again.
@@ -206,38 +221,48 @@ docs/                README media
   fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes
   `require('electron')` return a path. `xvfb-run -a` is only for headless machines and CI, and
   is not installed on development machines.
-- CI runs the suite on an Ubuntu runner under `xvfb-run` and on a Windows runner, where the
-  app opens on the runner's desktop session and ffmpeg comes from Chocolatey. The Linux job
-  makes Chromium's setuid sandbox helper root-owned because Ubuntu 24.04 runners restrict
-  unprivileged user namespaces. A case that deletes a file first discards the tile showing it
-  and retries the delete: Windows refuses to remove a file the video element still holds open,
-  and the profile directory stays locked the same way, so the harness treats its own cleanup
-  as best effort.
+- CI runs the suite on an Ubuntu runner under `xvfb-run` and on Windows and macOS (Apple
+  silicon) runners, where the app opens on the runner's desktop session and ffmpeg comes from
+  Chocolatey and Homebrew. The Linux job makes Chromium's setuid sandbox helper root-owned
+  because Ubuntu 24.04 runners restrict unprivileged user namespaces. A case that deletes a file
+  first discards the tile showing it and retries the delete: Windows refuses to remove a file the
+  video element still holds open, and the profile directory stays locked the same way, so the
+  harness treats its own cleanup as best effort.
 
 ## Packaging
 
-electron-builder config is the `build` field in `package.json`: AppImage and NSIS, only
-`src/**` bundled, icon from `build/icon.png`. `desktopName` plus `syncDesktopName` keeps the
-Linux desktop entry matched to the running window.
+electron-builder config is the `build` field in `package.json`: AppImage, NSIS, and DMGs for
+x64 and arm64, only `src/**` bundled, icon from `build/icon.png` (1024px; electron-builder
+makes the macOS icon set from it). `desktopName` plus `syncDesktopName` keeps the Linux desktop
+entry matched to the running window. The macOS bundle is signed ad hoc by the afterPack hook in
+`build/afterpack.js` (outside `files`, so not bundled), because Apple silicon will not run a
+bundle whose signature electron-builder's edits broke. There is no Developer ID
+(`identity: null`), so Gatekeeper still blocks a downloaded copy until the user lets it through;
+the README says how. The macOS bundle declares the media extensions as documents it can view
+(`mac.fileAssociations`, rank Alternate) and folders (`public.folder` in `mac.extendInfo`, rank
+None), which is what lets Finder and the Dock hand them to the app; the extension list mirrors
+`MEDIA_EXTS` in `lib/scan.js` and changes with it.
 
 Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json` and
 points at a commit on `main`; both are checked before anything is built. The workflow's tag
 filter takes those three numbers only, so a suffixed tag such as `v0.2.0-rc1` starts nothing. The release workflow
 calls the lint, format, unit and e2e workflows as reusable workflows, which is what their
-`workflow_call` trigger is for, builds both installers, and publishes a GitHub Release with
+`workflow_call` trigger is for, builds the installers, and publishes a GitHub Release with
 them, a `SHA256SUMS` file and auto-generated notes. The Linux build job also starts
 the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`, which makes
 main exit 0 once the renderer has loaded the library and 1 after a minute without, so a path
 that only breaks inside the packaged app fails the release before anything is uploaded. The
 Windows build job does the same with the unpacked build in `dist/win-unpacked`, which is what
-the installer packs; the installer itself is not run. The release is a draft until
-every asset is uploaded, and the publish job deletes its own draft when it fails or is
-cancelled, so a failed run normally leaves nothing behind but the tag. A tag that already has a
-release, draft included, is refused, so a draft left behind by a lost runner has to be deleted
-by hand before the run is retried. The installer file names come from the `artifactName`
-fields; the build job's upload globs and the publish job's patterns match them on everything
-except the architecture part (electron-builder writes `x86_64` for AppImage and `x64` for
-NSIS), and the README spells out the names the x64 runners produce. Change all four together.
+the installer packs; the installer itself is not run. The macOS build job builds both DMGs on
+an Apple silicon runner and smoke-runs the arm64 app in `dist/mac-arm64`; the DMGs are not
+mounted. The release is a draft until every asset is uploaded, and the publish job deletes its
+own draft when it fails or is cancelled, so a failed run normally leaves nothing behind but the
+tag. A tag that already has a release, draft included, is refused, so a draft left behind by a
+lost runner has to be deleted by hand before the run is retried. The installer file names come
+from the `artifactName` fields; the build job's upload globs and the publish job's patterns
+match them on everything except the architecture part (electron-builder writes `x86_64` for
+AppImage and `x64` for NSIS), where the publish job names `x64` and `arm64` for the two DMGs,
+and the README spells out the names the runners produce. Change all four together.
 `build.appId` doubles as the Windows AppUserModelID: electron-builder stamps it on the
 shortcuts and `main.js` sets the same literal on the running process, so the taskbar groups
 and pins them together. electron-builder strips the `build` field from the packaged

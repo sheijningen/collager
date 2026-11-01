@@ -52,6 +52,10 @@ window.addEventListener('drop', (event) => {
   addPaths(paths);
 });
 
+// files and folders dropped on the Dock icon or opened with the app from
+// Finder, sent by the main process
+window.api.onOpenPaths((paths) => addPaths(paths));
+
 /* ---------------- window resize ---------------- */
 
 let resizeTimer = null;

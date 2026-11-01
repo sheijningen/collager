@@ -18,6 +18,9 @@ jobs:
             runner: ubuntu-24.04
           - name: windows
             runner: windows-latest
+          - name: macos
+            # Apple silicon
+            runner: macos-latest
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
@@ -37,6 +40,11 @@ jobs:
       - name: Install ffmpeg (video fixture)
         if: matrix.name == 'windows'
         run: choco install ffmpeg -y --no-progress
+      - name: Install ffmpeg (video fixture)
+        if: matrix.name == 'macos'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+        run: brew install ffmpeg
       - name: Download the Electron binary
         # pnpm skips Electron's postinstall; running it here puts the binary (and
         # its sandbox helper) in place before the next step touches it
@@ -52,5 +60,5 @@ jobs:
         if: matrix.name == 'linux'
         run: xvfb-run -a -s "-screen 0 1600x1000x24" pnpm test:e2e
       - name: Run the suite on the runner's desktop
-        if: matrix.name == 'windows'
+        if: matrix.name == 'windows' || matrix.name == 'macos'
         run: pnpm test:e2e

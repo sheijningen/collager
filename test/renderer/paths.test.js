@@ -26,6 +26,9 @@ test('volumeRoot names drives, shares and the usual mounts, and nothing else', (
   assert.equal(volumeRoot('/media/stefan/EOS_DIGITAL/DCIM/a.jpg'), '/media/stefan/EOS_DIGITAL');
   assert.equal(volumeRoot('/run/media/stefan/stick/a.jpg'), '/run/media/stefan/stick');
   assert.equal(volumeRoot('/mnt/nas/photos/a.jpg'), '/mnt/nas');
+  assert.equal(volumeRoot('/Volumes/Untitled/DCIM/a.jpg'), '/Volumes/Untitled');
+  assert.equal(volumeRoot('/Volumes/My Passport/photos/2024/a.jpg'), '/Volumes/My Passport');
+  assert.equal(volumeRoot('/Users/stefan/Pictures/a.jpg'), null);
   assert.equal(volumeRoot('/home/stefan/Pictures/a.jpg'), null);
 });
 

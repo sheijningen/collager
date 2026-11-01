@@ -6,6 +6,15 @@ const path = require('path');
  * back at runtime and this literal has to match it. */
 const APP_NAME = 'Collager';
 
+let powerBlockerId = null;
+
+/* Lets the display sleep again; does nothing when no blocker runs. */
+function releaseKeepAwake() {
+  if (powerBlockerId === null) return;
+  powerSaveBlocker.stop(powerBlockerId);
+  powerBlockerId = null;
+}
+
 /* Window and app-level channels: fullscreen, the display-sleep blocker, the
  * removal question and the metadata shown in the About overlay. */
 function registerWindowIpc() {
@@ -36,14 +45,13 @@ function registerWindowIpc() {
   });
 
   /* Keeps the display (and thus the system) awake while the collage
-   * auto-scrolls; released the moment auto-scroll stops or the toggle is off. */
-  let powerBlockerId = null;
+   * auto-scrolls; released the moment auto-scroll stops, the toggle is off or
+   * the window closes. */
   ipcMain.on('keep-awake', (_event, on) => {
     if (on && powerBlockerId === null) {
       powerBlockerId = powerSaveBlocker.start('prevent-display-sleep');
-    } else if (!on && powerBlockerId !== null) {
-      powerSaveBlocker.stop(powerBlockerId);
-      powerBlockerId = null;
+    } else if (!on) {
+      releaseKeepAwake();
     }
   });
 
@@ -61,4 +69,4 @@ function registerWindowIpc() {
   });
 }
 
-module.exports = { registerWindowIpc };
+module.exports = { registerWindowIpc, releaseKeepAwake, APP_NAME };

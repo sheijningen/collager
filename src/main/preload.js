@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  // fixed for the session, and needed before the first key press and render
+  platform: process.platform,
   // a dropped File carries no path in the isolated renderer; webUtils resolves it
   pathForFile: (file) => webUtils.getPathForFile(file),
   probeFiles: (paths) => ipcRenderer.invoke('probe-files', paths),
@@ -25,5 +27,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   onProbeProgress: (callback) => {
     ipcRenderer.on('probe-progress', (_event, progress) => callback(progress));
+  },
+  onOpenPaths: (callback) => {
+    ipcRenderer.on('open-paths', (_event, paths) => callback(paths));
   }
 });

@@ -48,3 +48,32 @@ export function targetConsumesKey(target, key) {
   }
   return false;
 }
+
+/**
+ * Whether a keydown toggles fullscreen: F11 without modifiers, and on macOS
+ * also Ctrl+Cmd+F, the system's own binding, since F11 there belongs to the
+ * desktop unless the function keys are set to standard.
+ *
+ * @param {{key: string, ctrlKey: boolean, altKey: boolean, shiftKey: boolean, metaKey: boolean}} event
+ * @param {string} platform process.platform
+ */
+export function isFullscreenKey(event, platform) {
+  const { key, ctrlKey, altKey, shiftKey, metaKey } = event;
+  if (key === 'F11') return !ctrlKey && !altKey && !shiftKey && !metaKey;
+  if (platform !== 'darwin' || normalizeShortcutKey(key) !== 'f') return false;
+  return ctrlKey && metaKey && !altKey && !shiftKey;
+}
+
+/** The key the help names for fullscreen next to F. */
+export function fullscreenKeyLabel(platform) {
+  return platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11';
+}
+
+/**
+ * Whether a key removes the selection: Delete, and on macOS also Backspace,
+ * which is the key labelled delete there.
+ */
+export function isRemoveKey(key, platform) {
+  if (key === 'Delete') return true;
+  return platform === 'darwin' && key === 'Backspace';
+}

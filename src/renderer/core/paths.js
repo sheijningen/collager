@@ -13,8 +13,8 @@ export function dirname(filePath) {
 }
 
 /* The volume a path is on, as far as its text tells: a Windows drive or UNC
- * share, or a mount under one of the usual Linux locations. Null for a path
- * elsewhere. */
+ * share, or a mount under one of the usual Linux or macOS locations. Null for
+ * a path elsewhere. */
 export function volumeRoot(filePath) {
   const match =
     filePath.match(/^\\\\[^\\]+\\[^\\]+/) ||

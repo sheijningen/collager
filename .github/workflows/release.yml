@@ -92,6 +92,11 @@ jobs:
             runner: windows-latest
             script: dist:win
             glob: dist/Collager-*-setup.exe
+          - name: macos
+            # Apple silicon; electron-builder builds the x64 DMG here too
+            runner: macos-latest
+            script: dist:mac
+            glob: dist/Collager-*-macos-*.dmg
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +137,13 @@ jobs:
             Write-Error "the smoke run exited with $($app.ExitCode)"
             exit 1
           }
+      - name: Start the packaged app once
+        if: matrix.name == 'macos'
+        env:
+          COLLAGER_SMOKE: '1'
+        # the arm64 app the runner can execute, unpacked next to the DMGs; the
+        # DMGs themselves are not mounted
+        run: dist/mac-arm64/Collager.app/Contents/MacOS/Collager
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.name }}
@@ -156,15 +168,17 @@ jobs:
           path: artifacts
           merge-multiple: true
           pattern: installer-*
-      - name: Check that both installers arrived and compute SHA256SUMS
+      - name: Check that every installer arrived and compute SHA256SUMS
         run: |
           set -euo pipefail
           VERSION="${TAG#v}"
           cd artifacts
           # electron-builder spells the architecture per target (x86_64 for
-          # AppImage, x64 for NSIS), so match on the fixed parts only
+          # AppImage, x64 for NSIS), so match on the fixed parts only; the two
+          # DMGs are told apart by their architecture, so each is named
           missing=0
-          for pattern in "Collager-${VERSION}-linux-*.AppImage" "Collager-${VERSION}-windows-*-setup.exe"; do
+          for pattern in "Collager-${VERSION}-linux-*.AppImage" "Collager-${VERSION}-windows-*-setup.exe" \
+            "Collager-${VERSION}-macos-x64.dmg" "Collager-${VERSION}-macos-arm64.dmg"; do
             if ! compgen -G "$pattern" >/dev/null; then
               echo "::error::Missing expected artifact: $pattern"
               missing=1

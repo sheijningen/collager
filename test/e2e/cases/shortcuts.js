@@ -70,6 +70,22 @@ module.exports = {
     })()`)
     );
 
+    const named = await js(`({
+      platform: window.api.platform,
+      help: [...T.shortcutList.querySelectorAll('kbd')].map((kbd) => kbd.textContent),
+      title: document.getElementById('btn-fullscreen').title,
+      hint: document.getElementById('panel-hint').textContent
+    })`);
+    const fullscreenKey = process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11';
+    const toggleKey = process.platform === 'darwin' ? 'cmd' : 'ctrl';
+    check('the renderer knows the platform', named.platform === process.platform, named.platform);
+    check(
+      "the help, the fullscreen button and the panel hint name this platform's keys",
+      named.help.includes(`F / ${fullscreenKey}`) &&
+        named.title.includes(fullscreenKey) &&
+        named.hint.includes(`${toggleKey}: toggle`)
+    );
+
     check(
       'the column buttons step repeatedly',
       await js(`(() => {

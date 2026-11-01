@@ -151,3 +151,10 @@ export function describeStartupNotes({ missingCount, collapsed }) {
   if (collapsed) notes.push(`${formatCount(collapsed, 'duplicate')} merged`);
   return notes.join(' · ');
 }
+
+/* The file panel's footer hint. The modifier that toggles an item into the
+ * selection is Cmd on macOS, where Ctrl+click is a right-click. */
+export function selectionHint(platform) {
+  const toggleKey = platform === 'darwin' ? 'cmd' : 'ctrl';
+  return `click: select · ${toggleKey}: toggle · shift: range`;
+}
