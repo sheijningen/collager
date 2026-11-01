@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   // a dropped File carries no path in the isolated renderer; webUtils resolves it
   pathForFile: (file) => webUtils.getPathForFile(file),
   probeFiles: (paths) => ipcRenderer.invoke('probe-files', paths),
+  recheckMediaFile: (item) => ipcRenderer.invoke('recheck-media-file', item),
   loadLibrary: () => ipcRenderer.invoke('load-library'),
   saveLibrary: (items) => ipcRenderer.invoke('save-library', items),
   pickFiles: () => ipcRenderer.invoke('pick-files'),

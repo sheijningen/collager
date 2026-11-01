@@ -14,6 +14,7 @@ const {
   summarizeExtensions,
   typeForPath,
   probeFiles,
+  recheckMediaFile,
   SAMPLE_BYTES
 } = require('../../src/main/lib/scan.js');
 const { createTempDir, skipWithoutPermissionBits } = require('./helpers.js');
@@ -276,6 +277,128 @@ test('probeFiles: unreadable file counts as unreadable, not a rejection', async 
   assert.equal(unsupportedCount, 1);
   assert.deepEqual(unsupportedExtensions, ['.txt'], 'unreadable is not unsupported');
   assert.equal(unreadableCount, 1);
+});
+
+/* recheckMediaFile without the timing, which no test can pin */
+async function recheck(item) {
+  const report = await recheckMediaFile(item);
+  if (report === null) return null;
+  assert.equal(typeof report.statMs, 'number');
+  delete report.statMs;
+  return report;
+}
+
+/* dates the file back so recheckMediaFile does not take it for a copy in progress */
+function settle(filePath) {
+  const written = new Date(Date.now() - 60_000);
+  fs.utimesSync(filePath, written, written);
+}
+
+test('recheckMediaFile: a present file whose size matches keeps the stored hash', async (t) => {
+  const dir = tmpTree(t, { 'a.png': 'aaa', 'b.mp4': largeVideoBytes() });
+  const image = path.join(dir, 'a.png');
+  settle(image);
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 3 }), {
+    present: true,
+    hash: 'stored',
+    size: 3
+  });
+  // an entry from before sizes were recorded gets one
+  assert.deepEqual(await recheck({ path: image, hash: 'stored' }), {
+    present: true,
+    hash: 'stored',
+    size: 3
+  });
+  const video = path.join(dir, 'b.mp4');
+  settle(video);
+  const sampled = await sampledHashOf(video);
+  assert.deepEqual(await recheck({ path: video, hash: sampled, size: SAMPLE_BYTES * 4 }), {
+    present: true,
+    hash: sampled,
+    size: SAMPLE_BYTES * 4
+  });
+});
+
+test('recheckMediaFile: a stale hash is taken again', async (t) => {
+  const dir = tmpTree(t, { 'a.png': 'aaa', 'b.mp4': largeVideoBytes() });
+  const image = path.join(dir, 'a.png');
+  const video = path.join(dir, 'b.mp4');
+  settle(image);
+  settle(video);
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 2 }), {
+    present: true,
+    hash: await fullHashOf(image),
+    size: 3
+  });
+  // a video hash from before the sampled scheme
+  assert.deepEqual(await recheck({ path: video, hash: 'full-hash', size: SAMPLE_BYTES * 4 }), {
+    present: true,
+    hash: await sampledHashOf(video),
+    size: SAMPLE_BYTES * 4
+  });
+});
+
+test('recheckMediaFile: a file written just now has no hash yet, whatever its size', async (t) => {
+  const dir = tmpTree(t, { 'a.png': 'aaa' });
+  const image = path.join(dir, 'a.png');
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 3 }), {
+    present: true,
+    hash: null,
+    size: 3
+  });
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 2 }), {
+    present: true,
+    hash: null,
+    size: 3
+  });
+  // a write time just ahead of the clock, as FAT rounds it
+  const ahead = new Date(Date.now() + 1_500);
+  fs.utimesSync(image, ahead, ahead);
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 2 }), {
+    present: true,
+    hash: null,
+    size: 3
+  });
+  settle(image);
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 2 }), {
+    present: true,
+    hash: await fullHashOf(image),
+    size: 3
+  });
+});
+
+test('recheckMediaFile: a file that is gone or not a file is not present, other input is null', async (t) => {
+  const dir = tmpTree(t, { 'folder.png': {}, 'notes.txt': 'x' });
+  assert.deepEqual(await recheck({ path: path.join(dir, 'gone.png'), hash: 'h' }), {
+    present: false,
+    folderPresent: true
+  });
+  assert.deepEqual(await recheck({ path: path.join(dir, 'folder.png'), hash: 'h' }), {
+    present: false,
+    folderPresent: true
+  });
+  // the whole folder is gone, as when a drive is unplugged
+  assert.deepEqual(await recheck({ path: path.join(dir, 'gone', 'deep.png'), hash: 'h' }), {
+    present: false,
+    folderPresent: false
+  });
+  assert.equal(await recheck({ path: path.join(dir, 'notes.txt'), hash: 'h' }), null);
+  assert.equal(await recheck({ hash: 'h' }), null);
+  assert.equal(await recheck(42), null);
+  assert.equal(await recheck(null), null);
+});
+
+test('recheckMediaFile: a present file that cannot be read has no hash', async (t) => {
+  if (skipWithoutPermissionBits(t)) return;
+  const dir = tmpTree(t, { 'a.png': 'aaa' });
+  const image = path.join(dir, 'a.png');
+  settle(image);
+  fs.chmodSync(image, 0o000);
+  assert.deepEqual(await recheck({ path: image, hash: 'stored', size: 2 }), {
+    present: true,
+    hash: null,
+    size: 3
+  });
 });
 
 test('hashFileSampled: same bytes hash equal, prefix marks the scheme', async (t) => {

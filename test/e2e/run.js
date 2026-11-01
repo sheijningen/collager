@@ -118,6 +118,7 @@ async function run() {
     await finished;
     const ready = await waitFor(() => js('T.state.libraryLoaded'));
     if (!ready) throw new Error('the renderer did not finish loading the library');
+    await js('T.stopRetrying()'); // the new page started its own timer
   }
 
   /* Shared by every case. Cases need not clean up: resetApp runs first. */
@@ -157,9 +158,10 @@ async function run() {
    * open, auto-scroll off with its settings at their defaults, two columns,
    * collage order, default speed, panel and toolbar shown with the count
    * breakdown closed, not fullscreen, the starting window size, scrolled to
-   * the top, and the removal question answering yes. Library work still in flight from
-   * the previous case (a startup dimension pass, an add) finishes first, so it
-   * cannot push into the emptied library or leave its job line behind. */
+   * the top, no retry booked, and the removal question answering yes. Library work
+   * still in flight from the previous case (a startup dimension pass, an add)
+   * finishes first, so it cannot push into the emptied library or leave its
+   * job line behind. */
   async function resetApp() {
     win.setSize(baseWidth, baseHeight);
     dialog.showMessageBox = async () => ({ response: 0 });
@@ -190,6 +192,11 @@ async function run() {
       T.render();
       T.scroller.scrollTop = 0;
       await T.persist();
+      // no timed round may load a file a case flags by hand, and with the
+      // timer stopped no round is in flight, so this one runs and drops every
+      // booking with the library
+      T.stopRetrying();
+      await T.retryFailedFiles();
     })()`);
   }
 
