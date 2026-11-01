@@ -20,7 +20,8 @@ export let lastDragEndAt = 0;
 collage.addEventListener('pointerdown', (event) => {
   if (tileDrag || event.button !== 0 || !event.isPrimary) return;
   if (event.target.closest('.btn-remove')) return;
-  const tile = event.target.closest('.tile');
+  // a clone stands for a place in the next loop, not in the collage order
+  const tile = event.target.closest('.tile:not(.clone)');
   if (!tile) return;
   document.getElementById('drag-ghost')?.remove(); // never leave two ghosts
   tileDrag = {
@@ -58,7 +59,7 @@ window.addEventListener('pointermove', (event) => {
   // synchronous layout, so reads must come before writes (the ghost is
   // pointer-events:none and never hit-tests itself either way)
   const under = document.elementFromPoint(event.clientX, event.clientY);
-  const target = under && under.closest('.tile');
+  const target = under && under.closest('.tile:not(.clone)');
   const targetHash = target && target.dataset.hash !== tileDrag.hash ? target.dataset.hash : null;
 
   tileDrag.ghost.style.left = `${event.clientX + 12}px`;

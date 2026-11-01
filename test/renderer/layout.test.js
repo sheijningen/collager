@@ -172,3 +172,113 @@ test('packItems: a present item without dimensions gets the fallback size', () =
   );
   for (const pos of positions) assert.equal(pos.h, Math.round(MISSING_H * (colWidth / MISSING_W)));
 });
+
+const { packClones, shuffleItems, reconcileOrder } = require('../../src/renderer/core/layout.js');
+
+test('packItems: stops once every column reaches the stop height', () => {
+  const list = [item({ h: 300 }), item({ h: 100 }), item({ h: 100 }), item(), item()];
+  // a 100 px column: tiles keep their native size
+  const { positions, height } = packItems(list, 100 * 2 + GAP, 2, 150);
+  // the 100 px column takes a second tile, then both columns are past 150
+  assert.equal(positions.length, 3);
+  assert.equal(height, 300);
+  assert.deepEqual(positions, packItems(list, 100 * 2 + GAP, 2).positions.slice(0, 3));
+});
+
+test('packClones: clones sit wrapHeight below where packItems puts the item', () => {
+  const list = [item({ h: 300 }), item({ h: 120 }), item({ h: 80 }), item({ h: 200 })];
+  const { positions: real } = packItems(list, 1000, 3);
+  const { positions, wrapHeight } = packClones(list, 1000, 3, 777, Infinity);
+  assert.equal(wrapHeight, 777 + GAP);
+  assert.deepEqual(
+    positions,
+    real.map((pos) => ({ ...pos, y: pos.y + wrapHeight, clone: true }))
+  );
+});
+
+test('packClones: every column starts level one gap below the collage', () => {
+  const list = [item(), item(), item()];
+  const { positions } = packClones(list, 1000, 3, 500, Infinity);
+  assert.deepEqual(
+    positions.map((pos) => pos.y),
+    [500 + GAP, 500 + GAP, 500 + GAP]
+  );
+});
+
+test('packClones: stops once every column covers the minimum height', () => {
+  // 100 px square tiles in two columns: two rows reach 200 + GAP
+  const list = Array.from({ length: 10 }, () => item());
+  const { positions, height } = packClones(list, 100 * 2 + GAP, 2, 1000, 150);
+  assert.equal(positions.length, 4);
+  assert.equal(height, 200 + GAP);
+});
+
+test('packClones: a list too short to cover the minimum is packed once, not repeated', () => {
+  const single = item();
+  const one = packClones([single], 1000, 3, 400, 5000);
+  assert.equal(one.positions.length, 1);
+  assert.equal(one.positions[0].item, single);
+  assert.equal(one.positions[0].y, 400 + GAP);
+  assert.equal(one.height, one.positions[0].h);
+
+  const few = [item(), item({ h: 50 })];
+  const { positions } = packClones(few, 1000, 2, 400, 5000);
+  assert.deepEqual(
+    positions.map((pos) => pos.item),
+    few
+  );
+});
+
+test('packClones: an empty list gives no clones', () => {
+  const { positions, height, wrapHeight } = packClones([], 1000, 3, 0, 500);
+  assert.equal(positions.length, 0);
+  assert.equal(height, 0);
+  assert.equal(wrapHeight, GAP);
+});
+
+test('shuffleItems: returns a reordered copy and leaves the list alone', () => {
+  const list = [item(), item(), item(), item()];
+  const before = list.slice();
+  // always picking index 0 rotates the first item to the back, step by step
+  const shuffled = shuffleItems(list, () => 0);
+  assert.deepEqual(list, before);
+  assert.deepEqual(shuffled, [before[1], before[2], before[3], before[0]]);
+  assert.deepEqual(
+    shuffleItems(list, () => 0.999),
+    before
+  );
+  assert.deepEqual(
+    shuffleItems([], () => 0),
+    []
+  );
+});
+
+test('reconcileOrder: the same items keep their order', () => {
+  const [first, second, third] = [item(), item(), item()];
+  assert.deepEqual(reconcileOrder([third, first, second], [first, second, third]), [
+    third,
+    first,
+    second
+  ]);
+  assert.deepEqual(reconcileOrder([], []), []);
+});
+
+test('reconcileOrder: gone items go and the rest keep their places', () => {
+  const [first, second, third] = [item(), item(), item()];
+  // an item merged away still in the prepared order never comes back
+  assert.deepEqual(reconcileOrder([third, first, second], [first, third]), [third, first]);
+  // a copy with the same hash is another object, so it is not the same item
+  assert.deepEqual(reconcileOrder([{ ...first }, second], [first, second]), [second, first]);
+});
+
+test('reconcileOrder: new items follow at the end in library order', () => {
+  const [first, second, third, fourth] = [item(), item(), item(), item()];
+  const order = [second, first];
+  assert.deepEqual(reconcileOrder(order, [first, fourth, second, third]), [
+    second,
+    first,
+    fourth,
+    third
+  ]);
+  assert.deepEqual(order, [second, first]);
+});

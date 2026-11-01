@@ -1,8 +1,9 @@
 /* ---------------- auto-scroll ----------------
  * Smoothly scrolls the collage at a configurable speed (px/s). At the end it
- * either stops, or — if "restart" is on — jumps back to the top, optionally
- * re-shuffling the collage first. Manual scrolling while active is adopted
- * as the new position instead of being fought.
+ * stops, or with "restart" on it runs on into the wrap region collage.js
+ * builds below the end and wraps to the top from there, optionally with a
+ * new shuffle. A manual scroll while active becomes the new position, and
+ * the tick carries on from there.
  */
 
 import {
@@ -14,7 +15,7 @@ import {
   SCROLL_SPEED_STEP
 } from '../core/autoscroll.js';
 import { scroller, prefs } from './state.js';
-import { shuffle } from './collage.js';
+import { wrapHeight, wrapCollage, setWrapRegion } from './collage.js';
 import { lightbox } from './lightbox.js';
 import { ctxAnchoredTo } from './ctxmenu.js';
 import { anyOverlayOpen } from './shortcuts.js';
@@ -52,6 +53,11 @@ let keepAwake = prefs.bool('keepAwake', true);
 function syncKeepAwake() {
   window.api.setKeepAwake(autoScroll && keepAwake);
 }
+
+// the wrap region exists exactly while auto-scroll runs with restart on
+function syncWrapRegion() {
+  setWrapRegion(autoScroll && restartAtEnd, shuffleOnRestart);
+}
 let scrollRaf = null;
 let lastTick = null;
 let virtualTop = 0; // fractional scroll position (scrollTop rounds to ints)
@@ -82,29 +88,30 @@ function autoScrollTick(ts) {
     lastTick = ts;
     return;
   }
+  // clones lingering on screen put the viewport past the real end, where
+  // auto-scroll without restart stops
+  if (!restartAtEnd && wrapHeight > 0) {
+    setAutoScroll(false);
+    return;
+  }
   const elapsedSeconds = (ts - lastTick) / 1000;
   lastTick = ts;
 
-  const { top, atEnd, scrollable } = advanceAutoScroll({
+  const { top, atEnd, scrollable, wrapped } = advanceAutoScroll({
     virtualTop,
     scrollTop: scroller.scrollTop,
     maxScroll: scroller.scrollHeight - scroller.clientHeight,
     speed: scrollSpeed,
-    elapsedSeconds
+    elapsedSeconds,
+    wrapHeight
   });
   virtualTop = top;
   if (!scrollable) return; // nothing to scroll yet
+  if (wrapped) wrapCollage();
   scroller.scrollTop = virtualTop;
-
-  if (atEnd) {
-    if (restartAtEnd) {
-      if (shuffleOnRestart) shuffle();
-      virtualTop = 0;
-      scroller.scrollTop = 0;
-    } else {
-      setAutoScroll(false);
-    }
-  }
+  // with restart on the end is only reached while a re-layout that adds the
+  // wrap region is still pending, so the tick holds there
+  if (atEnd && !restartAtEnd) setAutoScroll(false);
 }
 
 function showAutoScrollState(on) {
@@ -125,6 +132,7 @@ export function setAutoScroll(on) {
     cancelAnimationFrame(scrollRaf);
     scrollRaf = null;
   }
+  syncWrapRegion();
   syncKeepAwake();
 }
 
@@ -153,12 +161,14 @@ loopCheckbox.checked = restartAtEnd;
 loopCheckbox.addEventListener('change', () => {
   restartAtEnd = loopCheckbox.checked;
   prefs.set('scrollRestart', restartAtEnd);
+  syncWrapRegion();
 });
 
 shuffleCheckbox.checked = shuffleOnRestart;
 shuffleCheckbox.addEventListener('change', () => {
   shuffleOnRestart = shuffleCheckbox.checked;
   prefs.set('scrollShuffle', shuffleOnRestart);
+  syncWrapRegion();
 });
 
 awakeCheckbox.checked = keepAwake;

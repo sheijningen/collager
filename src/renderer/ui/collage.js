@@ -4,6 +4,9 @@
 
 import {
   packItems,
+  packClones,
+  shuffleItems,
+  reconcileOrder,
   clampColumns,
   GAP,
   MISSING_W,
@@ -32,6 +35,7 @@ import {
   itemsByHash,
   reindexItems,
   tiles,
+  cloneTiles,
   lastPositions,
   scroller,
   collage,
@@ -71,7 +75,7 @@ export function setColumns(count) {
  * down so decoded frames, video decoders and network buffers are released.
  */
 
-const HYDRATE_MARGIN = '800px'; // how far outside the viewport media stays loaded
+export const HYDRATE_MARGIN = 800; // px; how far outside the viewport media stays loaded
 const MIN_LAYOUT_WIDTH = 100; // px; a collapsed window still gets a layout
 const DRAG_CLICK_WINDOW_MS = 400; // a click this soon after a drag is part of it
 const MEASURE_CONCURRENCY = 8; // metadata loads in flight at once
@@ -83,7 +87,7 @@ const observer = new IntersectionObserver(
       else dehydrate(entry.target);
     }
   },
-  { root: scroller, rootMargin: `${HYDRATE_MARGIN} 0px` }
+  { root: scroller, rootMargin: `${HYDRATE_MARGIN}px 0px` }
 );
 
 function hydrate(tile) {
@@ -98,7 +102,8 @@ function hydrate(tile) {
   media.addEventListener('error', () => {
     // a video says why it failed, an image does not
     const playerError = media.error ? describePlayerError(media.error) : '';
-    dehydrate(tile);
+    // a clone's media may have moved to the real tile at a wrap
+    if (media.parentElement) dehydrate(media.parentElement);
     recordLoadFailure(item, playerError);
   });
   tile.appendChild(media);
@@ -140,42 +145,172 @@ function dehydrate(tile) {
   tile.dataset.hydrated = '0';
 }
 
-/* Takes a tile out of the collage and the index, releasing its media first. */
+/* Takes the item's tile and its clone out of the collage and the indexes,
+ * releasing their media first. */
 export function discardTile(hash) {
-  const tile = tiles.get(hash);
+  removeTile(tiles, hash);
+  removeTile(cloneTiles, hash);
+}
+
+function removeTile(index, hash) {
+  const tile = index.get(hash);
   if (!tile) return;
   observer.unobserve(tile);
   dehydrate(tile);
   tile.remove();
-  tiles.delete(hash);
+  index.delete(hash);
+}
+
+/* ---------------- wrap region ----------------
+ * While auto-scroll loops, clone tiles below the collage show the first rows
+ * of the next loop, and the tick scrolls up by wrapHeight once it reaches
+ * them: the frame after that shows the same picture from the real tiles. */
+
+let wrapEnabled = false;
+let shuffleOnWrap = false;
+let nextOrder = null; // with shuffleOnWrap, the order the clones show and the wrap applies
+/** distance from where an item lands after the wrap down to its clone; 0
+ * while there are no clones */
+export let wrapHeight = 0;
+
+/* Builds the wrap region at every render while `enabled` and the collage is
+ * taller than the viewport, with a shuffled next loop when `shuffled`.
+ * Disabled while the viewport is past wrapHeight, it wraps first; disabled
+ * with clones still on screen, the region lingers until the viewport leaves
+ * it. Either way the screen keeps its picture. */
+export function setWrapRegion(enabled, shuffled) {
+  if (enabled === wrapEnabled && shuffled === shuffleOnWrap) return;
+  wrapEnabled = enabled;
+  shuffleOnWrap = shuffled;
+  if (!shuffled) nextOrder = null;
+  if (!enabled && wrapHeight > 0 && scroller.scrollTop >= wrapHeight) {
+    wrapInPlace();
+    return;
+  }
+  render();
+}
+
+/* Wraps and scrolls up by the same distance, so the screen keeps its picture. */
+function wrapInPlace() {
+  const top = scroller.scrollTop - wrapHeight;
+  wrapHeight = 0; // so the render in wrapCollage keeps no disabled region
+  wrapCollage();
+  scroller.scrollTop = top;
+}
+
+// a lingering region goes once the viewport leaves it, and a viewport
+// scrolled on past wrapHeight wraps
+scroller.addEventListener(
+  'scroll',
+  () => {
+    if (wrapEnabled || wrapHeight === 0) return;
+    if (scroller.scrollTop >= wrapHeight) {
+      wrapInPlace();
+      return;
+    }
+    if (scroller.scrollTop + scroller.clientHeight > wrapHeight) return;
+    render();
+  },
+  { passive: true }
+);
+
+/* Makes the clones the top of the collage: their order becomes the collage
+ * order and their loaded media move into the real tiles, which then show
+ * the clones' picture wrapHeight further up without loading anything. */
+export function wrapCollage() {
+  const reordered = nextOrder !== null;
+  if (reordered) {
+    // a retry round changes the items in place and renders only at its end,
+    // so an item merged away in the meantime must not come back here
+    state.items = reconcileOrder(nextOrder, state.items);
+    nextOrder = null;
+  }
+  for (const [hash, clone] of cloneTiles) {
+    const tile = tiles.get(hash);
+    const media = clone.querySelector('img, video');
+    if (!tile || !media) continue;
+    const own = tile.querySelector('img, video');
+    if (own) releaseMedia(own);
+    tile.appendChild(media); // a move within the document keeps a video playing
+    tile.dataset.hydrated = '1';
+    clone.dataset.hydrated = '0';
+    // the observer reports only crossings, so a clone that stays within the
+    // margin through the wrap (a collage not much taller than the window)
+    // would stay empty; observing it anew reports where it is now
+    observer.unobserve(clone);
+    observer.observe(clone);
+  }
+  render();
+  if (reordered) persist();
+}
+
+/* The order of the next loop. A shuffled one is kept across renders and
+ * follows the library's changes without reshuffling, so the clones do not
+ * rearrange under the viewer. */
+function prepareNextOrder() {
+  if (!shuffleOnWrap) return state.items;
+  nextOrder =
+    nextOrder === null ? shuffleItems(state.items) : reconcileOrder(nextOrder, state.items);
+  return nextOrder;
+}
+
+/* Moves the tile `index` holds for the item at `pos` there, building it
+ * first if needed. */
+function placeTile(index, pos) {
+  let tile = index.get(pos.item.hash);
+  if (!tile) {
+    tile = createTile(pos.item);
+    if (pos.clone) tile.classList.add('clone');
+    index.set(pos.item.hash, tile);
+    collage.appendChild(tile);
+    observer.observe(tile);
+  }
+  tile.style.transform = `translate(${pos.x + GAP}px, ${pos.y + GAP}px)`;
+  tile.style.width = `${pos.w}px`;
+  tile.style.height = `${pos.h}px`;
 }
 
 /* ---------------- rendering ---------------- */
 
 export function render() {
   reindexItems();
-  const width = scroller.clientWidth - GAP * 2;
-  const { positions, height } = packItems(state.items, Math.max(width, MIN_LAYOUT_WIDTH), columns);
-  collage.style.height = `${height + GAP}px`;
+  const width = Math.max(scroller.clientWidth - GAP * 2, MIN_LAYOUT_WIDTH);
+  const { positions, height } = packItems(state.items, width, columns);
+  const viewport = scroller.clientHeight;
+  let wrap = null;
+  // a collage that fits the viewport does not scroll, so it gets no clones
+  if ((wrapEnabled || wrapHeight > 0) && height + GAP > viewport) {
+    wrap = packClones(prepareNextOrder(), width, columns, height, viewport + HYDRATE_MARGIN);
+  }
+  // a disabled region lingers until the viewport has left it
+  if (!wrapEnabled && wrap && scroller.scrollTop + viewport <= wrap.wrapHeight) wrap = null;
+  if (wrap) {
+    wrapHeight = wrap.wrapHeight;
+    // the scroll range must reach wrapHeight even below a short clone region
+    collage.style.height = `${wrapHeight + Math.max(wrap.height + GAP, viewport)}px`;
+  } else {
+    wrapHeight = 0;
+    nextOrder = null;
+    collage.style.height = `${height + GAP}px`;
+  }
 
   const seen = new Set();
   lastPositions.clear();
   for (const pos of positions) {
     seen.add(pos.item.hash);
     lastPositions.set(pos.item.hash, pos);
-    let tile = tiles.get(pos.item.hash);
-    if (!tile) {
-      tile = createTile(pos.item);
-      tiles.set(pos.item.hash, tile);
-      collage.appendChild(tile);
-      observer.observe(tile);
-    }
-    tile.style.transform = `translate(${pos.x + GAP}px, ${pos.y + GAP}px)`;
-    tile.style.width = `${pos.w}px`;
-    tile.style.height = `${pos.h}px`;
+    placeTile(tiles, pos);
+  }
+  const cloneSeen = new Set();
+  for (const pos of wrap ? wrap.positions : []) {
+    cloneSeen.add(pos.item.hash);
+    placeTile(cloneTiles, pos);
   }
   for (const hash of [...tiles.keys()]) {
     if (!seen.has(hash)) discardTile(hash);
+  }
+  for (const hash of [...cloneTiles.keys()]) {
+    if (!cloneSeen.has(hash)) removeTile(cloneTiles, hash);
   }
   // the layout just moved every tile, so a menu opened on one now sits over
   // whatever took its place
@@ -317,11 +452,7 @@ export async function clearMissing() {
 }
 
 export function shuffle() {
-  const list = state.items;
-  for (let last = list.length - 1; last > 0; last--) {
-    const pick = Math.floor(Math.random() * (last + 1));
-    [list[last], list[pick]] = [list[pick], list[last]];
-  }
+  state.items = shuffleItems(state.items);
   render();
   persist();
 }

@@ -75,6 +75,27 @@ docs/                README media
   (see Retries), and the missing tile stays until then or until it is removed by hand.
 - **Resource limiting**: tiles are placeholders until within 800px of the viewport; the
   `<img>`/`<video>` is created then and torn down again once far away.
+- **Auto-scroll loop**: with Restart at the end on, the collage is a cylinder while auto-scroll
+  runs. Below the real collage a wrap region holds clone tiles: the next loop's order packed
+  from a level line one gap below the end (`packClones` in `core/layout.js`), one pass at most,
+  stopping once every column covers the viewport plus the 800px margin. Each clone sits exactly
+  `wrapHeight` below the place its item takes after the wrap, and the tick scrolls up by that
+  distance once it reaches it, so the frame after the wrap matches the one before. With Shuffle
+  on restart the next order is shuffled when the region is built, kept across renders (items
+  that go drop out, new ones join at the end, nothing reshuffles) and becomes the collage order
+  (saved) at the wrap. At the wrap the clones' loaded media move into the real tiles, so nothing
+  reloads on screen. Clones share the tile builder and the click, double-click and menu
+  handlers, live in their own `cloneTiles` index, and are never drag sources or targets,
+  scroll-to-item targets or entries in `lastPositions`. The region exists only while
+  auto-scroll runs with restart on and the collage is taller than the viewport; every render
+  rebuilds it. A collage barely taller than the window can pack shorter than the window after
+  a shuffled wrap; it then gets no clones and nothing scrolls until the next shuffle, though
+  auto-scroll still shows as running. Stopping auto-scroll or turning restart off with the
+  viewport past `wrapHeight` wraps first, and with clones only partly on screen the region
+  lingers until the viewport leaves it (scrolling on past `wrapHeight` wraps), so the screen
+  keeps its picture either way; auto-scroll with restart off stops on such a lingering region,
+  since the viewport is past the real end, and toggling Shuffle on restart reorders its clones,
+  as the user changed the next loop.
 - **Lightbox**: the arrow keys step to the previous or next item in collage order that can be
   shown, and the collage scrolls to it, so closing the lightbox lands where the browsing
   stopped. A focused video keeps the arrows for seeking.
