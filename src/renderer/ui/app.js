@@ -19,6 +19,7 @@ import * as toolbarModule from './toolbar.js';
 import * as fullscreenModule from './fullscreen.js';
 import * as dropdownModule from './dropdown.js';
 import * as statusModule from './status.js';
+import * as retryModule from './retry.js';
 import { startJob } from './status.js';
 
 /* ---------------- OS file drag & drop ---------------- */
@@ -100,7 +101,8 @@ if (new URLSearchParams(location.search).has('e2e')) {
     toolbarModule,
     fullscreenModule,
     dropdownModule,
-    statusModule
+    statusModule,
+    retryModule
   ]);
 }
 

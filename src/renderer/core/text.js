@@ -68,7 +68,7 @@ const MISSING_FILE_HINT = [
   '• it was deleted',
   '• it is on an external drive or network share that is not connected',
   '',
-  'Re-add the file from its new location to repair this entry, or click ✕ to remove it.'
+  'Collager checks now and then whether the file is back. Re-add it from its new location to repair this entry, or click ✕ to remove it.'
 ].join('\n');
 
 const UNSHOWABLE_FILE_HINT = [
@@ -77,7 +77,7 @@ const UNSHOWABLE_FILE_HINT = [
   '• the file is damaged',
   '• it could not be read just now (a network drive that dropped out, for example)',
   '',
-  'Open it with the default app from the right-click menu to check, or click ✕ to remove it.'
+  'Collager tries the file again now and then. Open it with the default app from the right-click menu to check, or click ✕ to remove it.'
 ].join('\n');
 
 /* The tooltip of a tile or list entry whose file has the given problem, or

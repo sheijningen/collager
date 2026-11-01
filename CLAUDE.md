@@ -20,7 +20,7 @@ src/main/lib/        pure Node logic: scanning, hashing, library persistence, pa
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
                      range, key rules, menu placement, item menu shape, count text, file list
                      key, empty drop, lightbox stepping, path names, user-facing text, a
-                     bounded worker pool
+                     bounded worker pool, the spacing of retries
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job
                      progress, popup.js places the context menu and the toolbar dropdowns
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
@@ -68,9 +68,9 @@ docs/                README media
   hash predates the sampled scheme is rehashed, and two entries that land on one hash merge.
   Hashing is invisible to the user: no toast or other copy mentions it, and its only visible
   effects are duplicates being skipped on add or merged at startup.
-  A video entry that was already missing keeps its unprefixed hash and can no longer be repaired
-  by re-adding the file: the copy comes back as a new item and the missing tile stays until it is
-  removed by hand.
+  A video entry that was already missing keeps its unprefixed hash, so a copy re-added from
+  elsewhere comes in as a new item; the entry is rehashed once a file is back at its own path
+  (see Retries), and the missing tile stays until then or until it is removed by hand.
 - **Resource limiting**: tiles are placeholders until within 800px of the viewport; the
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Lightbox**: the arrow keys step to the previous or next item in collage order that can be
@@ -92,10 +92,57 @@ docs/                README media
   so an entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry.
-- **Unshowable files**: a file that fails to load is missing only when the main process says
-  it is gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and
-  gets an amber dashed tile with its own hint for the session. It is not counted as missing,
-  and its menu keeps every action that does not need to show it.
+- **Retries**: every missing or unshowable item is looked at again now and then. A round runs every
+  five seconds; the first one that sees a failed item books its first attempt five seconds out, so
+  that comes five to ten seconds after the failure, and every attempt books the next one from the
+  moment it settled: ten seconds later, then fifteen, then every half minute, success included, so a
+  file that fails again after coming back waits its grown interval. That half minute holds for a
+  file whose folder is gone, since the drive may be plugged back in any moment; one that is gone
+  from a folder that is there, or there but undecodable, waits twice as long after each such answer
+  once it has reached the half minute, up to ten minutes, and after ten such answers in a row (about
+  half an hour) is left alone until the next start, so a library of deleted or undecodable files
+  soon costs nothing. One that fails to decode twice in a row, each time within a minute of coming
+  back (a video that decodes its first frame but breaks in playback), is left alone until the next
+  start; a drive unplugged again is not a flip. An attempt asks the main process whether the file is
+  there and whether its size still matches the stored one (the check the startup pass makes), and
+  has it rehashed when not. A file written within the last two seconds is still being copied,
+  whatever its size says, and waits for a later attempt; a share whose clock is off, or a copier
+  that stamps the time only when it closes the file or that pauses for longer than that, escapes
+  that check; the size check at the next start repairs what it let through, unless the copier also
+  gave the file its final size up front, as Windows copiers may do, in which case the entry keeps
+  the hash of the incomplete file until it is removed. A round works volume by volume (a drive
+  letter, a UNC share, a mount under /media/<user>, /run/media/<user> or /mnt; the folder itself
+  when the path is elsewhere) and folder by folder within it, and one answer speaks for the folder:
+  when the file's folder is gone as well (a drive unplugged), every other failing file in it is
+  booked without an attempt of its own, and the unshowable ones among them turn missing, so a drive
+  costs one question per folder per round. At most two attempts run at once, over all rounds and
+  never two on one volume, since each holds one of the main process's file threads until the file
+  system answers. An answer that takes five seconds or more and finds no file comes from a share
+  that is dropping out (one that finds the file is back, however long it took), and that file and
+  every other failing file on its volume, those that fail in the meantime included, wait five
+  minutes before their next attempt, so such a share costs one slow answer every five minutes rather
+  than one per file every half minute; a share mounted elsewhere costs one per folder, and one with
+  many folders can hold both places while it is down; a file left alone after its flips stays left
+  alone; an attempt that never settles (a hard NFS mount whose server is gone) holds up only its own
+  volume but takes one of the two places for the session, and two hangs (on two volumes, or in two
+  folders of a share mounted elsewhere) stop the retries until the next start, which keeps the main
+  process's file threads free for the saves; like the startup check on such a mount, it also keeps
+  the main process from exiting until the mount answers. A missing file that is back shows again
+  with its stored dimensions, or is loaded off screen first when those are the fallback of a failed
+  load; one that does not decode then is unshowable, with no dimensions until a load finds them. An
+  unshowable one that is still there is decoded off screen first, so its tile stays as it is until
+  the file decodes; a load still pending after twenty seconds counts as failed. One that was deleted
+  turns missing. When the hash moved, the path holds other content: that comes in as a new item in
+  the entry's place, or, when the library already holds it, the entry goes and the item holding it
+  takes the file when its own failed; either way the file is loaded by a URL carrying the new hash,
+  since Chromium would otherwise serve what it cached for the path. What the attempts change is
+  shown and saved together at the start and the end of a round, never per file. Nothing else on
+  screen changes. The spacing lives in `core/retry.js`, the rounds in `ui/retry.js`, the file check
+  in `recheckMediaFile` in `lib/scan.js`.
+- **Unshowable files**: a file that fails to load is missing only when the main process says it is
+  gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and gets an amber
+  dashed tile with its own hint until a retry decodes it. It is not counted as missing, and its menu
+  keeps every action that does not need to show it.
 - **File panel** always starts closed; its open state is not remembered across restarts.
   A counter above the list gives the item total and expands on click into the split by
   file extension, biggest group first.
@@ -156,19 +203,20 @@ docs/                README media
 - `pnpm test`: unit tests with `node:test`, no display needed.
 - `pnpm test:e2e`: boots the real app with a throwaway profile, generates fixtures in code (video
   only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
-  `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the
-  harness waits for library work the previous case left in flight, then resets the app (empty
-  library, nothing open or selected, two columns, collage order, default speed and Scroll
-  settings, the file panel and toolbar shown with the count breakdown closed, not fullscreen,
-  the starting window size, scrolled to the top, the removal question answering yes), so a case
-  loads what it needs (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to
-  a boolean) and never cleans up. A case that needs the startup
-  path seeds a saved library and restarts the renderer with `ctx.restartWith(library)`, which
-  takes an item list or a string written as the file's raw content; `ctx.reloadRenderer()`
-  restarts against whatever is on disk. `pnpm test:e2e panel drag` runs only the named cases,
-  in file order. The harness sets `COLLAGER_E2E=1`; main then loads the page with `?e2e` and
-  `app.js` exposes every module export on `window.collagerTest`, which the snippets reach as `T`;
-  every snippet also gets `press(key)`, which fires a keydown on the window.
+  `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the harness
+  waits for library work the previous case left in flight, then resets the app (empty library,
+  nothing open or selected, two columns, collage order, default speed and Scroll settings, the file
+  panel and toolbar shown with the count breakdown closed, not fullscreen, the starting window size,
+  scrolled to the top, the removal question answering yes), so a case loads what it needs
+  (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and never
+  cleans up. The retry timer is stopped after every page load, so a file a case flags by hand is
+  only looked at again by a round the case runs. A case that needs the startup path seeds a saved
+  library and restarts the renderer with `ctx.restartWith(library)`, which takes an item list or a
+  string written as the file's raw content; `ctx.reloadRenderer()` restarts against whatever is on
+  disk. `pnpm test:e2e panel drag` runs only the named cases, in file order. The harness sets
+  `COLLAGER_E2E=1`; main then loads the page with `?e2e` and `app.js` exposes every module export on
+  `window.collagerTest`, which the snippets reach as `T`; every snippet also gets `press(key)`,
+  which fires a keydown on the window.
 - Run the e2e suite locally as `env -u ELECTRON_RUN_AS_NODE pnpm test:e2e`, straight on the
   desktop: the app window opens and closes on the current display during the run, which is
   fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes
