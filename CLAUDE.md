@@ -160,6 +160,11 @@ docs/                README media
   `startJob` in `status.js`, one line per job in the status area stacked above the toast at the
   bottom centre. Toasts carry one-off messages; a sticky toast is reserved for a warning about
   a condition that lasts the session, such as a blocked save, and progress never goes through it.
+  An add expands every dropped folder before it reads a single file, counting the media files
+  found after every path it walks, media or not, so the `reading files X/Y` total that follows
+  covers the whole drop and never grows; a drop with no media skips the reading line. The main
+  process sends the first event of each phase and the last read, and at most one other per
+  100 ms, so a drop of hundreds of thousands of files does not flood the renderer.
 - **Menu**: removed on Linux and Windows so the app owns its shortcuts (notably F11). F12 opens
   devtools when unpackaged.
 - **Single instance**: a second launch exits at once and the running instance brings its

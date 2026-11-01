@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   formatCount,
   describeAddOutcome,
+  describeProbeProgress,
   describeRemoval,
   fileProblem,
   tileLabel
@@ -36,6 +37,19 @@ test('describeAddOutcome joins one fragment per outcome', () => {
   assert.equal(
     describeAddOutcome({ added: 0, duplicates: 0, ...nothingLeftOut }),
     'Nothing to add'
+  );
+});
+
+test('describeProbeProgress counts what the scan found, then reads against the total', () => {
+  assert.equal(describeProbeProgress({ phase: 'scanning', found: 0 }), 'scanning');
+  assert.equal(describeProbeProgress({ phase: 'scanning', found: 1 }), 'scanning, 1 file found');
+  assert.equal(
+    describeProbeProgress({ phase: 'scanning', found: 1234 }),
+    'scanning, 1234 files found'
+  );
+  assert.equal(
+    describeProbeProgress({ phase: 'reading', done: 0, total: 1234 }),
+    'reading files 0/1234'
   );
 });
 

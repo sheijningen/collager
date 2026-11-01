@@ -2,6 +2,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const crypto = require('crypto');
+const { performance } = require('perf_hooks');
 
 const MEDIA_EXTS = {
   '.png': 'image',
@@ -123,8 +124,9 @@ function summarizeExtensions(paths) {
 
 // Expand dropped paths: directories are walked recursively (symlink cycles
 // are guarded via realpath). Every path walked lands in exactly one of the
-// three lists.
-async function collectMediaPaths(inputPaths) {
+// three lists. `onWalked(foundCount)` is called with the number of media
+// files found so far after every path walked, whatever it turned out to be.
+async function collectMediaPaths(inputPaths, onWalked = null) {
   const found = [];
   const unsupported = [];
   const unreadable = [];
@@ -155,7 +157,7 @@ async function collectMediaPaths(inputPaths) {
         unreadable.push(entryPath);
         return;
       }
-      for (const entry of entries) await walk(path.join(entryPath, entry));
+      for (const entry of entries) await visit(path.join(entryPath, entry));
     } else if (typeForPath(entryPath)) {
       found.push(entryPath);
     } else {
@@ -163,17 +165,55 @@ async function collectMediaPaths(inputPaths) {
     }
   }
 
-  for (const inputPath of inputPaths) await walk(inputPath);
+  // a long run of files that are not media still refreshes the count, so the
+  // user sees the walk is making progress
+  async function visit(entryPath) {
+    await walk(entryPath);
+    if (onWalked) onWalked(found.length);
+  }
+
+  for (const inputPath of inputPaths) await visit(inputPath);
   return { found, unsupported, unreadable };
 }
 
+// a drop of a few hundred thousand files would otherwise send as many
+// progress messages to the renderer
+const PROGRESS_INTERVAL_MS = 100;
+
+/* Wraps `onProgress` so it passes the first event of each phase and the one
+ * that completes the reading phase, and otherwise at most one event per
+ * PROGRESS_INTERVAL_MS. */
+function throttleProgress(onProgress) {
+  let lastPhase = null;
+  let lastSentAt = 0;
+  return (progress) => {
+    // monotonic, so a wall clock set back cannot hold every event
+    const now = performance.now();
+    const phaseChanged = progress.phase !== lastPhase;
+    const finished = progress.phase === 'reading' && progress.done === progress.total;
+    if (!phaseChanged && !finished && now - lastSentAt < PROGRESS_INTERVAL_MS) return;
+    lastPhase = progress.phase;
+    lastSentAt = now;
+    onProgress(progress);
+  };
+}
+
 /* Expand paths, then hash the found media with bounded concurrency so a
- * large drop overlaps its disk reads. Returns entries in discovery order,
- * and counts what was left out: unsupported formats (with the extensions,
- * so the user learns what to convert) and files that could not be read,
- * a failed hash included. */
+ * large drop overlaps its disk reads. Every path is expanded before the
+ * first hash, so the reading phase knows its final total. Reports
+ * `{ phase: 'scanning', found }` while expanding and `{ phase: 'reading',
+ * done, total }` from the start of hashing when anything was found,
+ * throttled (see throttleProgress). Returns entries in discovery order, and
+ * counts what was left out: unsupported formats (with the extensions, so the
+ * user learns what to convert) and files that could not be read, a failed
+ * hash included. */
 async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
-  const { found, unsupported, unreadable } = await collectMediaPaths(inputPaths);
+  const report = onProgress ? throttleProgress(onProgress) : () => {};
+  const { found, unsupported, unreadable } = await collectMediaPaths(inputPaths, (count) =>
+    report({ phase: 'scanning', found: count })
+  );
+  // a drop with nothing to read goes straight to its outcome
+  if (found.length) report({ phase: 'reading', done: 0, total: found.length });
   const entries = new Array(found.length);
   await runWithConcurrency(
     found,
@@ -189,7 +229,7 @@ async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
         unreadable.push(filePath);
       }
     },
-    onProgress
+    (done, total) => report({ phase: 'reading', done, total })
   );
   return {
     entries: entries.filter(Boolean),
