@@ -320,14 +320,14 @@ async function isDirectory(dir) {
 }
 
 /* Looks at the file of a library entry (`path`, `hash`, `size`) again.
- * Resolves to `{ present: false, folderPresent, statMs }` when no regular
- * file is at the path (`folderPresent` is null when the stat was too slow to
- * ask about the folder as well), and otherwise to `{ present: true, hash,
- * size, statMs }`: the entry's own hash while the size on disk matches it, a
- * fresh one when it is stale (see hashIsStale), or null when the file was
- * written within `settleMs` or could not be read. `statMs` is how long the
- * file system took to answer about the file, hashing excluded. A path
- * without a media extension resolves to null. */
+ * No regular file at the path: `{ present: false, folderPresent, statMs }`,
+ * with `folderPresent` null when the stat was too slow to ask about the
+ * folder. Otherwise `{ present: true, hash, size, statMs }`, where `hash` is
+ * the entry's own while it describes the file, a fresh one when it is stale
+ * (see hashIsStale), and null when the file was written within `settleMs` or
+ * could not be read. `statMs` times the stat, and the folder's when it was
+ * asked, hashing excluded. A path without a media extension resolves to
+ * null. */
 async function recheckMediaFile(item, settleMs = WRITE_SETTLE_MS) {
   const filePath = item && typeof item === 'object' ? item.path : undefined;
   const type = typeof filePath === 'string' ? typeForPath(filePath) : undefined;
@@ -374,6 +374,5 @@ module.exports = {
   collectMediaPaths,
   probeFiles,
   rehashStaleItems,
-  hashIsStale,
   recheckMediaFile
 };

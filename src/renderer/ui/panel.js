@@ -18,7 +18,6 @@ import {
   badgeLabel,
   selectionHint
 } from '../core/text.js';
-import { isRemoveKey } from '../core/keys.js';
 import {
   state,
   selected,
@@ -33,7 +32,6 @@ import { render, removeItems, askRemoval } from './collage.js';
 import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
 import { lightbox } from './lightbox.js';
-import { anyOverlayOpen } from './shortcuts.js';
 
 const panel = document.getElementById('panel');
 export const fileList = document.getElementById('file-list');
@@ -205,10 +203,3 @@ sortSelect.addEventListener('change', () => {
 });
 applyPanelOpen(panelOpen);
 document.getElementById('panel-hint').textContent = selectionHint(window.api.platform);
-
-// Delete removes the selection; Escape belongs to the ladder in shortcuts.js
-window.addEventListener('keydown', (event) => {
-  if (!isRemoveKey(event.key, window.api.platform) || !selected.size) return;
-  if (!lightbox.hidden || anyOverlayOpen()) return;
-  removeSelected();
-});

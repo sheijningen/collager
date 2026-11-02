@@ -21,7 +21,8 @@ function isLibraryEntry(item) {
 
 /* Parses a library file into its items. Every way the file can be unusable
  * throws, so the caller moves the file aside exactly when this does; a
- * repeated hash keeps its first entry only. */
+ * repeated hash keeps its first entry only, and a width or height that is not
+ * a positive number is dropped, so the item is measured again. */
 function readLibraryItems(raw) {
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) throw new Error('library is not an array');
@@ -31,6 +32,10 @@ function readLibraryItems(raw) {
     if (!isLibraryEntry(item)) throw new Error('malformed library entry');
     if (seen.has(item.hash)) continue;
     seen.add(item.hash);
+    for (const side of ['w', 'h']) {
+      const valid = Number.isFinite(item[side]) && item[side] > 0;
+      if (!valid) delete item[side];
+    }
     items.push(item);
   }
   return items;
@@ -75,13 +80,12 @@ function createLibraryStore(getDir) {
   }
 
   return {
-    /* Resolves to the items, `sizeOnDisk` (the current byte size of every
-     * item whose file is present, from the one stat that also decides
-     * `missing` and, for a missing item, fills `loadError` with the stat's
-     * message), and `problem`: null when the file loaded (or did not exist
-     * yet), otherwise `{ backup }` with the backup path, or null when the
-     * file stays in place because it could not be moved or not be read at
-     * all, which also blocks saving. */
+    /* Resolves to `{ items, sizeOnDisk, problem }`. One stat per item sets
+     * `missing`, and the stat's message as `loadError` on a missing one.
+     * `sizeOnDisk` maps every present item to its byte size. `problem` is
+     * null when the file loaded or does not exist yet, and otherwise
+     * `{ backup }`: the backup path, or null when the file stays in place
+     * because it could not be moved or read, which also blocks saving. */
     async load() {
       let raw;
       try {

@@ -26,13 +26,12 @@ export function retryDelay(attempts) {
 }
 
 /* Syncs `schedule` (hash -> { attempts, dueAt, inFlight, flips, returnedAt,
- * backOffs })
- * with `itemsByHash` and returns the items due at `now` whose previous
- * attempt has settled. A newly failing item is booked, not due. An entry
- * outlives the problem, so a file that fails again after coming back keeps
- * its grown interval, and one that fails to decode twice in a row within
- * FLIP_WINDOW_MS of returning is left alone. Only a hash that left the
- * library is dropped. */
+ * backOffs }) with `itemsByHash` and returns the items due at `now` whose
+ * previous attempt has settled. A newly failing item is booked, not due. An
+ * entry outlives the problem, so a file that fails again after coming back
+ * keeps its grown interval, and one that fails to decode twice in a row
+ * within FLIP_WINDOW_MS of returning is left alone. Only a hash that left
+ * the library is dropped. */
 export function selectDueRetries(itemsByHash, schedule, now) {
   const due = [];
   for (const item of itemsByHash.values()) {
@@ -81,6 +80,23 @@ export function canStartRetry(schedule, hash, now) {
 export function beginRetry(schedule, hash) {
   const entry = schedule.get(hash);
   if (entry) entry.inFlight = true;
+}
+
+/* What the answer about a failing file says beyond that file, from `report`
+ * (null when no answer came) after `answerMs`: `slow` when the file system
+ * took SLOW_ANSWER_MS or more to find no file (a share that is dropping out;
+ * one that finds the file is back, however long it took), `folderGone` when
+ * the file's folder is gone as well, and `backOff` when the file is gone from
+ * a folder that is there. A present file sets none of them. */
+export function classifyRecheckAnswer(report, answerMs) {
+  const flags = { slow: false, folderGone: false, backOff: false };
+  if (report !== null && report.present) return flags;
+  flags.slow = answerMs >= SLOW_ANSWER_MS;
+  if (report === null) return flags;
+  // null: the stat was too slow to ask about the folder as well
+  flags.folderGone = report.folderPresent === false;
+  flags.backOff = report.folderPresent === true;
+  return flags;
 }
 
 /* Books the next attempt for `hash` after one that settled at `now`: after

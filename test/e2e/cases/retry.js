@@ -52,7 +52,8 @@ module.exports = {
       const recovered = await T.retryFailedFiles(${FAR_AHEAD + ROUND_APART});
       const item = T.state.items.find((i) => i.path.endsWith('flaky.png'));
       return recovered === 0 && item.unshowable === true
-        && T.tiles.get(item.hash).classList.contains('unshowable');
+        && T.tiles.get(item.hash).classList.contains('unshowable')
+        && T.schedule.get(item.hash).attempts === 1;
     })()`);
     check('a file that still fails stays flagged after a retry', stillBroken);
 

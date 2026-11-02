@@ -35,15 +35,14 @@ function openDropdown(trigger) {
   // gets a scrolling popup)
   const anchor = trigger.getBoundingClientRect();
   showPopupAt(popup, anchor.left, anchor.bottom + DROPDOWN_GAP);
-  // focus the popup itself, not its first control: a focused button would
-  // claim Space and Enter, which the shortcuts are meant to keep
+  // the popup itself takes focus: a focused button would take Space and Enter
+  // from the shortcuts
   popup.focus();
 }
 
-/* `keepFocus` false drops focus instead of handing it to the menu button: a
- * focused button would claim Space and Enter, which the shortcuts are meant
- * to keep. It is the case for a pointer-driven item click, where nothing
- * expects focus back. */
+/* Focus inside the popup moves to the menu button, or is dropped when
+ * `keepFocus` is false, as after a pointer click, which expects no focus
+ * back. */
 export function closeDropdown({ keepFocus = true } = {}) {
   if (!openTrigger) return;
   const popup = popups.get(openTrigger);

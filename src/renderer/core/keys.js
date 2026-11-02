@@ -69,6 +69,11 @@ export function fullscreenKeyLabel(platform) {
   return platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11';
 }
 
+/** The key the help names for removing the selection. */
+export function removeKeyLabel(platform) {
+  return platform === 'darwin' ? 'Del / Backspace' : 'Del';
+}
+
 /**
  * Whether a key removes the selection: Delete, and on macOS also Backspace,
  * which is the key labelled delete there.

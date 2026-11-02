@@ -8,7 +8,13 @@
 import { createPrefs } from '../core/prefs.js';
 
 export const state = {
-  /** @type {{hash:string, path:string, url:string, type:'image'|'gif'|'video', size?:number, w?:number, h?:number, missing?:boolean, unshowable?:boolean, loadError?:string}[]} the library, in collage order; `unshowable` is set while a present file fails to decode, and `loadError` holds what was found about a file that failed, for its hint; neither is saved */
+  /**
+   * The library, in collage order. `unshowable` is set while a present file
+   * fails to decode, and `loadError` holds what was found about a file that
+   * failed, for its hint; neither is saved.
+   * @type {{hash: string, path: string, url: string, type: 'image'|'gif'|'video', size?: number,
+   *   w?: number, h?: number, missing?: boolean, unshowable?: boolean, loadError?: string}[]}
+   */
   items: [],
   /** set once the saved library has been loaded into `items` */
   libraryLoaded: false,

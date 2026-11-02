@@ -4,6 +4,7 @@ const {
   packItems,
   sortItems,
   clampColumns,
+  hasOwnDimensions,
   reorderByHash,
   GAP,
   MISSING_W,
@@ -88,6 +89,17 @@ test('clampColumns: clamps to [1, 8] and defaults non-numbers', () => {
   assert.equal(clampColumns(2.9), 2);
   assert.equal(clampColumns(NaN), DEFAULT_COLUMNS);
   assert.equal(clampColumns(undefined), DEFAULT_COLUMNS);
+});
+
+test('hasOwnDimensions: the fallback, a zero or an absent side are not dimensions of its own', () => {
+  assert.equal(hasOwnDimensions(item({ w: MISSING_W, h: MISSING_H })), false);
+  assert.equal(hasOwnDimensions(item({ w: 0, h: 100 })), false);
+  assert.equal(hasOwnDimensions(item({ w: 100, h: 0 })), false);
+  assert.equal(hasOwnDimensions(item({ w: undefined, h: 100 })), false);
+  assert.equal(hasOwnDimensions(item({ w: 100, h: undefined })), false);
+  assert.equal(hasOwnDimensions(item({ w: 640, h: 480 })), true);
+  // one fallback side next to a real one is a real measure
+  assert.equal(hasOwnDimensions(item({ w: MISSING_W, h: 480 })), true);
 });
 
 test('sortItems: by name is case-insensitive and does not mutate input', () => {

@@ -6,11 +6,13 @@ const {
   canStartRetry,
   beginRetry,
   bookNextRetry,
+  classifyRecheckAnswer,
   FIRST_RETRY_MS,
   MAX_RETRY_MS,
   SLOW_RETRY_MS,
   LONG_RETRY_MS,
   MAX_BACK_OFFS,
+  SLOW_ANSWER_MS,
   FLIP_WINDOW_MS
 } = require('../../src/renderer/core/retry.js');
 
@@ -217,4 +219,36 @@ test('an item that left the library leaves the schedule', () => {
   // a fresh failure restarts the short wait
   selectDueRetries(indexByHash([missing, unshowable]), schedule, 5000);
   assert.deepEqual(schedule.get('a'), booked(5000 + FIRST_RETRY_MS));
+});
+
+const NO_FLAGS = { slow: false, folderGone: false, backOff: false };
+
+test('an answer that finds the file sets no flags, however long it took', () => {
+  const report = { present: true, hash: 'a', size: 1, statMs: 10 };
+  assert.deepEqual(classifyRecheckAnswer(report, 10), NO_FLAGS);
+  assert.deepEqual(classifyRecheckAnswer(report, SLOW_ANSWER_MS), NO_FLAGS);
+});
+
+test('a file gone from a folder that is there backs off', () => {
+  const report = { present: false, folderPresent: true, statMs: 10 };
+  assert.deepEqual(classifyRecheckAnswer(report, 10), { ...NO_FLAGS, backOff: true });
+});
+
+test('a file gone with its folder reports the folder gone', () => {
+  const report = { present: false, folderPresent: false, statMs: 10 };
+  assert.deepEqual(classifyRecheckAnswer(report, 10), { ...NO_FLAGS, folderGone: true });
+});
+
+test('an answer that could not ask about the folder says nothing about it', () => {
+  const report = { present: false, folderPresent: null, statMs: 10 };
+  assert.deepEqual(classifyRecheckAnswer(report, 10), NO_FLAGS);
+});
+
+test('finding no file after SLOW_ANSWER_MS or more is slow', () => {
+  const report = { present: false, folderPresent: null, statMs: SLOW_ANSWER_MS };
+  assert.deepEqual(classifyRecheckAnswer(report, SLOW_ANSWER_MS), { ...NO_FLAGS, slow: true });
+  assert.deepEqual(classifyRecheckAnswer(report, SLOW_ANSWER_MS - 1), NO_FLAGS);
+  // no answer at all says only how long the question was out
+  assert.deepEqual(classifyRecheckAnswer(null, SLOW_ANSWER_MS), { ...NO_FLAGS, slow: true });
+  assert.deepEqual(classifyRecheckAnswer(null, 10), NO_FLAGS);
 });

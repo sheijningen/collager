@@ -9,10 +9,10 @@ import {
   canStartRetry,
   beginRetry,
   bookNextRetry,
-  FIRST_RETRY_MS,
-  SLOW_ANSWER_MS
+  classifyRecheckAnswer,
+  FIRST_RETRY_MS
 } from '../core/retry.js';
-import { MISSING_W, MISSING_H } from '../core/layout.js';
+import { MISSING_W, MISSING_H, LOAD_TIMEOUT_MS, hasOwnDimensions } from '../core/layout.js';
 import { dirname, volumeRoot, urlForContent } from '../core/paths.js';
 import { fileProblem } from '../core/text.js';
 import { state, itemsByHash, reindexItems, persist } from './state.js';
@@ -23,11 +23,8 @@ import { releaseMedia } from './media.js';
 // file system answers, which a share that is dropping out can take a minute
 // over; two at a time leaves the threads the saves need.
 const MAX_IN_FLIGHT = 2;
-// the main process has just seen the file, so a load still pending by then
-// is a very slow read, and the next attempt tries again
-const LOAD_TIMEOUT_MS = 20_000;
 
-const schedule = new Map(); // hash -> the booking of its next attempt, see core/retry.js
+export const schedule = new Map(); // hash -> the booking of its next attempt, see core/retry.js
 let workers = 0; // attempts running, over all rounds
 // a scope is the volume a folder is on (see volumeRoot), or the folder itself
 // off any known volume; a worker has one to itself
@@ -142,11 +139,8 @@ async function retryItem(item) {
 }
 
 /* Resolves to `{ cameBack, slow, folderGone, backOff }`: whether the file
- * shows again, whether the file system took SLOW_ANSWER_MS or more to find
- * no file (a share that is dropping out; one that finds the file is back,
- * however long it took), whether its folder is gone as well, and whether the
- * answer says the file is not about to come back (gone from a folder that is
- * there, or there but not decodable). */
+ * shows again, and the flags of classifyRecheckAnswer, with `backOff` also
+ * set for a file that is there and settled but does not show. */
 async function lookAgain(item) {
   const triedPath = item.path;
   const asked = Date.now();
@@ -161,18 +155,13 @@ async function lookAgain(item) {
     // no answer says nothing about the file; the next attempt asks again
   }
   const answerMs = report ? report.statMs : Date.now() - asked;
-  const outcome = {
-    cameBack: false,
-    slow: answerMs >= SLOW_ANSWER_MS && !(report && report.present),
-    folderGone: false,
-    backOff: false
-  };
+  const answer = classifyRecheckAnswer(report, answerMs);
+  const outcome = { cameBack: false, slow: answer.slow, folderGone: false, backOff: false };
   if (!report || !stillFailing(item, triedPath)) return outcome;
   if (!report.present) {
     if (item.unshowable) turnMissing(item);
-    // null: the stat was too slow to ask about the folder as well
-    outcome.folderGone = report.folderPresent === false;
-    outcome.backOff = report.folderPresent === true;
+    outcome.folderGone = answer.folderGone;
+    outcome.backOff = answer.backOff;
     return outcome;
   }
   // a null hash: there, but being written or unreadable right now
@@ -238,13 +227,10 @@ function setDimensions(item, dimensions) {
   item.h = dimensions.h;
 }
 
-function hasOwnDimensions(item) {
-  if (!item.w || !item.h) return false;
-  return item.w !== MISSING_W || item.h !== MISSING_H;
-}
-
 /* Resolves to the file's native dimensions, or null on error or after
- * LOAD_TIMEOUT_MS. A video counts once its first frame decodes. */
+ * LOAD_TIMEOUT_MS: the main process has just seen the file, so a load still
+ * pending by then is a very slow read, and the next attempt tries again. A
+ * video counts once its first frame decodes. */
 function loadOffScreen(item) {
   return new Promise((resolve) => {
     let media;

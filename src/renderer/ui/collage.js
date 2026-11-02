@@ -8,9 +8,11 @@ import {
   shuffleItems,
   reconcileOrder,
   clampColumns,
+  hasOwnDimensions,
   GAP,
   MISSING_W,
   MISSING_H,
+  LOAD_TIMEOUT_MS,
   MIN_COLUMNS,
   MAX_COLUMNS,
   DEFAULT_COLUMNS
@@ -110,13 +112,9 @@ function hydrate(tile) {
   tile.dataset.hydrated = '1';
 }
 
-/* A file that failed to load is either gone since the startup check
- * (deleted, drive unplugged) or present in a shape Chromium cannot decode.
- * Only the main process can tell, and the two get different tiles, hints and
- * menus: re-adding repairs a missing entry, while an unshowable one comes
- * back only when a retry decodes it. What the main process found, and what
- * the player said, go into the hint. The render rebuilds the tile, the panel
- * entry and the missing count. */
+/* A file that failed to load is either gone (missing) or there but not
+ * decodable (unshowable); only the main process can tell which. The render
+ * rebuilds the tile, the panel entry and the missing count. */
 async function recordLoadFailure(item, playerError) {
   const failedPath = item.path;
   let report;
@@ -435,7 +433,7 @@ export async function askRemoval(subject) {
   }
 }
 
-export async function clearAll() {
+async function clearAll() {
   const count = state.items.length;
   if (!count) return;
   if (!(await askRemoval(`all ${formatCount(count, 'item')}`))) return;
@@ -457,31 +455,38 @@ export function shuffle() {
   persist();
 }
 
-/* Measure native dimensions by loading metadata only (no layout impact). */
+/* Measure native dimensions by loading metadata only (no layout impact). A
+ * load that fails gets the fallback size; one still pending after
+ * LOAD_TIMEOUT_MS resolves to null, so a hung mount cannot hold up the
+ * library queue and the next start measures the item again. */
 function measureItem(item) {
-  const url = item.url;
   return new Promise((resolve) => {
+    let media;
+    const timeout = setTimeout(() => settle(null), LOAD_TIMEOUT_MS);
+    const settle = (dimensions) => {
+      clearTimeout(timeout);
+      releaseMedia(media);
+      resolve(dimensions);
+    };
     if (item.type === 'video') {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      video.muted = true;
-      video.onloadedmetadata = () => {
-        resolve({ w: video.videoWidth || MISSING_W, h: video.videoHeight || MISSING_H });
-        releaseMedia(video);
+      media = document.createElement('video');
+      media.preload = 'metadata';
+      media.muted = true;
+      media.onloadedmetadata = () => {
+        settle({ w: media.videoWidth || MISSING_W, h: media.videoHeight || MISSING_H });
       };
-      video.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
-      video.src = url;
     } else {
-      const img = new Image();
-      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => resolve({ w: MISSING_W, h: MISSING_H });
-      img.src = url;
+      media = new Image();
+      media.onload = () => settle({ w: media.naturalWidth, h: media.naturalHeight });
     }
+    media.onerror = () => settle({ w: MISSING_W, h: MISSING_H });
+    media.src = item.url;
   });
 }
 
-/* Fills in w/h for items that lack them (mutates the items). Returns whether
- * anything was measured, i.e. whether the caller should persist. */
+/* Fills in w/h for items that lack them (mutates the items); a measure that
+ * timed out leaves them unset. Returns whether anything was measured, i.e.
+ * whether the caller should persist. */
 export async function measureMissingDimensions(list, onProgress = null) {
   const pending = list.filter((item) => !item.missing && (!item.w || !item.h));
   await runWithConcurrency(
@@ -489,6 +494,7 @@ export async function measureMissingDimensions(list, onProgress = null) {
     MEASURE_CONCURRENCY,
     async (item) => {
       const dims = await measureItem(item);
+      if (dims === null) return;
       item.w = dims.w;
       item.h = dims.h;
     },
@@ -509,7 +515,7 @@ export function queueLibraryOperation(task) {
 
 export function addPaths(paths) {
   return queueLibraryOperation(() =>
-    doAddPaths(paths).catch((err) => {
+    probeAndAddPaths(paths).catch((err) => {
       console.error('Failed to add files', err);
       showToast('Could not add the dropped files');
     })
@@ -525,25 +531,6 @@ window.api.onProbeProgress((progress) => {
   if (probeJob) probeJob.update(describeProbeProgress(progress));
 });
 
-async function probeFilesWithProgress(paths, job) {
-  probeJob = job;
-  try {
-    return await window.api.probeFiles(paths);
-  } finally {
-    probeJob = null;
-  }
-}
-
-async function doAddPaths(paths) {
-  if (!paths.length) return;
-  const job = startJob('Adding');
-  try {
-    await addPathsUnderJob(paths, job);
-  } finally {
-    job.finish();
-  }
-}
-
 /* Moves `existing` to the file `entry` was probed from, which holds the same
  * content, and clears its file problem. */
 function adoptPath(existing, entry) {
@@ -556,46 +543,62 @@ function adoptPath(existing, entry) {
   discardTile(existing.hash); // the next render builds a tile that loads the file
 }
 
-async function addPathsUnderJob(paths, job) {
-  job.update(describeProbeProgress({ phase: 'scanning', found: 0 }));
-  const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } =
-    await probeFilesWithProgress(paths, job);
+async function probeAndAddPaths(paths) {
+  if (!paths.length) return;
+  const job = startJob('Adding');
+  try {
+    job.update(describeProbeProgress({ phase: 'scanning', found: 0 }));
+    probeJob = job;
+    const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } =
+      await window.api.probeFiles(paths);
+    probeJob = null;
 
-  const known = new Map(itemsByHash); // a private copy: the batch dedups against itself too
-  const fresh = [];
-  let duplicates = 0;
-  for (const entry of entries) {
-    const existing = known.get(entry.hash);
-    if (existing) {
-      // Same content already present. If its old file vanished or would not
-      // show, adopt the new path and give it another go.
-      if (fileProblem(existing)) {
-        adoptPath(existing, entry);
-      } else {
-        duplicates++;
+    const known = new Map(itemsByHash); // a private copy: the batch dedups against itself too
+    const fresh = [];
+    const remeasured = [];
+    let duplicates = 0;
+    for (const entry of entries) {
+      const existing = known.get(entry.hash);
+      if (existing) {
+        // Same content already present. If its old file vanished or would not
+        // show, adopt the new path and give it another go.
+        if (fileProblem(existing)) {
+          adoptPath(existing, entry);
+          // the fallback of a failed measure, or none, would stretch its tile
+          if (!hasOwnDimensions(existing)) {
+            delete existing.w;
+            delete existing.h;
+            remeasured.push(existing);
+          }
+        } else {
+          duplicates++;
+        }
+        continue;
       }
-      continue;
+      known.set(entry.hash, entry);
+      fresh.push(entry);
     }
-    known.set(entry.hash, entry);
-    fresh.push(entry);
+
+    await measureMissingDimensions(fresh.concat(remeasured), (done, total) => {
+      job.update(`reading dimensions ${done}/${total}`);
+    });
+    // one at a time: spreading a batch of some hundred thousand entries into
+    // one push call overflows the call stack
+    for (const entry of fresh) state.items.push(entry);
+    render();
+    persist();
+
+    showToast(
+      describeAddOutcome({
+        added: fresh.length,
+        duplicates,
+        unsupportedCount,
+        unsupportedExtensions,
+        unreadableCount
+      })
+    );
+  } finally {
+    probeJob = null;
+    job.finish();
   }
-
-  await measureMissingDimensions(fresh, (done, total) => {
-    job.update(`reading dimensions ${done}/${total}`);
-  });
-  // one at a time: spreading a batch of some hundred thousand entries into
-  // one push call overflows the call stack
-  for (const entry of fresh) state.items.push(entry);
-  render();
-  persist();
-
-  showToast(
-    describeAddOutcome({
-      added: fresh.length,
-      duplicates,
-      unsupportedCount,
-      unsupportedExtensions,
-      unreadableCount
-    })
-  );
 }

@@ -6,6 +6,7 @@ import { basename } from './paths.js';
 export const GAP = 4; // px between tiles
 export const MISSING_W = 260; // fallback tile size for missing/unmeasured files
 export const MISSING_H = 140;
+export const LOAD_TIMEOUT_MS = 20_000; // a media load still pending this long counts as failed
 export const MIN_COLUMNS = 1;
 export const MAX_COLUMNS = 8;
 export const DEFAULT_COLUMNS = 3;
@@ -13,6 +14,13 @@ export const DEFAULT_COLUMNS = 3;
 export function clampColumns(count) {
   if (!Number.isFinite(count)) return DEFAULT_COLUMNS;
   return Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, Math.trunc(count)));
+}
+
+/* Whether the item has dimensions a load found: both set, and not the
+ * fallback a failed measure gives. */
+export function hasOwnDimensions(item) {
+  if (!item.w || !item.h) return false;
+  return item.w !== MISSING_W || item.h !== MISSING_H;
 }
 
 /* Masonry: a fixed number of equal-width columns. Every item is scaled to
