@@ -16,7 +16,8 @@ src/main/            main process: window, menu, single instance, GPU fallback, 
                      paths macOS asks to open, IPC registration
 src/main/ipc/        IPC handlers grouped by concern: library, files, window
 src/main/lib/        pure Node logic: scanning, hashing, library persistence, path checks,
-                     the relaunch options of the GPU fallback, the macOS menu template
+                     the relaunch options of the GPU fallback, the macOS menu template, the
+                     window bounds to remember
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
                      range, key rules, menu placement, item menu shape, count text, file list
                      key, empty drop, lightbox stepping, path names, volume roots and
@@ -216,6 +217,11 @@ docs/                README media
   them until a page has loaded and sends each Finder action's paths over `open-paths` as one
   batch, which the renderer adds like a drop, and the window comes forward. The app outlives its
   last window as macOS apps do; the Dock icon or such a drop opens a new one.
+- **Window bounds**: the window's normal bounds and whether it was maximized are written to
+  `window.json` in `userData` when it closes and restored at the next start, the size capped to
+  the display's work area. Saved bounds that no longer put part of the window on any display
+  (a monitor unplugged) are dropped for the default size, which the window manager places.
+  A Wayland compositor ignores the position and places the window itself.
 - **Single instance**: a second launch exits at once and the running instance brings its
   window forward (or opens one when it has none), so two instances can never take turns writing
   `library.json`.
