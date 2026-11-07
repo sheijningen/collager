@@ -1,6 +1,6 @@
 {
   "name": "collager",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Media collage viewer for images (PNG/JPEG/WebP/SVG), GIFs and videos (MP4/WebM/MKV)",
   "private": true,
   "homepage": "https://github.com/sheijningen/collager",
