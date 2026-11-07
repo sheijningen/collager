@@ -9,7 +9,7 @@ const tmpDir = (t) => createTempDir(t, 'mediapath');
 
 test('accepts an existing regular file with a media extension', async (t) => {
   const dir = tmpDir(t);
-  for (const name of ['pic.PNG', 'clip.mp4', 'anim.gif', 'photo.webp']) {
+  for (const name of ['pic.PNG', 'clip.mp4', 'anim.gif', 'photo.webp', 'logo.svg', 'clip.mkv']) {
     const file = path.join(dir, name);
     fs.writeFileSync(file, 'x');
     assert.equal(await isMediaFile(file), true, name);

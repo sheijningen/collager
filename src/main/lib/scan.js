@@ -9,9 +9,11 @@ const MEDIA_EXTS = {
   '.jpg': 'image',
   '.jpeg': 'image',
   '.webp': 'image', // animated webp plays in <img> just like gif
+  '.svg': 'image', // an <img> source runs no scripts
   '.gif': 'gif',
   '.mp4': 'video',
-  '.webm': 'video'
+  '.webm': 'video',
+  '.mkv': 'video' // demuxed like WebM; a codec Chromium lacks makes the file unshowable
 };
 
 function typeForPath(filePath) {

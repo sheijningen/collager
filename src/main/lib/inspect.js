@@ -16,6 +16,8 @@ const SIGNATURES = [
   { name: 'PDF', text: '%PDF' },
   { name: 'ZIP', bytes: [0x50, 0x4b, 0x03, 0x04] },
   { name: 'Matroska or WebM', bytes: [0x1a, 0x45, 0xdf, 0xa3] },
+  { name: 'SVG', text: '<!DOCTYPE svg' },
+  { name: 'SVG', text: '<svg' },
   { name: 'HTML', text: '<!DOCTYPE' },
   { name: 'HTML', text: '<html' },
   { name: 'XML', text: '<?xml' }

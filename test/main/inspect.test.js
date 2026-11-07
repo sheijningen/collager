@@ -79,6 +79,8 @@ test('nameFormat names the media formats and their look-alikes', () => {
   assert.equal(nameFormat(text('\x00\x00\x00\x18ftypavif')), 'ftyp avif, AVIF');
   assert.equal(nameFormat(text('\x00\x00\x00\x14ftypqt  ')), 'ftyp qt, QuickTime');
   assert.equal(nameFormat(text('<!DOCTYPE html>')), 'HTML');
+  assert.equal(nameFormat(text('<svg xmlns="h')), 'SVG');
+  assert.equal(nameFormat(text('<!DOCTYPE svg PUBLIC')), 'SVG');
   assert.equal(nameFormat(text('%PDF-1.7\n')), 'PDF');
 });
 
