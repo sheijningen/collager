@@ -75,6 +75,19 @@
       <button id="btn-shuffle" class="keep-open">
         <span>&#x1F500; Shuffle</span><kbd class="menu-key">S</kbd>
       </button>
+      <button
+        id="btn-sort-by"
+        data-submenu="sort-menu"
+        aria-expanded="false"
+        aria-controls="sort-menu"
+      >
+        <span>&#x21C5; Sort collage by</span><span class="caret" aria-hidden="true">&#x25BE;</span>
+      </button>
+      <div id="sort-menu" class="submenu" role="group" aria-label="Sort collage by" hidden>
+        <button data-sort="name">Name</button>
+        <button data-sort="path">Path</button>
+        <button data-sort="type">Type</button>
+      </div>
       <div class="dropdown-row keep-open" title="Number of columns (- / +)">
         <span>Columns</span>
         <span id="col-control">

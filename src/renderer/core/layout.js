@@ -110,13 +110,15 @@ export function reorderByHash(list, fromHash, toHash) {
  * order, which is the collage order. */
 export function sortItems(items, mode) {
   const arr = items.slice();
+  // numeric, so IMG_9 comes before IMG_10
+  const compare = (first, second) =>
+    first.localeCompare(second, undefined, { sensitivity: 'base', numeric: true });
+  const byPath = (first, second) => compare(first.path, second.path);
+  // the path breaks every tie, so one input sorts the same whatever order it came in
   const byName = (first, second) =>
-    basename(first.path).localeCompare(basename(second.path), undefined, { sensitivity: 'base' });
+    compare(basename(first.path), basename(second.path)) || byPath(first, second);
   if (mode === 'name') arr.sort(byName);
-  else if (mode === 'path')
-    arr.sort((first, second) =>
-      first.path.localeCompare(second.path, undefined, { sensitivity: 'base' })
-    );
+  else if (mode === 'path') arr.sort(byPath);
   else if (mode === 'type')
     arr.sort((first, second) => first.type.localeCompare(second.type) || byName(first, second));
   return arr;

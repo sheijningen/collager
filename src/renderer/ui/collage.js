@@ -6,6 +6,7 @@ import {
   packItems,
   packClones,
   shuffleItems,
+  sortItems,
   reconcileOrder,
   clampColumns,
   hasOwnDimensions,
@@ -477,6 +478,17 @@ export function shuffle() {
   state.items = shuffleItems(state.items);
   render();
   persist();
+}
+
+/* Reorders the collage by `mode` (see sortItems) and saves the order. */
+export function sortCollage(mode) {
+  state.items = sortItems(state.items, mode);
+  render();
+  persist();
+}
+
+for (const button of document.querySelectorAll('#sort-menu [data-sort]')) {
+  button.addEventListener('click', () => sortCollage(button.dataset.sort));
 }
 
 /* Measure native dimensions by loading metadata only (no layout impact). A

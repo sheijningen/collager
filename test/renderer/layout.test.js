@@ -117,6 +117,21 @@ test('sortItems: by name is case-insensitive and does not mutate input', () => {
   assert.deepEqual(list, original);
 });
 
+test('sortItems: numbers sort by value and equal names fall back to the path', () => {
+  const list = [
+    item({ path: '/b/same.png' }),
+    item({ path: '/x/IMG_10.png' }),
+    item({ path: '/a/same.png' }),
+    item({ path: '/x/IMG_9.png' })
+  ];
+  const byName = sortItems(list, 'name').map((i) => i.path);
+  assert.deepEqual(byName, ['/x/IMG_9.png', '/x/IMG_10.png', '/a/same.png', '/b/same.png']);
+  assert.deepEqual(
+    sortItems(list.slice().reverse(), 'name').map((i) => i.path),
+    byName
+  );
+});
+
 test('sortItems: by path uses the full path', () => {
   const list = [item({ path: '/z/a.png' }), item({ path: '/a/z.png' })];
   assert.deepEqual(
