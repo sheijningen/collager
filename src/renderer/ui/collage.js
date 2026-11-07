@@ -71,6 +71,26 @@ export function setColumns(count) {
   render();
 }
 
+/* ---------------- scrollbar setting ---------------- */
+
+const scrollbarCheckbox = document.getElementById('scroll-hide-scrollbar');
+export let scrollbarHidden = prefs.bool('scrollbarHidden', false);
+
+function applyScrollbarHidden(hidden) {
+  scrollbarHidden = hidden;
+  scrollbarCheckbox.checked = hidden;
+  scroller.classList.toggle('scrollbar-hidden', hidden);
+  prefs.set('scrollbarHidden', hidden);
+}
+
+export function setScrollbarHidden(hidden) {
+  applyScrollbarHidden(hidden);
+  render(); // the gutter goes with the scrollbar, which changes the packing width
+}
+
+scrollbarCheckbox.addEventListener('change', () => setScrollbarHidden(scrollbarCheckbox.checked));
+applyScrollbarHidden(scrollbarHidden); // the startup render in app.js picks the width up
+
 /* ---------------- media hydration (resource limiting) ----------------
  * Tiles are bare divs until they come near the viewport; only then is the
  * <img>/<video> created. Scrolled far away again, the media element is torn

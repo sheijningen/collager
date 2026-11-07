@@ -236,5 +236,33 @@ module.exports = {
       'a short window keeps the settings popup on screen',
       short.height <= 120 && short.onScreen && short.lastRowReachable
     );
+
+    // the gutter a classic scrollbar takes (none for an overlay scrollbar, as
+    // on macOS) goes to the tiles while the scrollbar is hidden
+    const scrollbar = await js(`(() => {
+      const box = document.getElementById('scroll-hide-scrollbar');
+      const scrollbarWidth = () => getComputedStyle(T.scroller).scrollbarWidth;
+      const gutter = () => T.scroller.offsetWidth - T.scroller.clientWidth;
+      const tileWidth = () => T.tiles.values().next().value.getBoundingClientRect().width;
+      const gutterBefore = gutter();
+      const tileBefore = tileWidth();
+      box.checked = true;
+      box.dispatchEvent(new Event('change'));
+      const hidden = T.scrollbarHidden && scrollbarWidth() === 'none' && gutter() === 0;
+      const repacked = gutterBefore === 0 ? tileWidth() === tileBefore : tileWidth() > tileBefore;
+      const saved = localStorage.getItem('collager.scrollbarHidden') === '1';
+      box.checked = false;
+      box.dispatchEvent(new Event('change'));
+      const shown = !T.scrollbarHidden && scrollbarWidth() !== 'none' &&
+        gutter() === gutterBefore && tileWidth() === tileBefore;
+      return { gutterBefore, hidden, repacked, saved, shown };
+    })()`);
+    check(
+      'Hide the scrollbar takes the scrollbar and its gutter away and is saved',
+      scrollbar.hidden && scrollbar.saved,
+      JSON.stringify(scrollbar)
+    );
+    check('the tiles take the width the gutter held', scrollbar.repacked);
+    check('unticking it brings the scrollbar, its gutter and the tile width back', scrollbar.shown);
   }
 };

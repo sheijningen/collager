@@ -62,8 +62,11 @@ docs/                README media
 ## Design decisions
 
 - **Layout**: masonry with a user-chosen column count (1 to 8, default 3). Items are scaled to
-  the column width, aspect ratio preserved, never cropped, placed in the shortest column. An
-  item's dimensions come from loading its metadata off screen. A load that fails gives the
+  the column width, aspect ratio preserved, never cropped, placed in the shortest column. The
+  scroller reserves its scrollbar gutter, so the packing width never depends on whether a
+  scrollbar is showing; hiding the scrollbar (Scroll menu) drops the gutter as well, and the
+  collage re-renders to the wider columns. An item's dimensions come from loading its metadata
+  off screen. A load that fails gives the
   260x140 fallback, which `hasOwnDimensions` in `core/layout.js` tells apart from a real
   measure; one still pending after twenty seconds (`LOAD_TIMEOUT_MS` there) leaves the item
   without dimensions, so it is laid out at the fallback size and measured again at the next start.
@@ -179,8 +182,9 @@ docs/                README media
 - **Async library mutations** (load, add batches, a retry's swap to content that changed under
   its path) run on one promise queue so overlapping drops cannot insert the same hash twice.
 - **Toolbar**: three dropdown menus on the left (Files: add files, add a folder, the panel
-  toggle; Collage: shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings),
-  fullscreen and help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens
+  toggle; Collage: shuffle, columns, clear; Scroll: the auto-scroll toggle, its settings and
+  the scrollbar toggle), fullscreen and help on the right next to the floating toolbar
+  toggle. `ui/dropdown.js` opens
   one menu at a time, not modal; a button in a menu closes it unless it or a row above it is
   marked `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a
   second row rather than overflow, and media queries drop the hint and counters first.
@@ -235,8 +239,9 @@ docs/                README media
   only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
   `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the harness
   waits for library work the previous case left in flight, then resets the app (empty library,
-  nothing open or selected, two columns, collage order, default speed and Scroll settings, the file
-  panel and toolbar shown with the count breakdown closed, not fullscreen, the starting window size,
+  nothing open or selected, two columns, collage order, the scrollbar shown, default speed and
+  Scroll settings, the file panel and toolbar shown with the count breakdown closed, not
+  fullscreen, the starting window size,
   scrolled to the top, the removal question answering yes), so a case loads what it needs
   (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and never
   cleans up. The retry timer is stopped after every page load, so a file a case flags by hand is
