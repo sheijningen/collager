@@ -92,6 +92,11 @@ body.toolbar-collapsed #btn-toolbar-toggle {
   opacity: 0.85;
 }
 
+/* no gutter to clear once the scrollbar is hidden */
+body.toolbar-collapsed:has(#scroller.scrollbar-hidden) #btn-toolbar-toggle {
+  right: 6px;
+}
+
 body.toolbar-collapsed #btn-toolbar-toggle:hover {
   opacity: 1;
   height: 26px;
@@ -543,6 +548,10 @@ div.dropdown-row {
   /* reserve the scrollbar gutter: render() measures clientWidth before the
    * new height can flip scrollbar presence, so the width must not depend on it */
   scrollbar-gutter: stable;
+}
+
+#scroller.scrollbar-hidden {
+  scrollbar-width: none;
 }
 
 #collage {
