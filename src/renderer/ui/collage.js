@@ -17,6 +17,7 @@ import { runWithConcurrency } from '../core/concurrency.js';
 import {
   formatCount,
   describeAddOutcome,
+  describeProbeProgress,
   describeRemoval,
   fileProblem,
   tileLabel,
@@ -384,13 +385,13 @@ export function addPaths(paths) {
   );
 }
 
-// live progress while the main process reads a dropped batch (the slow part
-// for video folders). The job is attached only for the duration of the probe
-// call, so a last progress event that lands after it resolved cannot
-// overwrite the next phase.
+// live progress while the main process expands and reads a dropped batch
+// (the slow part for big or video folders). The job is attached only for the
+// duration of the probe call, so a last progress event that lands after it
+// resolved cannot overwrite the next phase.
 let probeJob = null;
-window.api.onProbeProgress(({ done, total }) => {
-  if (probeJob) probeJob.update(`reading files ${done}/${total}`);
+window.api.onProbeProgress((progress) => {
+  if (probeJob) probeJob.update(describeProbeProgress(progress));
 });
 
 async function probeFilesWithProgress(paths, job) {
@@ -425,7 +426,7 @@ function adoptPath(existing, entry) {
 }
 
 async function addPathsUnderJob(paths, job) {
-  job.update('scanning');
+  job.update(describeProbeProgress({ phase: 'scanning', found: 0 }));
   const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } =
     await probeFilesWithProgress(paths, job);
 

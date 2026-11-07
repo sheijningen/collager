@@ -62,6 +62,15 @@ export function describeAddOutcome({
   return parts.length ? parts.join(' · ') : 'Nothing to add';
 }
 
+/* The job line detail while the main process probes a drop: "scanning, 40
+ * files found" while folders are expanded, "reading files 3/40" once the
+ * total is known. */
+export function describeProbeProgress(progress) {
+  if (progress.phase === 'reading') return `reading files ${progress.done}/${progress.total}`;
+  if (!progress.found) return 'scanning';
+  return `scanning, ${formatCount(progress.found, 'file')} found`;
+}
+
 const MISSING_FILE_HINT = [
   'This file could not be loaded. Likely causes:',
   '• it was moved or renamed',

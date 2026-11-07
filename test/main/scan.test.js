@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { performance } = require('perf_hooks');
 const {
   collectMediaPaths,
   hashFile,
@@ -151,6 +152,16 @@ test('summarizeExtensions: lower-cased, commonest first, ties alphabetical', () 
   assert.deepEqual(summarizeExtensions([]), []);
 });
 
+test('collectMediaPaths reports the media count found so far after every path walked', async (t) => {
+  const dir = tmpTree(t, { 'a.png': 'x', 'b.txt': 'x', sub: { 'c.gif': 'x', 'd.doc': 'x' } });
+  const counts = [];
+  await collectMediaPaths([dir, path.join(dir, 'ghost.png')], (count) => counts.push(count));
+  // four files, two folders and the unreadable ghost
+  assert.equal(counts.length, 7);
+  assert.ok(counts.every((count, index) => index === 0 || count >= counts[index - 1]));
+  assert.equal(counts.at(-1), 2);
+});
+
 test('collectMediaPaths survives symlink cycles without duplicates', async (t) => {
   const dir = tmpTree(t, { sub: { 'pic.png': 'x' } });
   try {
@@ -254,13 +265,62 @@ test('probeFiles: hashes concurrently, keeps discovery order, types entries', as
   assert.equal(probed.unreadableCount, 0);
 });
 
-test('probeFiles: reports progress once per file, ending at total', async (t) => {
-  const dir = tmpTree(t, { 'a.png': 'aa', 'b.png': 'bb', 'c.gif': 'cc' });
-  const calls = [];
-  await probeFiles([dir], 2, (done, total) => calls.push([done, total]));
-  assert.equal(calls.length, 3);
-  assert.deepEqual(calls.map(([d]) => d).sort(), [1, 2, 3]);
-  assert.ok(calls.every(([, t2]) => t2 === 3));
+test('probeFiles: expands every path before reading, so the read total is final', async (t) => {
+  const folder = Object.fromEntries(
+    Array.from({ length: 20 }, (_, index) => [`f${index}.png`, `f${index}`])
+  );
+  const dir = tmpTree(t, { 'top1.png': 'a', big: folder, 'top2.gif': 'b', 'notes.txt': 'x' });
+  const inputs = ['top1.png', 'big', 'top2.gif', 'notes.txt'].map((name) => path.join(dir, name));
+  const events = [];
+  const { entries } = await probeFiles(inputs, 2, (progress) => events.push(progress));
+  assert.equal(entries.length, 22);
+  const firstRead = events.findIndex((progress) => progress.phase === 'reading');
+  assert.deepEqual(events[0], { phase: 'scanning', found: 1 }, 'the first find is reported');
+  assert.ok(
+    events.slice(0, firstRead).every((progress) => progress.phase === 'scanning'),
+    'scanning ends before reading starts'
+  );
+  const reads = events.slice(firstRead);
+  assert.ok(reads.every((progress) => progress.phase === 'reading' && progress.total === 22));
+  assert.deepEqual(reads[0], { phase: 'reading', done: 0, total: 22 }, 'the total shows at once');
+  assert.deepEqual(reads.at(-1), { phase: 'reading', done: 22, total: 22 });
+});
+
+test('probeFiles: files that are not media keep the scan count fresh', async (t) => {
+  const tail = Object.fromEntries(
+    Array.from({ length: 500 }, (_, index) => [`raw${index}.cr2`, 'x'])
+  );
+  const dir = tmpTree(t, { photos: { 'a.png': 'a', 'b.png': 'b', 'c.png': 'c' }, raw: tail });
+  // every reading of the clock moves it 1 ms on, so the tail alone crosses
+  // the throttle window several times
+  let clock = 0;
+  t.mock.method(performance, 'now', () => clock++);
+  const events = [];
+  await probeFiles([path.join(dir, 'photos'), path.join(dir, 'raw')], 4, (progress) =>
+    events.push(progress)
+  );
+  const scans = events.filter((progress) => progress.phase === 'scanning');
+  assert.ok(scans.length > 2, `${scans.length} scanning events`);
+  assert.deepEqual(scans.at(-1), { phase: 'scanning', found: 3 });
+});
+
+test('probeFiles: a drop with no media reports no read', async (t) => {
+  const dir = tmpTree(t, { 'notes.txt': 'x', empty: {} });
+  const events = [];
+  await probeFiles([dir], 4, (progress) => events.push(progress));
+  assert.ok(events.every((progress) => progress.phase === 'scanning'));
+});
+
+test('probeFiles: throttles progress for a big drop', async (t) => {
+  const folder = Object.fromEntries(
+    Array.from({ length: 300 }, (_, index) => [`f${index}.png`, `f${index}`])
+  );
+  const dir = tmpTree(t, { big: folder });
+  const events = [];
+  await probeFiles([dir], 4, (progress) => events.push(progress));
+  // at most one event per 100 ms, plus each phase's first and the last
+  assert.ok(events.length < 50, `${events.length} events for 300 files`);
+  assert.deepEqual(events.at(-1), { phase: 'reading', done: 300, total: 300 });
 });
 
 test('probeFiles: unreadable file counts as unreadable, not a rejection', async (t) => {

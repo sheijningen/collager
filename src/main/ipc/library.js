@@ -7,8 +7,8 @@ const { loadAndRepairLibrary } = require('../lib/library');
  * library file again, loading and saving the persisted collection. */
 function registerLibraryIpc(library) {
   ipcMain.handle('probe-files', async (event, inputPaths) => {
-    const probed = await probeFiles(inputPaths, 4, (done, total) => {
-      if (!event.sender.isDestroyed()) event.sender.send('probe-progress', { done, total });
+    const probed = await probeFiles(inputPaths, 4, (progress) => {
+      if (!event.sender.isDestroyed()) event.sender.send('probe-progress', progress);
     });
     for (const entry of probed.entries) entry.url = pathToFileURL(entry.path).href;
     return probed;
