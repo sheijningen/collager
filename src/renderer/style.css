@@ -272,6 +272,19 @@ body.toolbar-collapsed #btn-toolbar-toggle:hover {
   color: var(--fg-dim);
 }
 
+.dropdown button .caret {
+  margin-left: auto;
+  padding-left: 18px;
+}
+
+/* a group an entry unfolds, indented under it */
+.submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 16px;
+}
+
 .dropdown-row {
   display: flex;
   align-items: center;

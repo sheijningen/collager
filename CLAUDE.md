@@ -95,7 +95,8 @@ docs/                README media
   distance once it reaches it, so the frame after the wrap matches the one before. With Shuffle
   on restart the next order is shuffled when the region is built, kept across renders (items
   that go drop out, new ones join at the end, nothing reshuffles) and becomes the collage order
-  (saved) at the wrap. At the wrap the clones' loaded media move into the real tiles, so nothing
+  (saved) at the wrap; a sort or shuffle picked while that loop runs holds only until the wrap
+  replaces it. At the wrap the clones' loaded media move into the real tiles, so nothing
   reloads on screen. Clones share the tile builder and the click, double-click and menu
   handlers, live in their own `cloneTiles` index, and are never drag sources or targets,
   scroll-to-item targets or entries in `lastPositions`. The region exists only while
@@ -183,12 +184,13 @@ docs/                README media
 - **Async library mutations** (load, add batches, a retry's swap to content that changed under
   its path) run on one promise queue so overlapping drops cannot insert the same hash twice.
 - **Toolbar**: three dropdown menus on the left (Files: add files, add a folder, the panel
-  toggle; Collage: shuffle, columns, clear; Scroll: the auto-scroll toggle, its settings and
-  the scrollbar toggle), fullscreen and help on the right next to the floating toolbar
-  toggle. `ui/dropdown.js` opens
-  one menu at a time, not modal; a button in a menu closes it unless it or a row above it is
-  marked `keep-open` (shuffle, the column stepper, the settings rows). The bar wraps onto a
-  second row rather than overflow, and media queries drop the hint and counters first.
+  toggle; Collage: shuffle, sort by name, path or type, columns, clear; Scroll: the
+  auto-scroll toggle, its settings and the scrollbar toggle), fullscreen and help on the right
+  next to the floating toolbar toggle. `ui/dropdown.js` opens one menu at a time, not modal; a
+  button in a menu closes it unless it or a row above it is marked `keep-open` (shuffle, the
+  column stepper, the settings rows). A button marked `data-submenu` unfolds the group it names
+  inside the menu (the sort orders), folded again each time the menu opens. The bar wraps onto
+  a second row rather than overflow, and media queries drop the hint and counters first.
 - **Escape order**: toolbar dropdown, context menu, lightbox, help/about overlays, selection,
   fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
   layer.

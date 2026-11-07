@@ -25,16 +25,42 @@ export function openDropdownId() {
   return openTrigger ? openTrigger.dataset.menu : null;
 }
 
+/* Hangs `trigger`'s popup off the button's bottom-left corner, kept on screen
+ * (a very short window gets a scrolling popup). */
+function placePopup(trigger) {
+  const anchor = trigger.getBoundingClientRect();
+  showPopupAt(popups.get(trigger), anchor.left, anchor.bottom + DROPDOWN_GAP);
+}
+
+function setSubmenuOpen(trigger, open) {
+  document.getElementById(trigger.dataset.submenu).hidden = !open;
+  trigger.setAttribute('aria-expanded', String(open));
+  trigger.querySelector('.caret').textContent = open ? '▴' : '▾';
+}
+
+// a button marked data-submenu unfolds the group it names and keeps the popup
+// open; the taller popup may have to move up to stay on screen
+for (const [trigger, popup] of popups) {
+  for (const submenuTrigger of popup.querySelectorAll('[data-submenu]')) {
+    submenuTrigger.addEventListener('click', () => {
+      const submenu = document.getElementById(submenuTrigger.dataset.submenu);
+      setSubmenuOpen(submenuTrigger, submenu.hidden);
+      placePopup(trigger);
+    });
+  }
+}
+
 function openDropdown(trigger) {
   closeDropdown();
   const popup = popups.get(trigger);
+  // every group starts folded, so the menu comes up the same every time
+  for (const submenuTrigger of popup.querySelectorAll('[data-submenu]')) {
+    setSubmenuOpen(submenuTrigger, false);
+  }
   openTrigger = trigger;
   trigger.classList.add('open');
   trigger.setAttribute('aria-expanded', 'true');
-  // the popup hangs off the button's bottom-left corner (a very short window
-  // gets a scrolling popup)
-  const anchor = trigger.getBoundingClientRect();
-  showPopupAt(popup, anchor.left, anchor.bottom + DROPDOWN_GAP);
+  placePopup(trigger);
   // the popup itself takes focus: a focused button would take Space and Enter
   // from the shortcuts
   popup.focus();
@@ -67,14 +93,17 @@ for (const [trigger, popup] of popups) {
   // choosing an action closes the menu; capture phase so the menu is gone
   // before the action's handler opens a confirm dialog. Controls marked
   // keep-open (shuffle, the column stepper, the settings rows) leave it open,
-  // so their effect on the collage can be watched and the click repeated.
-  // A click without a detail count was keyboard activation (Enter or Space
-  // on the focused item), and only then does focus belong back on the button.
+  // so their effect on the collage can be watched and the click repeated, as
+  // do the buttons that unfold a group. A click without a detail count was
+  // keyboard activation (Enter or Space on the focused item), and only then
+  // does focus belong back on the button.
   popup.addEventListener(
     'click',
     (event) => {
       const button = event.target.closest('button');
-      if (button && !button.closest('.keep-open')) closeDropdown({ keepFocus: event.detail === 0 });
+      if (!button) return;
+      const keepsOpen = button.closest('.keep-open') || button.hasAttribute('data-submenu');
+      if (!keepsOpen) closeDropdown({ keepFocus: event.detail === 0 });
     },
     true
   );

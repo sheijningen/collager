@@ -47,12 +47,12 @@ folder checks the installers against it (`shasum -a 256 -c SHA256SUMS` on macOS)
 - **File panel**: **Files ▾** also toggles a sidebar listing every file,
   sortable in different ways. Clicking an entry scrolls to it.
 - **Collage menu**: **Collage ▾** holds **Shuffle**, which re-shuffles and
-  re-packs the collage, the **Columns** stepper (1 to 8), and **Clear all**,
-  which removes every item after confirmation.
+  re-packs the collage, **Sort collage by** name, path or type, the **Columns** stepper
+  (1 to 8), and **Clear all**, which removes every item after confirmation.
 - **Auto-scroll**: **Scroll ▾** holds **Start auto-scroll**, which scrolls the
   collage continuously, and its settings: the speed slider,
-  **Restart at the end** to carry on seamlessly from the top, **Shuffle on restart**, and
-  **Keep the display awake** while it runs.
+  **Restart at the end** to carry on seamlessly from the top, **Shuffle on restart**,
+  **Keep the display awake** while it runs, and **Hide the scrollbar**.
 - **Fullscreen**: the ⛶ button at the right of the toolbar, or F11 (Ctrl+Cmd+F
   on macOS).
 - **Toolbar**: the chevron in the top-right corner hides and shows the toolbar.
