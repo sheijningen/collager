@@ -17,8 +17,14 @@ import {
 import { state, selected, showToast, runOrToast } from './state.js';
 import { SCROLL_SPEED_STEP } from '../core/autoscroll.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
-import { columns, setColumns, shuffle } from './collage.js';
-import { panelOpen, setPanelOpen, applySelection, removeSelected } from './panel.js';
+import { columns, setColumns, shuffle, addPickedFiles, addPickedFolder } from './collage.js';
+import {
+  panelOpen,
+  setPanelOpen,
+  applySelection,
+  removeSelected,
+  releaseSortSelect
+} from './panel.js';
 import { ctxMenu, closeCtxMenu } from './ctxmenu.js';
 import { toolbarOpen, setToolbarOpen } from './toolbar.js';
 import { openDropdownId, closeDropdown } from './dropdown.js';
@@ -162,7 +168,8 @@ window.addEventListener('keydown', (event) => {
     handleEscape();
     return;
   }
-  if (targetConsumesKey(event.target, event.key)) return;
+  const released = releaseSortSelect(event.target);
+  if (!released && targetConsumesKey(event.target, event.key)) return;
   const key = normalizeShortcutKey(event.key);
 
   // overlays are modal: their toggles close them, all else is inert
@@ -211,12 +218,15 @@ window.addEventListener('keydown', (event) => {
     case 's':
       if (!event.repeat && state.items.length) shuffle();
       break;
-    case 'a': {
+    case 'a':
+      if (event.repeat) break;
+      // closed without focus going back to its button, which would take the
+      // next Space
+      closeDropdown({ keepFocus: false });
       // the modifier, not the letter's case, so caps lock cannot swap the two
-      const button = event.shiftKey ? 'btn-add-folder' : 'btn-add';
-      if (!event.repeat) document.getElementById(button).click();
+      if (event.shiftKey) addPickedFolder();
+      else addPickedFiles();
       break;
-    }
     case 'p':
       if (!event.repeat) setPanelOpen(!panelOpen);
       break;

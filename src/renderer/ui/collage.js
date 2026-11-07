@@ -380,21 +380,25 @@ function createTile(item) {
 
 /* ---------------- toolbar buttons ---------------- */
 
-document.getElementById('btn-add').addEventListener('click', async () => {
+export async function addPickedFiles() {
   const paths = await runOrToast(() => window.api.pickFiles(), 'Could not open the file dialog');
   if (paths) addPaths(paths);
-});
-document.getElementById('btn-add-folder').addEventListener('click', async () => {
+}
+
+export async function addPickedFolder() {
   const paths = await runOrToast(
     () => window.api.pickFolders(),
     'Could not open the folder dialog'
   );
   if (paths) addPaths(paths);
-});
+}
+
+document.getElementById('btn-add').addEventListener('click', () => addPickedFiles());
+document.getElementById('btn-add-folder').addEventListener('click', () => addPickedFolder());
 document.getElementById('btn-empty-add').addEventListener('click', (event) => {
   // a focused button would claim Space and Enter from the shortcuts
   if (event.detail) event.currentTarget.blur();
-  document.getElementById('btn-add').click();
+  addPickedFiles();
 });
 document.getElementById('btn-shuffle').addEventListener('click', () => shuffle());
 document.getElementById('btn-col-minus').addEventListener('click', () => setColumns(columns - 1));

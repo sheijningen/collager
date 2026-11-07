@@ -307,8 +307,13 @@ module.exports = {
     );
 
     // a collage not much taller than the window keeps clones within the
-    // hydration margin through the wrap, and they must load again after it
+    // hydration margin through the wrap, and they must load again after it.
+    // Shuffle is off so the order, and with it the packed height, survives the
+    // wrap: a shuffled order can pack shorter than the window and get no clones
     const nearlyFits = await js(`(() => {
+      const box = document.getElementById('scroll-shuffle');
+      box.checked = false;
+      box.dispatchEvent(new Event('change'));
       T.setAutoScroll(true);
       const fitsMargin = () =>
         T.wrapHeight > 0 && T.wrapHeight < T.scroller.clientHeight + T.HYDRATE_MARGIN;
@@ -333,8 +338,14 @@ module.exports = {
     await js('T.setAutoScroll(false)');
     check('clones still in range after a wrap load their media again', wrappedAgain && reloaded);
 
+    // the stop above may have left clones lingering on screen; they go on the
+    // scroll event, after which the viewport is clear of them
+    await js('T.scroller.scrollTop = 0');
+    check(
+      'the lingering clones of the stop are gone before restart is turned off',
+      await waitFor(() => js('T.cloneTiles.size === 0 && T.wrapHeight === 0'))
+    );
     const restartOff = await js(`(() => {
-      T.scroller.scrollTop = 0;
       T.setAutoScroll(true);
       const had = T.cloneTiles.size > 0;
       const loop = document.getElementById('scroll-loop');

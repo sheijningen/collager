@@ -201,5 +201,26 @@ sortSelect.addEventListener('change', () => {
   prefs.set('sort', sortMode);
   renderList();
 });
+
+/* A select a pointer focused keeps focus once its popup closes and would then
+ * take every key as type-ahead; the first key after a pointer pick goes to
+ * the shortcuts instead. Keyboard focus never comes through pointerdown and
+ * keeps its keys. */
+let sortPickedByPointer = false;
+sortSelect.addEventListener('pointerdown', () => {
+  sortPickedByPointer = true;
+});
+sortSelect.addEventListener('blur', () => {
+  sortPickedByPointer = false;
+});
+
+/* Blurs the sort select when a pointer focused it, so `target` no longer
+ * consumes a key; returns whether it did. */
+export function releaseSortSelect(target) {
+  if (target !== sortSelect || !sortPickedByPointer) return false;
+  sortPickedByPointer = false;
+  sortSelect.blur();
+  return true;
+}
 applyPanelOpen(panelOpen);
 document.getElementById('panel-hint').textContent = selectionHint(window.api.platform);

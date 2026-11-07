@@ -25,11 +25,13 @@ src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll s
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job
                      progress, popup.js places the context menu and the toolbar dropdowns
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
-test/main, test/renderer   unit tests mirroring src/main/lib, build/afterpack.js and
-                     src/renderer/core; test/main/helpers.js holds what the main tests share
+test/main, test/renderer, test/scripts   unit tests mirroring src/main/lib, build/afterpack.js,
+                     src/renderer/core and scripts/; test/main/helpers.js holds what the main
+                     tests share
 test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js,
                      second-instance.js (a second launch against the harness profile)
 build/               icon (SVG source, PNG export for electron-builder), the afterPack hook
+scripts/             the Electron launcher behind pnpm start and pnpm test:e2e
 docs/                README media
 ```
 
@@ -108,7 +110,8 @@ docs/                README media
 - **Audio**: videos are muted in the collage; the lightbox's native controls are the only place
   to unmute.
 - **Persistence**: `library.json` in `userData` is an array of items, saves serialized and atomic
-  (temp file, synced, then renamed into place). The renderer refuses to save until the saved
+  (temp file, synced, then renamed into place). A quit, and the GPU fallback's relaunch, wait for
+  the queued saves first, five seconds at most. The renderer refuses to save until the saved
   library has been loaded into its state, so nothing done during startup or after a failed load can
   overwrite the file with an empty list. An unreadable file is moved to `library.json.corrupt` (a
   timestamped name when that exists, so no backup is ever overwritten) and the app starts empty.
@@ -244,11 +247,13 @@ docs/                README media
   `COLLAGER_E2E=1`; main then loads the page with `?e2e` and `app.js` exposes every module export on
   `window.collagerTest`, which the snippets reach as `T`; every snippet also gets `press(key)`,
   which fires a keydown on the window.
-- Run the e2e suite locally as `env -u ELECTRON_RUN_AS_NODE pnpm test:e2e`, straight on the
-  desktop: the app window opens and closes on the current display during the run, which is
-  fine. `ELECTRON_RUN_AS_NODE` must be unset because VS Code terminals export it, which makes
-  `require('electron')` return a path. `xvfb-run -a` is only for headless machines and CI, and
-  is not installed on development machines.
+- Run the e2e suite locally as `pnpm test:e2e`, straight on the desktop: the app window opens
+  and closes on the current display during the run, which is fine. `pnpm start` and
+  `pnpm test:e2e` go through `scripts/electron.js`, which drops `ELECTRON_RUN_AS_NODE` (VS Code
+  terminals export it, and with it the Electron binary runs as plain Node) and the GTK paths the
+  VS Code snap exports (with them Chromium's GTK integration fails and the window comes up
+  without a title bar). `xvfb-run -a` is only for headless machines and CI, and is not installed
+  on development machines.
 - CI runs the suite on an Ubuntu runner under `xvfb-run` and on Windows and macOS (Apple
   silicon) runners, where the app opens on the runner's desktop session and ffmpeg comes from
   Chocolatey and Homebrew. The Linux job makes Chromium's setuid sandbox helper root-owned

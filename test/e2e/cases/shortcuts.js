@@ -1,7 +1,50 @@
 /* Keyboard shortcuts and the toolbar controls they mirror. */
+const { dialog } = require('electron');
+
 module.exports = {
   name: 'shortcuts',
-  async run({ js, check }) {
+  async run({ js, check, waitFor }) {
+    // the file dialog answers cancelled, so the shortcut runs to its end
+    const showOpenDialog = dialog.showOpenDialog;
+    let asked = false;
+    dialog.showOpenDialog = async () => {
+      asked = true;
+      return { canceled: true, filePaths: [] };
+    };
+    let menu;
+    try {
+      menu = await js(`(() => {
+        const button = document.getElementById('btn-files-menu');
+        button.click();
+        const open = T.openDropdownId() === 'files-menu';
+        press('a');
+        return { open, closed: T.openDropdownId() === null, focusFree: document.activeElement !== button };
+      })()`);
+      check('A asks for the file picker', await waitFor(() => asked));
+    } finally {
+      dialog.showOpenDialog = showOpenDialog;
+    }
+    check('A with the Files menu open closes it', menu.open && menu.closed);
+    check('and leaves its button unfocused, so Space stays with auto-scroll', menu.focusFree);
+
+    const sorted = await js(`(() => {
+      const pressOn = (el, key) =>
+        el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      const select = T.sortSelect;
+      select.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      select.focus();
+      pressOn(select, ' ');
+      const released = document.activeElement !== select && T.autoScroll;
+      T.setAutoScroll(false);
+      select.focus();
+      pressOn(select, ' ');
+      const kept = document.activeElement === select && !T.autoScroll;
+      select.blur();
+      return { released, kept };
+    })()`);
+    check('a key after a pointer pick in the sort select goes to the shortcuts', sorted.released);
+    check('a sort select focused by keyboard keeps its keys', sorted.kept);
+
     const speed = await js(`(() => {
       T.setScrollSpeed(80);
       press('.');

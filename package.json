@@ -18,9 +18,9 @@
   },
   "packageManager": "pnpm@10.15.1",
   "scripts": {
-    "start": "electron .",
-    "test": "node --test \"test/main/*.test.js\" \"test/renderer/*.test.js\"",
-    "test:e2e": "electron test/e2e/run.js",
+    "start": "node scripts/electron.js .",
+    "test": "node --test \"test/main/*.test.js\" \"test/renderer/*.test.js\" \"test/scripts/*.test.js\"",
+    "test:e2e": "node scripts/electron.js test/e2e/run.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
