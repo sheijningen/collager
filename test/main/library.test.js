@@ -55,11 +55,14 @@ test('save/load round-trip persists only the durable fields', async (t) => {
       { hash: 'h2', missing: true }
     ]
   );
+  assert.equal(items[0].loadError, undefined);
+  assert.match(items[1].loadError, /^ENOENT: no such file or directory/, 'the stat error is kept');
   assert.deepEqual([...sizeOnDisk], [[items[0], 1]], 'only the present file is measured');
   assert.ok(items[0].url.startsWith('file://'), 'url is recomputed from path');
   const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
   assert.equal(onDisk[0].url, undefined, 'volatile fields are not persisted');
   assert.equal(onDisk[0].missing, undefined);
+  assert.equal(onDisk[1].loadError, undefined);
   assert.deepEqual(
     onDisk.map((e) => e.size),
     [1, 900],

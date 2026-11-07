@@ -81,11 +81,30 @@ const UNSHOWABLE_FILE_HINT = [
 ].join('\n');
 
 /* The tooltip of a tile or list entry whose file has the given problem, or
- * an empty string when there is none. */
-export function hintForFileProblem(problem) {
-  if (problem === 'missing') return MISSING_FILE_HINT;
-  if (problem === 'unshowable') return UNSHOWABLE_FILE_HINT;
-  return '';
+ * an empty string when there is none. The likely causes come first, and
+ * `loadError` (see describeLoadError) closes the hint, so the exact reason
+ * is there for whoever wants it. */
+export function hintForFileProblem(problem, loadError = '') {
+  let hint = '';
+  if (problem === 'missing') hint = MISSING_FILE_HINT;
+  if (problem === 'unshowable') hint = UNSHOWABLE_FILE_HINT;
+  if (!hint || !loadError) return hint;
+  return `${hint}\n\nDetails:\n${loadError}`;
+}
+
+/* What the player said when a video failed, as it said it: Chromium's
+ * message names the stage that failed (a demuxer or decoder error), and a
+ * player that gives none leaves the numeric code. */
+export function describePlayerError({ code, message }) {
+  if (message) return message;
+  return `media error code ${code}`;
+}
+
+/* The lines that tell the user exactly what went wrong: what the player said
+ * (videos only) and what the operating system found on the file, each as
+ * reported. */
+export function describeLoadError({ player = '', file = '' }) {
+  return [player, file].filter(Boolean).join('\n');
 }
 
 /* The badge on a file panel entry. */

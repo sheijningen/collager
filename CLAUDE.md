@@ -86,8 +86,9 @@ docs/                README media
   When the move fails, or the file is there but cannot be read at all (permissions, a directory in
   its place), the file stays in place and saving is refused so it is not overwritten. There is no
   schema version: a file the current code cannot read counts as unreadable. Only path, hash, size,
-  type and dimensions are stored per item; URL and missing flag are derived at load, the unshowable
-  flag while the app runs, and an entry without a hash or a media type makes the file unreadable; a
+  type and dimensions are stored per item; URL, missing flag and the load error of a missing entry
+  are derived at load, the unshowable flag and the load error of a failed load while the app
+  runs, and an entry without a hash or a media type makes the file unreadable; a
   save carrying such an entry is refused so that file is never written. A size is optional on read,
   so an entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
@@ -114,6 +115,13 @@ docs/                README media
   gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and gets an amber
   dashed tile with its own hint until a retry decodes it. It is not counted as missing, and its menu
   keeps every action that does not need to show it.
+- **Load error in the hint**: the hint of a missing or unshowable item ends with what was
+  found, as reported. A video contributes the player's message (`MediaError.message`; an
+  image says nothing). The main process contributes its report on the file: the stat or read
+  error with its path, or the size and the first bytes with the format they announce when the
+  file reads fine, since then the content itself is the problem (a HEIF file named .jpg, a
+  saved error page). The report is only ever made for a path with a media extension.
+  `lib/inspect.js` writes the report, `describeLoadError` in `core/text.js` joins the lines.
 - **File panel** always starts closed; its open state is not remembered across restarts.
   A counter above the list gives the item total and expands on click into the split by
   file extension, biggest group first.
@@ -147,7 +155,7 @@ docs/                README media
   fullscreen. One keydown handler in `shortcuts.js` walks that ladder and closes exactly one
   layer.
 - **File panel list**: rebuilt only when what it shows changes (sort mode, and each entry's
-  hash, path, type and file problem in order); other renders leave its DOM alone.
+  hash, path, type, file problem and load error in order); other renders leave its DOM alone.
 - **Progress**: long-running work (preparing the library, adding a batch) reports through
   `startJob` in `status.js`, one line per job in the status area stacked above the toast at the
   bottom centre. Toasts carry one-off messages; a sticky toast is reserved for a warning about

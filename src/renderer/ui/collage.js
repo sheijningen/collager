@@ -21,6 +21,8 @@ import {
   fileProblem,
   tileLabel,
   hintForFileProblem,
+  describePlayerError,
+  describeLoadError,
   clearMissingLabel
 } from '../core/text.js';
 import {
@@ -93,8 +95,10 @@ function hydrate(tile) {
   if (media.tagName === 'IMG') media.decoding = 'async';
   media.draggable = false;
   media.addEventListener('error', () => {
+    // a video says why it failed, an image does not
+    const playerError = media.error ? describePlayerError(media.error) : '';
     dehydrate(tile);
-    recordLoadFailure(item);
+    recordLoadFailure(item, playerError);
   });
   tile.appendChild(media);
   tile.dataset.hydrated = '1';
@@ -104,24 +108,26 @@ function hydrate(tile) {
  * (deleted, drive unplugged) or present in a shape Chromium cannot decode.
  * Only the main process can tell, and the two get different tiles, hints and
  * menus: re-adding repairs a missing entry, while an unshowable one comes
- * back only when a retry decodes it. The render rebuilds the tile, the panel
+ * back only when a retry decodes it. What the main process found, and what
+ * the player said, go into the hint. The render rebuilds the tile, the panel
  * entry and the missing count. */
-async function recordLoadFailure(item) {
+async function recordLoadFailure(item, playerError) {
   const failedPath = item.path;
-  let present;
+  let report;
   try {
-    present = await window.api.mediaFileExists(failedPath);
+    report = await window.api.inspectMediaFile(failedPath);
   } catch {
     // without an answer the file is not declared missing, since that tile
     // offers to clear an entry whose file may well be on disk; unshowable
     // keeps every action that does not decode it and is never saved
-    present = true;
+    report = { present: true, detail: '' };
   }
   // removed, repaired or already judged while the question was out
   if (itemsByHash.get(item.hash) !== item) return;
   if (item.path !== failedPath || fileProblem(item)) return;
-  if (present) item.unshowable = true;
+  if (report.present) item.unshowable = true;
   else item.missing = true;
+  item.loadError = describeLoadError({ player: playerError, file: report.detail });
   discardTile(item.hash);
   render();
 }
@@ -212,7 +218,7 @@ function createTile(item) {
   label.className = 'placeholder-label';
   label.textContent = tileLabel(item, basename(item.path));
   tile.appendChild(label);
-  if (problem) tile.title = hintForFileProblem(problem);
+  if (problem) tile.title = hintForFileProblem(problem, item.loadError);
 
   const remove = document.createElement('button');
   remove.className = 'btn-remove';
@@ -414,6 +420,7 @@ function adoptPath(existing, entry) {
   existing.size = entry.size;
   existing.missing = false;
   existing.unshowable = false;
+  delete existing.loadError;
   discardTile(existing.hash); // the next render builds a tile that loads the file
 }
 

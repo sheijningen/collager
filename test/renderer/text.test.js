@@ -93,6 +93,8 @@ test('tileLabel prefixes the name with the problem', () => {
 
 const {
   hintForFileProblem,
+  describePlayerError,
+  describeLoadError,
   badgeLabel,
   clearMissingLabel,
   describeLibraryProblem,
@@ -103,6 +105,32 @@ test('hintForFileProblem explains each problem and is silent without one', () =>
   assert.match(hintForFileProblem('missing'), /moved or renamed/);
   assert.match(hintForFileProblem('unshowable'), /cannot show it/);
   assert.equal(hintForFileProblem(null), '');
+  assert.equal(hintForFileProblem(null, 'ENOENT: gone'), '');
+});
+
+test('hintForFileProblem closes with the load error when there is one', () => {
+  const hint = hintForFileProblem('missing', "ENOENT: no such file or directory, stat '/a.png'");
+  assert.ok(hint.startsWith(hintForFileProblem('missing')));
+  assert.ok(hint.endsWith("\n\nDetails:\nENOENT: no such file or directory, stat '/a.png'"));
+  assert.equal(hintForFileProblem('unshowable', ''), hintForFileProblem('unshowable'));
+});
+
+test('describePlayerError keeps the message and falls back to the code', () => {
+  assert.equal(
+    describePlayerError({ code: 4, message: 'MEDIA_ELEMENT_ERROR: Format error' }),
+    'MEDIA_ELEMENT_ERROR: Format error'
+  );
+  assert.equal(describePlayerError({ code: 3, message: '' }), 'media error code 3');
+});
+
+test('describeLoadError lists what the player said and what the file holds', () => {
+  assert.equal(
+    describeLoadError({ player: 'PIPELINE_ERROR_DECODE', file: '12 bytes, starts with 00 (x)' }),
+    'PIPELINE_ERROR_DECODE\n12 bytes, starts with 00 (x)'
+  );
+  assert.equal(describeLoadError({ file: 'empty file' }), 'empty file');
+  assert.equal(describeLoadError({ player: 'x', file: '' }), 'x');
+  assert.equal(describeLoadError({}), '');
 });
 
 test('badgeLabel names the three media types', () => {

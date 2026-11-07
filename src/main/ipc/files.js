@@ -1,6 +1,7 @@
 const { ipcMain, BrowserWindow, dialog, shell } = require('electron');
 const { MEDIA_EXTS } = require('../lib/scan');
 const { isMediaFile, existingMediaFolder } = require('../lib/mediapath');
+const { inspectMediaFile } = require('../lib/inspect');
 
 /* Shows the file selected in the file manager. A missing library entry has
  * no file to select, so its folder is opened instead, which still tells the
@@ -46,8 +47,10 @@ function registerFilesIpc() {
 
   ipcMain.handle('reveal-file', (_event, filePath) => revealFile(filePath));
 
-  // lets the renderer tell a file that is gone from one it cannot decode
-  ipcMain.handle('media-file-exists', (_event, filePath) => isMediaFile(filePath));
+  // tells the renderer whether a file that failed to load is gone or there
+  // but unreadable or undecodable, with what the OS found for the user to
+  // read; a path without a media extension is not looked at
+  ipcMain.handle('inspect-media-file', (_event, filePath) => inspectMediaFile(filePath));
 
   /* Opens a media file in whatever the desktop associates with its type.
    * Resolves to an empty string on success, otherwise the reason. */
