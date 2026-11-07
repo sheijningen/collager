@@ -19,7 +19,16 @@ import {
   selectionHint
 } from '../core/text.js';
 import { isRemoveKey } from '../core/keys.js';
-import { state, selected, tiles, lastPositions, scroller, prefs, showToast } from './state.js';
+import {
+  state,
+  selected,
+  tiles,
+  cloneTiles,
+  lastPositions,
+  scroller,
+  prefs,
+  showToast
+} from './state.js';
 import { render, removeItems, askRemoval } from './collage.js';
 import { openCtxMenu, closeCtxMenu, ctxAnchoredTo } from './ctxmenu.js';
 import { autoScroll, setAutoScrollPosition } from './autoscroll.js';
@@ -140,6 +149,7 @@ export function handleSelectClick(hash, event, source) {
 
 export function applySelection() {
   for (const [hash, tile] of tiles) tile.classList.toggle('selected', selected.has(hash));
+  for (const [hash, tile] of cloneTiles) tile.classList.toggle('selected', selected.has(hash));
   for (const [hash, li] of listEntries) li.classList.toggle('selected', selected.has(hash));
   updateRemoveSelectedBtn();
 }

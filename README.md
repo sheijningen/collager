@@ -51,7 +51,7 @@ folder checks the installers against it (`shasum -a 256 -c SHA256SUMS` on macOS)
   which removes every item after confirmation.
 - **Auto-scroll**: **Scroll ▾** holds **Start auto-scroll**, which scrolls the
   collage continuously, and its settings: the speed slider,
-  **Restart at the end** to jump back to the top, **Shuffle on restart**, and
+  **Restart at the end** to carry on seamlessly from the top, **Shuffle on restart**, and
   **Keep the display awake** while it runs.
 - **Fullscreen**: the ⛶ button at the right of the toolbar, or F11 (Ctrl+Cmd+F
   on macOS).

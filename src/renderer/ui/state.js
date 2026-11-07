@@ -21,6 +21,8 @@ export const selected = new Set();
 export const itemsByHash = new Map();
 /** hash -> tile element */
 export const tiles = new Map();
+/** hash -> clone tile element in the wrap region below the collage */
+export const cloneTiles = new Map();
 /** hash -> packed position {x, y, w, h} from the last render */
 export const lastPositions = new Map();
 

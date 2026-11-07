@@ -17,8 +17,9 @@ export function clampColumns(count) {
 
 /* Masonry: a fixed number of equal-width columns. Every item is scaled to
  * the column width with its aspect ratio preserved and dropped into the
- * currently shortest column, so column heights stay balanced. */
-export function packItems(list, containerWidth, columns) {
+ * currently shortest column, so column heights stay balanced. Packing stops
+ * early once every column reaches `stopHeight`. */
+export function packItems(list, containerWidth, columns, stopHeight = Infinity) {
   const colWidth = Math.floor((containerWidth - GAP * (columns - 1)) / columns);
   const colHeights = new Array(columns).fill(0);
   const positions = [];
@@ -32,6 +33,7 @@ export function packItems(list, containerWidth, columns) {
     for (let candidate = 1; candidate < columns; candidate++) {
       if (colHeights[candidate] < colHeights[col]) col = candidate;
     }
+    if (colHeights[col] >= stopHeight) break;
     positions.push({
       item,
       x: col * (colWidth + GAP),
@@ -42,6 +44,45 @@ export function packItems(list, containerWidth, columns) {
     colHeights[col] += tileHeight + GAP;
   }
   return { positions, height: Math.max(0, Math.max(0, ...colHeights) - GAP) };
+}
+
+/* The wrap region below a collage `height` tall: `list` packed from a level
+ * line one GAP below it, as packItems packs it from the top, until every
+ * column reaches `minHeight` below that line. Each clone sits exactly
+ * `wrapHeight` below the position packItems gives its item, so scrolling by
+ * that distance shows the same picture. A single pass at most: repeating
+ * items would show tiles the top of the collage does not have. */
+export function packClones(list, containerWidth, columns, height, minHeight) {
+  const wrapHeight = height + GAP;
+  const packed = packItems(list, containerWidth, columns, minHeight);
+  return {
+    positions: packed.positions.map((pos) => ({ ...pos, y: pos.y + wrapHeight, clone: true })),
+    wrapHeight,
+    height: packed.height
+  };
+}
+
+/* A copy of `list` in random order (Fisher-Yates). */
+export function shuffleItems(list, random = Math.random) {
+  const arr = list.slice();
+  for (let last = arr.length - 1; last > 0; last--) {
+    const pick = Math.floor(random() * (last + 1));
+    [arr[last], arr[pick]] = [arr[pick], arr[last]];
+  }
+  return arr;
+}
+
+/* `order` brought up to date with `items`: the item objects of `order` still
+ * in `items` keep their places, the others go, and the items `order` lacks
+ * follow at the end in their order in `items`. Returns a new array. */
+export function reconcileOrder(order, items) {
+  const present = new Set(items);
+  const kept = order.filter((item) => present.has(item));
+  const known = new Set(kept);
+  for (const item of items) {
+    if (!known.has(item)) kept.push(item);
+  }
+  return kept;
 }
 
 /* Reorder for drag & drop: the moved item takes the target's place —
