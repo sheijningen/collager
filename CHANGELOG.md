@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.0] - 2026-11-07
+
+### Added
+
+- macOS support.
+- SVG and MKV file support.
+- **Sort collage by** name, path or type, in the Collage menu.
+- **Hide the scrollbar**, in the Scroll menu.
+- The window size is remembered between sessions.
+- Clearer errors are given when a file fails loading.
+
+### Changed
+
+- Infinite scrolling is now seamless.
+- The progress count is more accurate when adding folders.
+
+### Fixed
+
+- Retry mechanism for when files fail loading.
+- Keyboard shortcuts keep working even when selecting certain components or menus.
+- Closing the app right after adding files could lose those files.
+- Prevent files in unresponsive networks from holding up the application.
+
 ## [0.2.0] - 2026-09-19
 
 ### Added

@@ -67,10 +67,10 @@ docs/                README media
   scroller reserves its scrollbar gutter, so the packing width never depends on whether a
   scrollbar is showing; hiding the scrollbar (Scroll menu) drops the gutter as well, and the
   collage re-renders to the wider columns. An item's dimensions come from loading its metadata
-  off screen. A load that fails gives the
-  260x140 fallback, which `hasOwnDimensions` in `core/layout.js` tells apart from a real
-  measure; one still pending after twenty seconds (`LOAD_TIMEOUT_MS` there) leaves the item
-  without dimensions, so it is laid out at the fallback size and measured again at the next start.
+  off screen. A load that fails gives the 260x140 fallback, which `hasOwnDimensions` in
+  `core/layout.js` tells apart from a real measure; one still pending after twenty seconds
+  (`LOAD_TIMEOUT_MS` there) leaves the item without dimensions, so it is laid out at the fallback
+  size and measured again at the next start.
 - **Identity**: file contents are hashed with SHA-256. The hash is the item identity everywhere
   and makes the same media under two names one item. Videos are hashed over their size plus
   1 MiB samples at the start, middle and end (whole file when smaller), and such hashes carry a
@@ -88,27 +88,21 @@ docs/                README media
 - **Resource limiting**: tiles are placeholders until within 800px of the viewport; the
   `<img>`/`<video>` is created then and torn down again once far away.
 - **Auto-scroll loop**: with Restart at the end on, the collage is a cylinder while auto-scroll
-  runs. Below the real collage a wrap region holds clone tiles: the next loop's order packed
-  from a level line one gap below the end (`packClones` in `core/layout.js`), one pass at most,
-  stopping once every column covers the viewport plus the 800px margin. Each clone sits exactly
-  `wrapHeight` below the place its item takes after the wrap, and the tick scrolls up by that
-  distance once it reaches it, so the frame after the wrap matches the one before. With Shuffle
-  on restart the next order is shuffled when the region is built, kept across renders (items
-  that go drop out, new ones join at the end, nothing reshuffles) and becomes the collage order
-  (saved) at the wrap; a sort or shuffle picked while that loop runs holds only until the wrap
-  replaces it. At the wrap the clones' loaded media move into the real tiles, so nothing
-  reloads on screen. Clones share the tile builder and the click, double-click and menu
-  handlers, live in their own `cloneTiles` index, and are never drag sources or targets,
-  scroll-to-item targets or entries in `lastPositions`. The region exists only while
-  auto-scroll runs with restart on and the collage is taller than the viewport; every render
-  rebuilds it. A collage barely taller than the window can pack shorter than the window after
-  a shuffled wrap; it then gets no clones and nothing scrolls until the next shuffle, though
-  auto-scroll still shows as running. Stopping auto-scroll or turning restart off with the
-  viewport past `wrapHeight` wraps first, and with clones only partly on screen the region
-  lingers until the viewport leaves it (scrolling on past `wrapHeight` wraps), so the screen
-  keeps its picture either way; auto-scroll with restart off stops on such a lingering region,
-  since the viewport is past the real end, and toggling Shuffle on restart reorders its clones,
-  as the user changed the next loop.
+  runs. Below the real collage a wrap region holds clone tiles packed in the next loop's order
+  (`packClones` in `core/layout.js`), enough to cover the viewport plus the 800px margin. Each
+  clone sits exactly `wrapHeight` below where its item lands after the wrap, and the tick
+  scrolls up by that distance on reaching it, so the frame after the wrap matches the one
+  before and the clones' loaded media move into the real tiles. With Shuffle on restart the
+  next order is drawn when the region is built, kept across renders, and becomes the saved
+  collage order at the wrap, replacing any sort or shuffle picked meanwhile. Clones share the
+  tile builder and click handlers, live in `cloneTiles`, and are never drag, scroll-to or
+  `lastPositions` entries. The region exists only while auto-scroll runs with restart on and
+  the collage is taller than the viewport; every render rebuilds it. Stopping, or turning
+  restart off, with clones on screen wraps first when the viewport is past `wrapHeight` and
+  otherwise leaves the region lingering until the viewport leaves it, so the picture never
+  jumps; auto-scroll with restart off stops on a lingering region. A collage barely taller than
+  the window can pack shorter after a shuffled wrap and then gets no clones until the next
+  shuffle.
 - **Lightbox**: the arrow keys step to the previous or next item in collage order that can be
   shown, and the collage scrolls to it, so closing the lightbox lands where the browsing
   stopped. A focused video keeps the arrows for seeking.
@@ -131,35 +125,30 @@ docs/                README media
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
   new location repairs the entry, and measures it again when it has the fallback size or none.
 - **Retries**: missing and unshowable items are looked at again: five to ten seconds after the
-  failure, then ten, fifteen, then every half minute, each wait counted from when the previous
-  attempt settled. A file that is not about to come back (gone from a folder that is still there, or
-  there but undecodable) doubles its wait after each such answer beyond the third in a row, up to
-  ten minutes, and is left alone after ten such answers in a row, as is one that decodes and then
-  breaks twice in a row within a minute of coming back. An attempt has the main process stat the
-  file; a file written in the last two seconds waits for a later attempt, and one whose hash is
-  stale (its size moved, or a video hash from before the sampled scheme) is rehashed. Other content
-  at the path takes the entry's place, or merges into the item that already holds it, and loads by a
-  URL carrying the new hash so Chromium's cache does not serve the old content. An unshowable file
-  is decoded off screen before it shows again. At most two attempts run at once and never two on one
-  volume, and one answer speaks for its folder (gone) or its volume (slower than five seconds and
-  found nothing: parked for five minutes) until that file is due again, so an unplugged drive costs
-  one question per folder and a dropping share one answer per five minutes; a share mounted outside
-  the known volume roots (drive letters, UNC shares, /media/<user>, /run/media/<user>, /mnt, /net,
-  /Volumes) is covered per folder. An attempt that never settles keeps its place for the session.
-  Changes are shown and saved per round, never per file. The spacing and what an answer means
-  (`classifyRecheckAnswer`) live in `core/retry.js`, the rounds in `ui/retry.js`, the file check in
+  failure, then ten, fifteen, then every half minute. A file that is not about to come back (gone
+  from a folder that is still there, or there but undecodable) doubles its wait after the third
+  such answer in a row, up to ten minutes, and is given up after ten, as is one that decodes and
+  breaks twice within a minute. An attempt has the main process stat the file: one written in the
+  last two seconds waits, one whose hash is stale is rehashed, and other content at the path takes
+  the entry's place (or merges into the item that already holds it) and loads by a URL carrying
+  the new hash, so Chromium's cache cannot serve the old bytes. An unshowable file is decoded off
+  screen before it shows again. At most two attempts run at once, never two on one volume, and
+  one answer covers its folder (gone) or its volume (slower than five seconds and found nothing:
+  parked for five minutes), so an unplugged drive costs one question per folder; a path outside
+  the known volume roots (drive letters, UNC shares, /media/<user>, /run/media/<user>, /mnt,
+  /net, /Volumes) is covered per folder. Changes are shown and saved per round. The spacing and
+  `classifyRecheckAnswer` live in `core/retry.js`, the rounds in `ui/retry.js`, the file check in
   `recheckMediaFile` in `lib/scan.js`.
 - **Unshowable files**: a file that fails to load is missing only when the main process says it is
   gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and gets an amber
   dashed tile with its own hint until a retry decodes it. It is not counted as missing, and its menu
   keeps every action that does not need to show it.
-- **Load error in the hint**: the hint of a missing or unshowable item ends with what was
-  found, as reported. A video contributes the player's message (`MediaError.message`; an
-  image says nothing). The main process contributes its report on the file: the stat or read
-  error with its path, or the size and the first bytes with the format they announce when the
-  file reads fine, since then the content itself is the problem (a HEIF file named .jpg, a
-  saved error page). The report is only ever made for a path with a media extension.
-  `lib/inspect.js` writes the report, `describeLoadError` in `core/text.js` joins the lines.
+- **Load error in the hint**: the hint of a missing or unshowable item ends with the player's
+  message for a video (`MediaError.message`) and the main process's report on the file: the
+  stat or read error, or, when the file reads fine, its size and first bytes with the format
+  they announce (a HEIF file named .jpg, a saved error page). The report is only made for a path
+  with a media extension. `lib/inspect.js` writes it, `describeLoadError` in `core/text.js`
+  joins the lines.
 - **File panel** always starts closed; its open state is not remembered across restarts.
   A counter above the list gives the item total and expands on click into the split by
   file extension, biggest group first.
@@ -247,12 +236,11 @@ docs/                README media
   only when ffmpeg is installed) and drives the renderer via `executeJavaScript`. Each file in
   `test/e2e/cases/` is one feature and exports `{ name, run(ctx) }`. Before every case the harness
   waits for library work the previous case left in flight, then resets the app (empty library,
-  nothing open or selected, two columns, collage order, the scrollbar shown, default speed and
-  Scroll settings, the file panel and toolbar shown with the count breakdown closed, not
-  fullscreen, the starting window size,
-  scrolled to the top, the removal question answering yes), so a case loads what it needs
-  (`ctx.loadFixtures()`), turns waits into checks (`ctx.waitFor` resolves to a boolean) and never
-  cleans up. The retry timer is stopped after every page load, so a file a case flags by hand is
+  nothing open or selected, every setting at its default, the panel and toolbar shown, not
+  fullscreen, the starting window size, scrolled to the top, the removal question answering
+  yes), so a case loads what it needs (`ctx.loadFixtures()`), turns waits into checks
+  (`ctx.waitFor` resolves to a boolean) and never cleans up. The retry timer is stopped after
+  every page load, so a file a case flags by hand is
   only looked at again by a round the case runs. A case that needs the startup path seeds a saved
   library and restarts the renderer with `ctx.restartWith(library)`, which takes an item list or a
   string written as the file's raw content; `ctx.reloadRenderer()` restarts against whatever is on
@@ -283,20 +271,22 @@ makes the macOS icon set from it). `desktopName` plus `syncDesktopName` keeps th
 entry matched to the running window. The macOS bundle is signed ad hoc by the afterPack hook in
 `build/afterpack.js` (outside `files`, so not bundled), because Apple silicon will not run a
 bundle whose signature electron-builder's edits broke. There is no Developer ID
-(`identity: null`), so Gatekeeper still blocks a downloaded copy until the user lets it through;
-the README says how. The macOS bundle declares the media extensions as documents it can view
+(`identity: null`), so Gatekeeper still blocks a downloaded copy until the user lets it through
+(Open from the context menu, Open Anyway in Privacy & Security, or clearing the quarantine
+attribute). The macOS bundle declares the media extensions as documents it can view
 (`mac.fileAssociations`, rank Alternate) and folders (`public.folder` in `mac.extendInfo`, rank
 None), which is what lets Finder and the Dock hand them to the app; the extension list mirrors
 `MEDIA_EXTS` in `lib/scan.js` and changes with it.
 
 Releases are cut by pushing a `vX.Y.Z` tag that matches the `version` in `package.json` and
 points at a commit on `main`; both are checked before anything is built. The workflow's tag
-filter takes those three numbers only, so a suffixed tag such as `v0.2.0-rc1` starts nothing. The release workflow
-calls the lint, format, unit and e2e workflows as reusable workflows, which is what their
-`workflow_call` trigger is for, builds the installers, and publishes a GitHub Release with
-them, a `SHA256SUMS` file and auto-generated notes. The Linux build job also starts
-the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`, which makes
-main exit 0 once the renderer has loaded the library and 1 after a minute without, so a path
+filter takes those three numbers only, so a suffixed tag such as `v0.2.0-rc1` starts nothing.
+The release workflow calls the lint, format, unit and e2e workflows as reusable workflows,
+which is what their `workflow_call` trigger is for, builds the installers, and publishes a
+GitHub Release with them, a `SHA256SUMS` file and auto-generated notes. The Linux build job
+also starts the freshly built AppImage once under a virtual display with `COLLAGER_SMOKE=1`,
+which makes main exit 0 once the renderer has loaded the library and 1 after a minute without,
+so a path
 that only breaks inside the packaged app fails the release before anything is uploaded. The
 Windows build job does the same with the unpacked build in `dist/win-unpacked`, which is what
 the installer packs; the installer itself is not run. The macOS build job builds both DMGs on
@@ -307,8 +297,8 @@ tag. A tag that already has a release, draft included, is refused, so a draft le
 lost runner has to be deleted by hand before the run is retried. The installer file names come
 from the `artifactName` fields; the build job's upload globs and the publish job's patterns
 match them on everything except the architecture part (electron-builder writes `x86_64` for
-AppImage and `x64` for NSIS), where the publish job names `x64` and `arm64` for the two DMGs,
-and the README spells out the names the runners produce. Change all four together.
+AppImage and `x64` for NSIS), where the publish job names `x64` and `arm64` for the two DMGs.
+Change all three together.
 `build.appId` doubles as the Windows AppUserModelID: electron-builder stamps it on the
 shortcuts and `main.js` sets the same literal on the running process, so the taskbar groups
 and pins them together. electron-builder strips the `build` field from the packaged
