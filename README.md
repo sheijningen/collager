@@ -13,26 +13,7 @@ photos from Wikimedia Commons.</sub>
 ## Install
 
 Download the latest installer from the
-[releases page](https://github.com/sheijningen/collager/releases/latest):
-
-- **Linux**: `Collager-<version>-linux-x86_64.AppImage`. Make it executable
-  (`chmod +x`) and run it.
-- **Windows**: `Collager-<version>-windows-x64-setup.exe`. It installs Collager for
-  the current user, on the Desktop and in the Start menu.
-- **macOS**: `Collager-<version>-macos-arm64.dmg` for Apple silicon,
-  `Collager-<version>-macos-x64.dmg` for Intel Macs. Open it and drag Collager into
-  Applications.
-
-  Collager is signed ad hoc, not with an Apple Developer ID, so macOS warns about an
-  unidentified developer and blocks the first start. Control-click (or right-click)
-  Collager in Applications, pick **Open** and confirm. On macOS 15 and later
-  that dialog has no Open button: start the app once, then click **Open Anyway** under
-  **System Settings > Privacy & Security**. If macOS says the app is damaged, or either
-  way fails, clear the quarantine flag in Terminal instead:
-
-  ```bash
-  xattr -d com.apple.quarantine /Applications/Collager.app
-  ```
+[releases page](https://github.com/sheijningen/collager/releases/latest).
 
 Every release also carries a `SHA256SUMS` file; `sha256sum -c SHA256SUMS` in the download
 folder checks the installers against it (`shasum -a 256 -c SHA256SUMS` on macOS).
