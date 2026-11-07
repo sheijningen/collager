@@ -74,6 +74,16 @@ async function waitFor(probe, timeoutMs = 10000) {
   return false;
 }
 
+/* Leaves the maximized state a window manager puts a window in that the
+ * display could not fit: a maximized Wayland window ignores setSize. The
+ * restore lands with the window manager's event, waited for briefly. */
+async function unmaximize(win) {
+  if (!win.isMaximized()) return;
+  const restored = new Promise((resolve) => win.once('unmaximize', resolve));
+  win.unmaximize();
+  await Promise.race([restored, sleep(1000)]);
+}
+
 app.whenReady().then(() => {
   setTimeout(run, 2000);
 });
@@ -85,6 +95,7 @@ async function run() {
 
   const win = BrowserWindow.getAllWindows()[0];
   const wc = win.webContents;
+  await unmaximize(win);
   const [baseWidth, baseHeight] = win.getSize(); // a case may resize; the reset puts it back
   // every snippet sees the app's module exports as T (see app.js) and can
   // press(key) to fire a keydown on the window
@@ -163,6 +174,7 @@ async function run() {
    * finishes first, so it cannot push into the emptied library or leave its
    * job line behind. */
   async function resetApp() {
+    await unmaximize(win);
     win.setSize(baseWidth, baseHeight);
     dialog.showMessageBox = async () => ({ response: 0 });
     await js(`(async () => {

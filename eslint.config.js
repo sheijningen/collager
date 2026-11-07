@@ -26,9 +26,16 @@ module.exports = [
     }
   },
 
-  // main process, its libs, the build hook and all tests: plain CommonJS under Node
+  // main process, its libs, the build hook, the launcher and all tests: plain
+  // CommonJS under Node
   {
-    files: ['src/main/**/*.js', 'build/**/*.js', 'test/**/*.js', 'eslint.config.js'],
+    files: [
+      'src/main/**/*.js',
+      'build/**/*.js',
+      'scripts/**/*.js',
+      'test/**/*.js',
+      'eslint.config.js'
+    ],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { ...globals.node }

@@ -66,10 +66,28 @@ const noGpuSwitch = '--collager-no-gpu';
 const gpuFallback = process.argv.includes(noGpuSwitch);
 if (gpuFallback) app.disableHardwareAcceleration();
 
+/* Resolves once the queued saves have landed, or after this long: a save
+ * hung on a failing disk must not keep the app alive without a window. */
+const SAVE_FLUSH_TIMEOUT_MS = 5000;
+function flushSaves() {
+  const deadline = new Promise((resolve) => setTimeout(resolve, SAVE_FLUSH_TIMEOUT_MS));
+  return Promise.race([library.flush(), deadline]);
+}
+
 let gpuCrashes = 0;
+let relaunching = false;
 let quitting = false;
-app.on('before-quit', () => {
+let savesFlushed = false;
+app.on('before-quit', (event) => {
   quitting = true;
+  if (savesFlushed) return;
+  // the exit would cut off a save still writing library.json.tmp and lose
+  // the batch it carries; the quit goes on once the queue has settled
+  event.preventDefault();
+  flushSaves().then(() => {
+    savesFlushed = true;
+    app.quit();
+  });
 });
 
 app.on('child-process-gone', (_event, details) => {
@@ -81,9 +99,14 @@ app.on('child-process-gone', (_event, details) => {
   if (!['crashed', 'abnormal-exit', 'launch-failed'].includes(details.reason)) return;
   gpuCrashes++;
   console.error(`GPU process gone (${details.reason}), crash #${gpuCrashes}`);
-  if (gpuCrashes >= 3 && !gpuFallback) {
-    app.relaunch(buildRelaunchOptions(process.argv, process.env.APPIMAGE, noGpuSwitch));
-    app.exit(0);
+  if (gpuCrashes >= 3 && !gpuFallback && !relaunching) {
+    relaunching = true;
+    const options = buildRelaunchOptions(process.argv, process.env.APPIMAGE, noGpuSwitch);
+    flushSaves().then(() => {
+      if (quitting) return; // closed by the user meanwhile
+      app.relaunch(options);
+      app.exit(0);
+    });
   }
 });
 

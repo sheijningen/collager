@@ -315,6 +315,24 @@ test('concurrent saves serialize; last write wins and file stays valid', async (
   assert.equal(onDisk.length, 20, 'last enqueued save is the final state');
 });
 
+test('flush resolves once every queued save has landed', async (t) => {
+  const { dir, store } = tmpStore(t);
+  store.save([entry('h1')]);
+  store.save([entry('h1'), entry('h2')]);
+  await store.flush();
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8'));
+  assert.equal(onDisk.length, 2);
+});
+
+test('flush resolves after a save that failed', async (t) => {
+  const base = createTempDir(t, 'lib');
+  const file = path.join(base, 'a-file');
+  fs.writeFileSync(file, '');
+  const store = createLibraryStore(() => path.join(file, 'inside'));
+  await assert.rejects(store.save([entry('h')]));
+  await store.flush();
+});
+
 test('save creates the directory if it does not exist yet', async (t) => {
   const base = createTempDir(t, 'lib');
   const dir = path.join(base, 'not', 'yet', 'created');

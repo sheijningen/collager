@@ -164,6 +164,11 @@ function createLibraryStore(getDir) {
           await fsp.rename(tmp, libraryFile());
         });
       return saveChain;
+    },
+
+    /* Resolves once every save queued so far has landed or failed. */
+    flush() {
+      return saveChain.catch(() => {});
     }
   };
 }
