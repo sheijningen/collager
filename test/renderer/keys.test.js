@@ -4,7 +4,10 @@ const {
   targetConsumesKey,
   normalizeShortcutKey,
   SCROLL_KEYS,
-  RANGE_INPUT_KEYS
+  RANGE_INPUT_KEYS,
+  isFullscreenKey,
+  fullscreenKeyLabel,
+  isRemoveKey
 } = require('../../src/renderer/core/keys.js');
 
 test('no target or a plain element consumes nothing', () => {
@@ -66,4 +69,46 @@ test('normalizeShortcutKey lowercases letters and leaves named keys alone', () =
 test('SCROLL_KEYS is Space plus every key a slider consumes', () => {
   assert.equal(SCROLL_KEYS[0], ' ');
   assert.deepEqual(SCROLL_KEYS.slice(1), RANGE_INPUT_KEYS);
+});
+
+/* A keydown with only the named modifiers held. */
+function keydown(key, modifiers = {}) {
+  return { key, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...modifiers };
+}
+
+test('F11 alone toggles fullscreen everywhere, with any modifier nowhere', () => {
+  for (const platform of ['linux', 'win32', 'darwin']) {
+    assert.equal(isFullscreenKey(keydown('F11'), platform), true, platform);
+    for (const modifier of ['ctrlKey', 'altKey', 'shiftKey', 'metaKey']) {
+      assert.equal(isFullscreenKey(keydown('F11', { [modifier]: true }), platform), false);
+    }
+  }
+});
+
+test('Ctrl+Cmd+F toggles fullscreen on macOS only, and only with exactly those two', () => {
+  const ctrlCmd = { ctrlKey: true, metaKey: true };
+  assert.equal(isFullscreenKey(keydown('f', ctrlCmd), 'darwin'), true);
+  assert.equal(isFullscreenKey(keydown('F', ctrlCmd), 'darwin'), true);
+  assert.equal(isFullscreenKey(keydown('f', ctrlCmd), 'linux'), false);
+  assert.equal(isFullscreenKey(keydown('f', ctrlCmd), 'win32'), false);
+  assert.equal(isFullscreenKey(keydown('f', { metaKey: true }), 'darwin'), false);
+  assert.equal(isFullscreenKey(keydown('f', { ctrlKey: true }), 'darwin'), false);
+  assert.equal(isFullscreenKey(keydown('f', { ...ctrlCmd, shiftKey: true }), 'darwin'), false);
+  assert.equal(isFullscreenKey(keydown('f'), 'darwin'), false);
+});
+
+test('the help names the fullscreen key the platform uses', () => {
+  assert.equal(fullscreenKeyLabel('linux'), 'F11');
+  assert.equal(fullscreenKeyLabel('win32'), 'F11');
+  assert.equal(fullscreenKeyLabel('darwin'), 'Ctrl+Cmd+F');
+});
+
+test('Delete removes everywhere, Backspace only on macOS', () => {
+  for (const platform of ['linux', 'win32', 'darwin']) {
+    assert.equal(isRemoveKey('Delete', platform), true, platform);
+  }
+  assert.equal(isRemoveKey('Backspace', 'darwin'), true);
+  assert.equal(isRemoveKey('Backspace', 'linux'), false);
+  assert.equal(isRemoveKey('Backspace', 'win32'), false);
+  assert.equal(isRemoveKey('d', 'darwin'), false);
 });

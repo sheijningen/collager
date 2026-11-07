@@ -1,9 +1,14 @@
 /* ---------------- fullscreen ----------------
- * The default application menu is removed in the main process, so this
- * module owns the F11 binding outright. */
+ * Linux and Windows have no application menu, so this module owns F11
+ * outright. On macOS it handles Ctrl+Cmd+F itself and prevents the default,
+ * so a fullscreen item AppKit may add to the Window menu does not toggle a
+ * second time. */
+
+import { isFullscreenKey, fullscreenKeyLabel } from '../core/keys.js';
 
 export let isFullscreen = false;
 const fullscreenBtn = document.getElementById('btn-fullscreen');
+fullscreenBtn.title = `Toggle fullscreen (${fullscreenKeyLabel(window.api.platform)})`;
 fullscreenBtn.addEventListener('click', () => window.api.toggleFullscreen());
 
 function applyFullscreenState(fullscreen) {
@@ -16,8 +21,7 @@ window.api.onFullscreenChanged(applyFullscreenState);
 window.api.isFullscreen().then(applyFullscreenState);
 
 window.addEventListener('keydown', (event) => {
-  const modified = event.ctrlKey || event.altKey || event.shiftKey || event.metaKey;
-  if (event.key !== 'F11' || event.repeat || modified) return;
+  if (event.repeat || !isFullscreenKey(event, window.api.platform)) return;
   event.preventDefault();
   // a lightbox video's native controls can enter HTML element-fullscreen,
   // which Electron promotes to window fullscreen; unwind that first or the

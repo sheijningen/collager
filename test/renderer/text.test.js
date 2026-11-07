@@ -6,7 +6,8 @@ const {
   describeProbeProgress,
   describeRemoval,
   fileProblem,
-  tileLabel
+  tileLabel,
+  selectionHint
 } = require('../../src/renderer/core/text.js');
 
 test('formatCount picks the singular only for exactly one', () => {
@@ -172,4 +173,10 @@ test('describeStartupNotes points at the menu entry with its exact label', () =>
     describeStartupNotes({ missingCount: 1, collapsed: 3 }),
     /missing on disk.* · 3 duplicates merged$/
   );
+});
+
+test('selectionHint names Cmd as the toggle on macOS and Ctrl elsewhere', () => {
+  assert.equal(selectionHint('linux'), 'click: select · ctrl: toggle · shift: range');
+  assert.equal(selectionHint('win32'), 'click: select · ctrl: toggle · shift: range');
+  assert.equal(selectionHint('darwin'), 'click: select · cmd: toggle · shift: range');
 });

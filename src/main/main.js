@@ -3,8 +3,9 @@ const path = require('path');
 const { createLibraryStore } = require('./lib/library');
 const { registerLibraryIpc } = require('./ipc/library');
 const { registerFilesIpc } = require('./ipc/files');
-const { registerWindowIpc } = require('./ipc/window');
+const { registerWindowIpc, releaseKeepAwake, APP_NAME } = require('./ipc/window');
 const { buildRelaunchOptions } = require('./lib/relaunch');
+const { buildMacMenuTemplate } = require('./lib/appmenu');
 
 const library = createLibraryStore(() => app.getPath('userData'));
 
@@ -15,11 +16,43 @@ if (!app.requestSingleInstanceLock()) {
   app.exit(0);
   return;
 }
-app.on('second-instance', () => {
+app.on('second-instance', showWindow);
+
+/* Brings the window forward, or opens one when the app has none, as on macOS
+ * after the last one closed. Before ready the startup opens the first one. */
+function showWindow() {
+  if (!app.isReady()) return;
   const win = BrowserWindow.getAllWindows()[0];
-  if (!win) return;
+  if (!win) {
+    createWindow();
+    return;
+  }
   if (win.isMinimized()) win.restore();
   win.focus();
+}
+
+/* ---------------- paths macOS asks the app to open ----------------
+ * Files and folders dropped on the Dock icon or opened with the app from
+ * Finder are added like a drop. They can arrive before the window exists,
+ * even before ready, so they wait until a page has loaded; a reload holds
+ * them back until the new page is up. One Finder action delivers its paths
+ * back to back, and the deferred send takes them over as one batch. */
+let pendingOpenPaths = [];
+let openPathsReceiver = null; // the webContents of a loaded page, if any
+
+function sendOpenPaths() {
+  if (!openPathsReceiver || !pendingOpenPaths.length) return;
+  openPathsReceiver.send('open-paths', pendingOpenPaths);
+  pendingOpenPaths = [];
+}
+
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  pendingOpenPaths.push(filePath);
+  // the items should land where the user sees them, in a window that may be
+  // minimized or, on macOS, closed
+  showWindow();
+  setImmediate(sendOpenPaths);
 });
 
 /* ---------------- GPU crash resilience ----------------
@@ -122,7 +155,7 @@ function createWindow() {
   // changes (our IPC, the window manager, HTML fullscreen from a video)
   win.on('enter-full-screen', () => win.webContents.send('fullscreen-changed', true));
   win.on('leave-full-screen', () => win.webContents.send('fullscreen-changed', false));
-  // the application menu is dropped below, so restore devtools for development
+  // no application menu carries devtools, so restore them for development
   win.webContents.on('before-input-event', (_event, input) => {
     if (!app.isPackaged && input.type === 'keyDown' && input.key === 'F12') {
       win.webContents.toggleDevTools();
@@ -131,6 +164,18 @@ function createWindow() {
   if (gpuFallback) {
     win.webContents.on('did-finish-load', () => win.webContents.send('gpu-fallback'));
   }
+  win.webContents.on('did-start-loading', () => {
+    openPathsReceiver = null;
+  });
+  win.webContents.on('did-finish-load', () => {
+    openPathsReceiver = win.webContents;
+    sendOpenPaths();
+  });
+  win.on('closed', () => {
+    openPathsReceiver = null;
+    // a closed page never says to stop, and on macOS the app runs on
+    releaseKeepAwake();
+  });
   // the e2e harness drives the renderer, and the smoke run reads its ready
   // flag, through a hook app.js only installs when the page is loaded with ?e2e
   const query = process.env.COLLAGER_E2E === '1' || smokeRun ? { e2e: '1' } : {};
@@ -139,10 +184,14 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // drop the default menu: the app owns its shortcuts (notably F11, which the
-  // default menu would otherwise also bind, risking double-toggles). Kept on
-  // macOS, where a null menu would strip Cmd+Q/C/V and make the app unquittable.
-  if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
+  // the app owns its shortcuts (notably F11, which the default menu would also
+  // bind, risking double-toggles). macOS keeps a minimal menu, since without
+  // one Cmd+Q, C and V do nothing and the app cannot be quit from the keyboard.
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMacMenuTemplate(APP_NAME)));
+  } else {
+    Menu.setApplicationMenu(null);
+  }
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
