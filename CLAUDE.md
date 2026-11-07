@@ -283,8 +283,9 @@ makes the macOS icon set from it). `desktopName` plus `syncDesktopName` keeps th
 entry matched to the running window. The macOS bundle is signed ad hoc by the afterPack hook in
 `build/afterpack.js` (outside `files`, so not bundled), because Apple silicon will not run a
 bundle whose signature electron-builder's edits broke. There is no Developer ID
-(`identity: null`), so Gatekeeper still blocks a downloaded copy until the user lets it through;
-the README says how. The macOS bundle declares the media extensions as documents it can view
+(`identity: null`), so Gatekeeper still blocks a downloaded copy until the user lets it through
+(Open from the context menu, Open Anyway in Privacy & Security, or clearing the quarantine
+attribute). The macOS bundle declares the media extensions as documents it can view
 (`mac.fileAssociations`, rank Alternate) and folders (`public.folder` in `mac.extendInfo`, rank
 None), which is what lets Finder and the Dock hand them to the app; the extension list mirrors
 `MEDIA_EXTS` in `lib/scan.js` and changes with it.
@@ -307,8 +308,8 @@ tag. A tag that already has a release, draft included, is refused, so a draft le
 lost runner has to be deleted by hand before the run is retried. The installer file names come
 from the `artifactName` fields; the build job's upload globs and the publish job's patterns
 match them on everything except the architecture part (electron-builder writes `x86_64` for
-AppImage and `x64` for NSIS), where the publish job names `x64` and `arm64` for the two DMGs,
-and the README spells out the names the runners produce. Change all four together.
+AppImage and `x64` for NSIS), where the publish job names `x64` and `arm64` for the two DMGs.
+Change all three together.
 `build.appId` doubles as the Windows AppUserModelID: electron-builder stamps it on the
 shortcuts and `main.js` sets the same literal on the running process, so the taskbar groups
 and pins them together. electron-builder strips the `build` field from the packaged
