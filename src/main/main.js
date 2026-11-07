@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, screen } = require('electron');
 const path = require('path');
 const { createLibraryStore } = require('./lib/library');
+const { createWindowStateStore, fitBounds } = require('./lib/windowstate');
 const { registerLibraryIpc } = require('./ipc/library');
 const { registerFilesIpc } = require('./ipc/files');
 const { registerWindowIpc, releaseKeepAwake, APP_NAME } = require('./ipc/window');
@@ -8,6 +9,7 @@ const { buildRelaunchOptions } = require('./lib/relaunch');
 const { buildMacMenuTemplate } = require('./lib/appmenu');
 
 const library = createLibraryStore(() => app.getPath('userData'));
+const windowState = createWindowStateStore(() => app.getPath('userData'));
 
 /* One instance per library: a second launch (a double double-click, a second
  * shortcut) would write library.json in turns with the first and lose what
@@ -160,9 +162,14 @@ registerFilesIpc();
 registerWindowIpc();
 
 function createWindow() {
+  const saved = windowState.load();
+  const bounds = fitBounds(
+    saved,
+    screen.getAllDisplays().map((display) => display.workArea)
+  );
   const win = new BrowserWindow({
-    width: 1280,
-    height: 860,
+    ...bounds,
+    show: false, // shown once maximized, so the normal size never flashes first
     backgroundColor: '#111114',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -170,6 +177,24 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+  if (saved && saved.maximized) win.maximize();
+  win.show();
+  // the state to remember is taken while the window is normal or maximized:
+  // closed while fullscreen or minimized it reports the bounds of neither
+  let remembered = null;
+  function snapshotWindowState() {
+    if (win.isFullScreen() || win.isMinimized()) return;
+    remembered = { ...win.getNormalBounds(), maximized: win.isMaximized() };
+  }
+  snapshotWindowState();
+  for (const event of ['resize', 'move', 'maximize', 'unmaximize']) {
+    win.on(event, snapshotWindowState);
+  }
+  function saveWindowState() {
+    if (remembered) windowState.save(remembered);
+  }
+  win.on('close', saveWindowState);
+  win.on('session-end', saveWindowState); // a Windows shutdown or logoff skips close
   // keep the renderer's fullscreen button in sync no matter how the state
   // changes (our IPC, the window manager, HTML fullscreen from a video)
   win.on('enter-full-screen', () => win.webContents.send('fullscreen-changed', true));
