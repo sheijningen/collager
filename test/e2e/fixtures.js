@@ -59,6 +59,24 @@ const GIF_1PX = Buffer.from(
   'base64'
 );
 
+/* Writes a one second 160x90 test video to `file`, in the container its
+ * extension names. Returns whether ffmpeg was there to write it. */
+function makeVideo(file) {
+  const ffmpeg = spawnSync('ffmpeg', [
+    '-loglevel',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'testsrc=duration=1:size=160x90:rate=10',
+    '-pix_fmt',
+    'yuv420p',
+    '-y',
+    file
+  ]);
+  return ffmpeg.status === 0;
+}
+
 /* Writes the fixture set into mediaDir: wide, tall and square PNGs, a GIF,
  * a byte-identical copy of the wide PNG under another name, and the video
  * when ffmpeg is available. Returns whether the video was written. */
@@ -70,21 +88,9 @@ function makeFixtures(mediaDir) {
   // duplicate content under a different name
   fs.writeFileSync(path.join(mediaDir, 'wide-copy.png'), makePng(320, 180, [200, 40, 40]));
 
-  const ffmpeg = spawnSync('ffmpeg', [
-    '-loglevel',
-    'error',
-    '-f',
-    'lavfi',
-    '-i',
-    'testsrc=duration=1:size=160x90:rate=10',
-    '-pix_fmt',
-    'yuv420p',
-    '-y',
-    path.join(mediaDir, 'clip.mp4')
-  ]);
-  if (ffmpeg.status === 0) return true;
+  if (makeVideo(path.join(mediaDir, 'clip.mp4'))) return true;
   console.log('# ffmpeg not available, skipping the video fixture');
   return false;
 }
 
-module.exports = { makePng, makeFixtures };
+module.exports = { makePng, makeVideo, makeFixtures };

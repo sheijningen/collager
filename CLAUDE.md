@@ -1,7 +1,7 @@
 # Collager
 
-Desktop media collage viewer for Linux, Windows and macOS: images (PNG/JPEG/WebP), GIFs and videos
-(MP4/WebM) as one scrollable masonry collage.
+Desktop media collage viewer for Linux, Windows and macOS: images (PNG/JPEG/WebP/SVG), GIFs and
+videos (MP4/WebM/MKV) as one scrollable masonry collage.
 
 ## Stack
 
