@@ -78,10 +78,12 @@ module.exports = {
     })`);
     const fullscreenKey = process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11';
     const toggleKey = process.platform === 'darwin' ? 'cmd' : 'ctrl';
+    const removeKey = process.platform === 'darwin' ? 'Del / Backspace' : 'Del';
     check('the renderer knows the platform', named.platform === process.platform, named.platform);
     check(
       "the help, the fullscreen button and the panel hint name this platform's keys",
       named.help.includes(`F / ${fullscreenKey}`) &&
+        named.help.includes(removeKey) &&
         named.title.includes(fullscreenKey) &&
         named.hint.includes(`${toggleKey}: toggle`)
     );

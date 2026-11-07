@@ -177,30 +177,33 @@ module.exports = {
       return T.autoScroll && T.scroller.scrollTop > at;
     })()`);
     check('scrolling carries on from the top after the wrap', continued);
-    check(
-      'the new order is saved',
-      await waitFor(async () => {
-        const order = await js(`T.state.items.map((item) => item.hash).join()`);
-        try {
-          const saved = JSON.parse(fs.readFileSync(libraryFile, 'utf8'));
-          return saved.map((item) => item.hash).join() === order;
-        } catch {
-          return false;
-        }
-      }, 3000)
-    );
 
+    // once stopped nothing wraps or reshuffles, so the order holds still while
+    // the saved file catches up with it
     const stopped = await js(`(() => {
       T.setAutoScroll(false);
       return {
         clones: T.cloneTiles.size,
         domClones: document.querySelectorAll('.tile.clone').length,
-        wrapHeight: T.wrapHeight
+        wrapHeight: T.wrapHeight,
+        order: T.state.items.map((item) => item.hash).join()
       };
     })()`);
     check(
       'stopping auto-scroll removes the clones',
       stopped.clones === 0 && stopped.domClones === 0 && stopped.wrapHeight === 0
+    );
+    if (wrap) check('stopping keeps the order the wrap set', stopped.order === wrap.order.join());
+    check(
+      'the new order is saved',
+      await waitFor(() => {
+        try {
+          const saved = JSON.parse(fs.readFileSync(libraryFile, 'utf8'));
+          return saved.map((item) => item.hash).join() === stopped.order;
+        } catch {
+          return false;
+        }
+      }, 3000)
     );
 
     // stopped with the clones on screen, the real tiles take over in place

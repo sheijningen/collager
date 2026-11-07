@@ -24,8 +24,9 @@ module.exports = {
     })()`);
     check('missing files explain themselves in a tooltip', missingTip);
 
-    // re-adding the same content from a new path repairs the entry, and the
-    // panel entry follows the new name
+    // re-adding the same content from a new path repairs the entry, the panel
+    // entry follows the new name, and the fallback size of a failed measure
+    // gives way to the file's own
     const movedDir = path.join(workDir, 'moved');
     fs.mkdirSync(movedDir, { recursive: true });
     const movedPath = path.join(movedDir, 'tall-moved.png');
@@ -36,13 +37,19 @@ module.exports = {
     const repaired = await js(`(async () => {
       const item = T.state.items.find((i) => i.path.endsWith('tall.png'));
       item.missing = true;
+      item.w = T.MISSING_W;
+      item.h = T.MISSING_H;
       T.render();
       await T.addPaths(${JSON.stringify([movedPath])});
       const li = T.listEntries.get(item.hash);
-      return !item.missing && item.path === ${JSON.stringify(movedPath)}
-        && li.querySelector('.fname').textContent === 'tall-moved.png' && li.title === item.path;
+      return {
+        repaired: !item.missing && item.path === ${JSON.stringify(movedPath)}
+          && li.querySelector('.fname').textContent === 'tall-moved.png' && li.title === item.path,
+        measured: item.w === 150 && item.h === 250
+      };
     })()`);
-    check('re-adding repairs a missing entry and renames its panel entry', repaired);
+    check('re-adding repairs a missing entry and renames its panel entry', repaired.repaired);
+    check('re-adding measures an entry that had only the fallback size', repaired.measured);
 
     const clearMissing = await js(`(() => {
       const btn = document.getElementById('btn-clear-missing');

@@ -181,6 +181,30 @@ test('entries need a path, a hash and a media type; a repeated hash keeps its fi
   assert.equal(items[0].size, undefined, 'a size is optional on read');
 });
 
+test('a width or height that is not a positive number is dropped on read', () => {
+  const items = readLibraryItems(
+    JSON.stringify([
+      entry('a', { w: 0, h: -5 }),
+      entry('b', { w: 'wide', h: null }),
+      entry('c', { w: 640, h: 480 })
+    ])
+  );
+  assert.deepEqual(
+    items.map((item) => [item.w, item.h]),
+    [
+      [undefined, undefined],
+      [undefined, undefined],
+      [640, 480]
+    ]
+  );
+  // JSON has no NaN or Infinity, but an overflowing literal parses as Infinity
+  const [overflowing] = readLibraryItems(
+    '[{"path":"/media/d.png","hash":"d","type":"image","w":1e999,"h":2}]'
+  );
+  assert.equal(overflowing.w, undefined);
+  assert.equal(overflowing.h, 2);
+});
+
 test('save refuses an entry the next load would reject and leaves the file as it is', async (t) => {
   const { dir, store } = tmpStore(t);
   await store.save([entry('h1')]);

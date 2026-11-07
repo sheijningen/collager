@@ -19,13 +19,14 @@ src/main/lib/        pure Node logic: scanning, hashing, library persistence, pa
                      the relaunch options of the GPU fallback, the macOS menu template
 src/renderer/core/   pure logic, no DOM: layout, selection, prefs, auto-scroll step and speed
                      range, key rules, menu placement, item menu shape, count text, file list
-                     key, empty drop, lightbox stepping, path names, user-facing text, a
-                     bounded worker pool, the spacing of retries
+                     key, empty drop, lightbox stepping, path names, volume roots and
+                     cache-busting URLs, user-facing text, a bounded worker pool, the spacing
+                     of retries and what a retry's answer means
 src/renderer/ui/     DOM modules, ES modules with app.js as the entry; status.js owns job
                      progress, popup.js places the context menu and the toolbar dropdowns
 src/renderer/package.json   type: module, so Node reads core/ the same way in tests
-test/main, test/renderer   unit tests mirroring src/main/lib and src/renderer/core;
-                     test/main/helpers.js holds what the main tests share
+test/main, test/renderer   unit tests mirroring src/main/lib, build/afterpack.js and
+                     src/renderer/core; test/main/helpers.js holds what the main tests share
 test/e2e/            boots the real app and drives it: run.js harness, fixtures.js, cases/*.js,
                      second-instance.js (a second launch against the harness profile)
 build/               icon (SVG source, PNG export for electron-builder), the afterPack hook
@@ -34,22 +35,23 @@ docs/                README media
 
 - The renderer is ES modules. `ui/app.js` is the entry (`index.html` loads only it) and imports
   every other module, which is what wires their handlers up. Shared mutable state lives in
-  `ui/state.js`: `state.items`, `state.selectionAnchor`, the `selected` set and the derived
-  `itemsByHash` index (rebuilt by `reindexItems`, which every render calls); other modules
-  own their state and export setters for what others may change. Module top levels touch only
-  their own DOM and `state.js`; cross-module calls happen inside functions and handlers, which
+  `ui/state.js`: `state.items`, `state.libraryLoaded`, `state.selectionAnchor`, the `selected` set
+  and the derived `itemsByHash` index (rebuilt by `reindexItems`, which every render calls); other
+  modules own their state and export setters for what others may change. Module top levels touch
+  only their own DOM and `state.js`; cross-module calls happen inside functions and handlers, which
   keeps the import cycles between ui modules harmless. Module evaluation order also decides the
   order in which window listeners register, so nothing may rely on one listener running before
-  another: anything order-sensitive (the Escape ladder) lives in a single handler. Explicit
-  imports mean eslint checks every identifier.
+  another: anything order-sensitive (the Escape ladder) lives in a single handler. Explicit imports
+  mean eslint checks every identifier.
 - `core/` modules are pure ES modules with no DOM access. `src/renderer/package.json` declares
   `type: module`, so Node loads them the same way and the unit tests `require()` them. Logic that
   can be stated without the DOM (a decision, a computation, a text) goes there with a unit test;
   the `ui/` module keeps only the DOM reads and writes around it.
 - The renderer is isolated (`contextIsolation`, no `nodeIntegration`, CSP in `index.html`).
   Main-process capabilities are exposed only through an IPC channel plus a `window.api` entry
-  in the preload script. The one value it exposes without a channel is `window.api.platform`,
-  which key handling and the help text need before anything could answer. Handlers live in
+  in the preload script. Two entries need no channel: `window.api.platform`, which key handling
+  and the help text need before anything could answer, and `window.api.pathForFile`, which
+  resolves a dropped file's path through `webUtils` in the preload itself. Handlers live in
   `src/main/ipc/`, one module per concern with a `register*Ipc` function that `main.js` calls
   once. A path the renderer sends back to be handed to the shell must pass the checks in
   `lib/mediapath.js` first (a supported media extension plus an existing regular file, or an
@@ -58,7 +60,11 @@ docs/                README media
 ## Design decisions
 
 - **Layout**: masonry with a user-chosen column count (1 to 8, default 3). Items are scaled to
-  the column width, aspect ratio preserved, never cropped, placed in the shortest column.
+  the column width, aspect ratio preserved, never cropped, placed in the shortest column. An
+  item's dimensions come from loading its metadata off screen. A load that fails gives the
+  260x140 fallback, which `hasOwnDimensions` in `core/layout.js` tells apart from a real
+  measure; one still pending after twenty seconds (`LOAD_TIMEOUT_MS` there) leaves the item
+  without dimensions, so it is laid out at the fallback size and measured again at the next start.
 - **Identity**: file contents are hashed with SHA-256. The hash is the item identity everywhere
   and makes the same media under two names one item. Videos are hashed over their size plus
   1 MiB samples at the start, middle and end (whole file when smaller), and such hashes carry a
@@ -115,24 +121,25 @@ docs/                README media
   save carrying such an entry is refused so that file is never written. A size is optional on read,
   so an entry from before sizes were recorded loads and has one filled in.
 - **Missing files** stay in the library as red dashed tiles; re-adding the same content from a
-  new location repairs the entry.
+  new location repairs the entry, and measures it again when it has the fallback size or none.
 - **Retries**: missing and unshowable items are looked at again: five to ten seconds after the
   failure, then ten, fifteen, then every half minute, each wait counted from when the previous
   attempt settled. A file that is not about to come back (gone from a folder that is still there, or
-  there but undecodable) doubles its wait up to ten minutes and is left alone after ten such answers
-  in a row, as is one that decodes and then breaks twice in a row within a minute of coming back. An
-  attempt has the main process stat the file; a file written in the last two seconds waits for a
-  later attempt, and one whose hash is stale (its size moved, or a video hash from before the
-  sampled scheme) is rehashed. Other content at the path takes the entry's place, or merges into the
-  item that already holds it, and loads by a URL carrying the new hash so Chromium's cache does not
-  serve the old content. An unshowable file is decoded off screen before it shows again. At most two
-  attempts run at once and never two on one volume, and one answer speaks for its folder (gone) or
-  its volume (slower than five seconds and found nothing: parked for five minutes) until that file
-  is due again, so an unplugged drive costs one question per folder and a dropping share one answer
-  per five minutes; a share mounted outside the known volume roots (drive letters, UNC shares,
-  /media/<user>, /run/media/<user>, /mnt, /Volumes) is covered per folder. An attempt that never
-  settles keeps its place for the session. Changes are shown and saved per round, never per
-  file. The spacing lives in `core/retry.js`, the rounds in `ui/retry.js`, the file check in
+  there but undecodable) doubles its wait after each such answer beyond the third in a row, up to
+  ten minutes, and is left alone after ten such answers in a row, as is one that decodes and then
+  breaks twice in a row within a minute of coming back. An attempt has the main process stat the
+  file; a file written in the last two seconds waits for a later attempt, and one whose hash is
+  stale (its size moved, or a video hash from before the sampled scheme) is rehashed. Other content
+  at the path takes the entry's place, or merges into the item that already holds it, and loads by a
+  URL carrying the new hash so Chromium's cache does not serve the old content. An unshowable file
+  is decoded off screen before it shows again. At most two attempts run at once and never two on one
+  volume, and one answer speaks for its folder (gone) or its volume (slower than five seconds and
+  found nothing: parked for five minutes) until that file is due again, so an unplugged drive costs
+  one question per folder and a dropping share one answer per five minutes; a share mounted outside
+  the known volume roots (drive letters, UNC shares, /media/<user>, /run/media/<user>, /mnt, /net,
+  /Volumes) is covered per folder. An attempt that never settles keeps its place for the session.
+  Changes are shown and saved per round, never per file. The spacing and what an answer means
+  (`classifyRecheckAnswer`) live in `core/retry.js`, the rounds in `ui/retry.js`, the file check in
   `recheckMediaFile` in `lib/scan.js`.
 - **Unshowable files**: a file that fails to load is missing only when the main process says it is
   gone. One that is still there cannot be decoded (an HEVC video, a damaged image) and gets an amber
@@ -166,8 +173,8 @@ docs/                README media
   action as the Files menu entry, so a first start has something to click.
 - **Empty drops**: a drop that resolves to no paths is explained when it carried links or a
   file with no location on disk (an image dragged out of a browser), and ignored otherwise.
-- **Async library mutations** (load, add batches) run on one promise queue so overlapping drops
-  cannot insert the same hash twice.
+- **Async library mutations** (load, add batches, a retry's swap to content that changed under
+  its path) run on one promise queue so overlapping drops cannot insert the same hash twice.
 - **Toolbar**: three dropdown menus on the left (Files: add files, add a folder, the panel
   toggle; Collage: shuffle, columns, clear; Scroll: the auto-scroll toggle and its settings),
   fullscreen and help on the right next to the floating toolbar toggle. `ui/dropdown.js` opens

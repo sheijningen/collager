@@ -7,6 +7,7 @@ const {
   RANGE_INPUT_KEYS,
   isFullscreenKey,
   fullscreenKeyLabel,
+  removeKeyLabel,
   isRemoveKey
 } = require('../../src/renderer/core/keys.js');
 
@@ -101,6 +102,12 @@ test('the help names the fullscreen key the platform uses', () => {
   assert.equal(fullscreenKeyLabel('linux'), 'F11');
   assert.equal(fullscreenKeyLabel('win32'), 'F11');
   assert.equal(fullscreenKeyLabel('darwin'), 'Ctrl+Cmd+F');
+});
+
+test('the help names Backspace for removing only on macOS', () => {
+  assert.equal(removeKeyLabel('linux'), 'Del');
+  assert.equal(removeKeyLabel('win32'), 'Del');
+  assert.equal(removeKeyLabel('darwin'), 'Del / Backspace');
 });
 
 test('Delete removes everywhere, Backspace only on macOS', () => {

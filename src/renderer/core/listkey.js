@@ -4,10 +4,10 @@ import { fileProblem } from './text.js';
 
 /* Everything an entry shows, in display order: hash, path (name and title),
  * type (badge), file problem and its load error (the title), plus the sort
- * mode. Two lists with the
- * same key render identically, so a render that changes none of these (a
- * resize, a column change) can leave the list DOM alone. Selection is not
- * part of the key; it is applied to the existing entries separately. */
+ * mode. Two lists with the same key render identically, so a render that
+ * changes none of these (a resize, a column change) can leave the list DOM
+ * alone. Selection is not part of the key; it is applied to the existing
+ * entries separately. */
 export function buildListKey(items, sortMode) {
   const entries = items.map(
     (item) =>

@@ -56,14 +56,10 @@ app.on('open-file', (event, filePath) => {
 });
 
 /* ---------------- GPU crash resilience ----------------
- * Some Windows GPU drivers make Chromium's GPU process crash ("GPU state
- * invalid after WaitForGetOffsetInRange", blank window, hard crash). If the
- * GPU process dies repeatedly, relaunch with hardware acceleration disabled
- * so the session keeps working. The switch is passed to the relaunched
- * process and nothing is written to disk, so every normal start tries
- * hardware acceleration again: a driver update or a reboot then fixes itself
- * without the user having to know any of this exists.
- */
+ * Some Windows GPU drivers crash Chromium's GPU process; three crashes
+ * relaunch the app without hardware acceleration. Nothing is written to
+ * disk, so every normal start tries it again and a driver update or a reboot
+ * fixes it by itself. */
 
 const noGpuSwitch = '--collager-no-gpu';
 

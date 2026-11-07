@@ -1,22 +1,24 @@
 /* ---------------- keyboard shortcuts, help & about overlays ----------------
  * One place owns every global key binding that isn't already claimed by a
- * more specific handler (F11 in fullscreen.js, Delete in panel.js), and the
- * Escape ladder. Toolbar dropdowns are not modal, so the shortcuts stay live
- * while one is open. The help overlay is generated from SHORTCUTS so the page
- * and the actual bindings can't drift apart.
+ * more specific handler (F11 in fullscreen.js), and the Escape ladder.
+ * Toolbar dropdowns are not modal, so the shortcuts stay live while one is
+ * open. The help overlay is generated from SHORTCUTS so the page and the
+ * actual bindings can't drift apart.
  */
 
 import {
   targetConsumesKey,
   normalizeShortcutKey,
   fullscreenKeyLabel,
+  isRemoveKey,
+  removeKeyLabel,
   SCROLL_KEYS
 } from '../core/keys.js';
 import { state, selected, showToast, runOrToast } from './state.js';
 import { SCROLL_SPEED_STEP } from '../core/autoscroll.js';
 import { autoScroll, scrollSpeed, setAutoScroll, setScrollSpeed } from './autoscroll.js';
 import { columns, setColumns, shuffle } from './collage.js';
-import { panelOpen, setPanelOpen, applySelection } from './panel.js';
+import { panelOpen, setPanelOpen, applySelection, removeSelected } from './panel.js';
 import { ctxMenu, closeCtxMenu } from './ctxmenu.js';
 import { toolbarOpen, setToolbarOpen } from './toolbar.js';
 import { openDropdownId, closeDropdown } from './dropdown.js';
@@ -37,7 +39,7 @@ export const SHORTCUTS = [
   ['T', 'Show / hide the toolbar'],
   ['− / +', 'Fewer / more columns'],
   [`F / ${fullscreenKeyLabel(window.api.platform)}`, 'Toggle fullscreen'],
-  ['Del', 'Remove the selected items'],
+  [removeKeyLabel(window.api.platform), 'Remove the selected items'],
   ['Esc', 'Close overlays / clear the selection / exit fullscreen'],
   ['I', 'About Collager'],
   ['? / F1', 'Show this help'],
@@ -181,6 +183,10 @@ window.addEventListener('keydown', (event) => {
   }
   if (!ctxMenu.hidden) return;
 
+  if (isRemoveKey(key, window.api.platform)) {
+    if (selected.size) removeSelected();
+    return;
+  }
   switch (key) {
     case '?':
     case 'F1':

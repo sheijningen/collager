@@ -1,5 +1,7 @@
 /* File panel: listing, sorting, selection shared with the collage, the
  * Escape ladder, batch remove. */
+const { dialog } = require('electron');
+
 module.exports = {
   name: 'panel',
   async run({ js, check, readLibraryWhen, expected, loadFixtures, restartWith, waitFor }) {
@@ -25,6 +27,15 @@ module.exports = {
         counter.rows.every((row) => row.extension.startsWith('.'))
     );
     check('clicking the counter again hides the split', counter.reclosed);
+
+    // the collage order runs against the names, so sorting has work to do
+    const unsorted = await js(`(() => {
+      T.state.items = T.sortItems(T.state.items, 'name').reverse();
+      T.render();
+      const shown = [...T.fileList.children].map((li) => li.querySelector('.fname').textContent);
+      return JSON.stringify(shown) !== JSON.stringify(shown.slice().sort((a, b) => a.localeCompare(b)));
+    })()`);
+    check('the list starts out of name order', unsorted);
 
     // a render that changes nothing the list shows leaves its DOM alone, so an
     // open context menu stays anchored to its entry; a rebuild closes it
@@ -98,6 +109,24 @@ module.exports = {
     check('Escape closes the lightbox and keeps the selection', ladder.lightboxOnly);
     check('Escape closes an overlay and keeps the selection', ladder.overlayOnly);
     check('Escape then clears the selection', ladder.selectionCleared);
+
+    // the item menu is modal: Delete under it asks nothing, Delete without it
+    // asks to remove the selection (answered Keep here)
+    let questions = 0;
+    dialog.showMessageBox = async () => {
+      questions++;
+      return { response: 1 };
+    };
+    await js(`T.openCtxMenu(T.state.items[0], 10, 10, 'tile'); press('Delete'); T.closeCtxMenu()`);
+    const askedUnderMenu = questions;
+    await js(`press('Delete')`);
+    const askedWithout = await waitFor(() => questions > 0);
+    await js('T.selected.size'); // one more round trip for a late question
+    check(
+      'Delete asks to remove the selection, but not under the item menu',
+      askedUnderMenu === 0 && askedWithout && questions === 1
+    );
+    dialog.showMessageBox = async () => ({ response: 0 });
 
     await js('T.removeSelectedBtn.click(); void 0');
     check(
