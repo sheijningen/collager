@@ -1,7 +1,7 @@
 # Collager
 
 A desktop media collage viewer for Linux, Windows and macOS. Drop in images
-(PNG/JPEG/WebP), GIFs and videos (MP4/WebM) and see them all together as one
+(PNG/JPEG/WebP/SVG), GIFs and videos (MP4/WebM/MKV) and see them all together as one
 scrollable, tightly packed collage. GIFs and videos loop forever; videos are
 muted.
 

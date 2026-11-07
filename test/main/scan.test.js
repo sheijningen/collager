@@ -70,6 +70,8 @@ test('typeForPath maps extensions case-insensitively', () => {
   assert.equal(typeForPath('/a/b.mp4'), 'video');
   assert.equal(typeForPath('/a/b.webm'), 'video');
   assert.equal(typeForPath('/a/b.webp'), 'image');
+  assert.equal(typeForPath('/a/b.svg'), 'image');
+  assert.equal(typeForPath('/a/b.MKV'), 'video');
   assert.equal(typeForPath('/a/b.tiff'), undefined);
   assert.equal(typeForPath('/a/noext'), undefined);
 });

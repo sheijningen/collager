@@ -748,6 +748,18 @@ div.dropdown-row {
   cursor: default;
 }
 
+img.vector {
+  background: #fff;
+}
+
+/* scaled to the window height, since a vector image has no size of its own
+ * worth showing; a very wide one is capped and letterboxed */
+#lightbox-content img.vector {
+  height: 94vh;
+  width: auto;
+  object-fit: contain;
+}
+
 /* ---------- help & about overlays ---------- */
 
 .overlay {
