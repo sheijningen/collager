@@ -103,8 +103,9 @@ function hydrate(tile) {
 /* A file that failed to load is either gone since the startup check
  * (deleted, drive unplugged) or present in a shape Chromium cannot decode.
  * Only the main process can tell, and the two get different tiles, hints and
- * menus: re-adding repairs a missing entry, nothing repairs an unshowable
- * one. The render rebuilds the tile, the panel entry and the missing count. */
+ * menus: re-adding repairs a missing entry, while an unshowable one comes
+ * back only when a retry decodes it. The render rebuilds the tile, the panel
+ * entry and the missing count. */
 async function recordLoadFailure(item) {
   const failedPath = item.path;
   let present;
@@ -113,7 +114,7 @@ async function recordLoadFailure(item) {
   } catch {
     // without an answer the file is not declared missing, since that tile
     // offers to clear an entry whose file may well be on disk; unshowable
-    // keeps every action that does not decode it and lasts this session only
+    // keeps every action that does not decode it and is never saved
     present = true;
   }
   // removed, repaired or already judged while the question was out
@@ -405,6 +406,17 @@ async function doAddPaths(paths) {
   }
 }
 
+/* Moves `existing` to the file `entry` was probed from, which holds the same
+ * content, and clears its file problem. */
+function adoptPath(existing, entry) {
+  existing.path = entry.path;
+  existing.url = entry.url;
+  existing.size = entry.size;
+  existing.missing = false;
+  existing.unshowable = false;
+  discardTile(existing.hash); // the next render builds a tile that loads the file
+}
+
 async function addPathsUnderJob(paths, job) {
   job.update('scanning');
   const { entries, unsupportedCount, unsupportedExtensions, unreadableCount } =
@@ -419,12 +431,7 @@ async function addPathsUnderJob(paths, job) {
       // Same content already present. If its old file vanished or would not
       // show, adopt the new path and give it another go.
       if (fileProblem(existing)) {
-        existing.path = entry.path;
-        existing.url = entry.url;
-        existing.size = entry.size;
-        existing.missing = false;
-        existing.unshowable = false;
-        discardTile(existing.hash); // the next render builds a tile that loads the file
+        adoptPath(existing, entry);
       } else {
         duplicates++;
       }

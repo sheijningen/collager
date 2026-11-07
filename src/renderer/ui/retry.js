@@ -1,0 +1,332 @@
+/* ---------------- retrying files that failed ----------------
+ * Missing and unshowable files are looked at again on the core/retry.js
+ * schedule: the main process stats and, when the content moved, rehashes
+ * them, and an unshowable one that is there is decoded off screen. One that
+ * is back shows again without any other change on screen. */
+
+import {
+  selectDueRetries,
+  canStartRetry,
+  beginRetry,
+  bookNextRetry,
+  FIRST_RETRY_MS,
+  SLOW_ANSWER_MS
+} from '../core/retry.js';
+import { MISSING_W, MISSING_H } from '../core/layout.js';
+import { dirname, volumeRoot, urlForContent } from '../core/paths.js';
+import { fileProblem } from '../core/text.js';
+import { state, itemsByHash, reindexItems, persist } from './state.js';
+import { render, discardTile, queueLibraryOperation } from './collage.js';
+import { releaseMedia } from './media.js';
+
+// Every question to the main process holds one of its file threads until the
+// file system answers, which a share that is dropping out can take a minute
+// over; two at a time leaves the threads the saves need.
+const MAX_IN_FLIGHT = 2;
+// the main process has just seen the file, so a load still pending by then
+// is a very slow read, and the next attempt tries again
+const LOAD_TIMEOUT_MS = 20_000;
+
+const schedule = new Map(); // hash -> the booking of its next attempt, see core/retry.js
+let workers = 0; // attempts running, over all rounds
+// a scope is the volume a folder is on (see volumeRoot), or the folder itself
+// off any known volume; a worker has one to itself
+const busyScopes = new Set();
+// An answer that finds no file speaks for more than its file until that file
+// is due again: a folder that is gone with its files, or a scope that is
+// dropping out. The other failing files there are booked without a question
+// of their own, as the answer would have booked them.
+const covers = new Map(); // folder or scope -> { until, gone }
+
+/* One round: the items due at `now` are looked at again, a scope per worker
+ * in the places the attempts of earlier rounds leave free, and the changes
+ * are shown and saved at the end. Resolves to how many items show again. */
+export async function retryFailedFiles(now = Date.now()) {
+  flushChanges();
+  const due = selectDueRetries(itemsByHash, schedule, now);
+  const slots = MAX_IN_FLIGHT - workers;
+  if (!due.length || slots <= 0) return 0;
+  const byScope = new Map();
+  for (const item of due) {
+    const folder = dirname(item.path);
+    const cover = coverOf(folder, now);
+    if (cover) {
+      bookUnderCover(item, cover);
+      continue;
+    }
+    const scope = volumeRoot(folder) ?? folder;
+    if (!byScope.has(scope)) byScope.set(scope, []);
+    byScope.get(scope).push(item);
+  }
+  const pending = [...byScope.keys()];
+  let shown = 0;
+  async function work() {
+    workers++;
+    try {
+      while (pending.length) {
+        const scope = pending.shift();
+        if (busyScopes.has(scope)) continue; // another round's worker is on it
+        busyScopes.add(scope);
+        try {
+          // read `shown` after the await: both workers add to it
+          const count = await workScope(scope, byScope.get(scope), now);
+          shown += count;
+        } finally {
+          busyScopes.delete(scope);
+        }
+      }
+    } finally {
+      workers--;
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(slots, pending.length) }, work));
+  flushChanges();
+  return shown;
+}
+
+/* The cover in force at `now` over `folder`, its own or its scope's, or
+ * null. */
+function coverOf(folder, now) {
+  for (const key of [folder, volumeRoot(folder)]) {
+    const cover = key === null ? undefined : covers.get(key);
+    if (!cover) continue;
+    if (cover.until > now) return cover;
+    covers.delete(key);
+  }
+  return null;
+}
+
+/* Books the item as the answer behind `cover` would have: a slow answer
+ * for the long wait, a gone folder turning an unshowable item missing. */
+function bookUnderCover(item, cover) {
+  bookNextRetry(schedule, item.hash, Date.now(), { slow: !cover.gone });
+  if (cover.gone && item.unshowable) turnMissing(item);
+}
+
+/* Attempts the due `items` of `scope`. An answer that speaks for more than
+ * its file covers its folder (gone with its files) or the scope (a slow
+ * answer) until the file is due again, and the items still due there are
+ * booked under the cover. Resolves to how many items show again. */
+async function workScope(scope, items, now) {
+  let shown = 0;
+  for (const item of items) {
+    if (!canStartRetry(schedule, item.hash, now)) continue; // a later round got to it first
+    const folder = dirname(item.path);
+    const cover = coverOf(folder, now);
+    if (cover) {
+      bookUnderCover(item, cover);
+      continue;
+    }
+    const hash = item.hash; // the attempt may give the item the hash of new content
+    const outcome = await retryItem(item);
+    if (outcome.cameBack) shown++;
+    const until = schedule.get(hash)?.dueAt ?? now;
+    if (outcome.slow) covers.set(scope, { until, gone: false });
+    else if (outcome.folderGone) covers.set(folder, { until, gone: true });
+  }
+  return shown;
+}
+
+/* One attempt for `item`, booked as in flight until it settles. Resolves to
+ * its outcome, see lookAgain. */
+async function retryItem(item) {
+  const hash = item.hash; // the attempt may give the item the hash of new content
+  beginRetry(schedule, hash);
+  let outcome = { cameBack: false, slow: false, folderGone: false, backOff: false };
+  try {
+    outcome = await lookAgain(item);
+  } finally {
+    bookNextRetry(schedule, hash, Date.now(), outcome);
+  }
+  return outcome;
+}
+
+/* Resolves to `{ cameBack, slow, folderGone, backOff }`: whether the file
+ * shows again, whether the file system took SLOW_ANSWER_MS or more to find
+ * no file (a share that is dropping out; one that finds the file is back,
+ * however long it took), whether its folder is gone as well, and whether the
+ * answer says the file is not about to come back (gone from a folder that is
+ * there, or there but not decodable). */
+async function lookAgain(item) {
+  const triedPath = item.path;
+  const asked = Date.now();
+  let report = null;
+  try {
+    report = await window.api.recheckMediaFile({
+      path: triedPath,
+      hash: item.hash,
+      size: item.size
+    });
+  } catch {
+    // no answer says nothing about the file; the next attempt asks again
+  }
+  const answerMs = report ? report.statMs : Date.now() - asked;
+  const outcome = {
+    cameBack: false,
+    slow: answerMs >= SLOW_ANSWER_MS && !(report && report.present),
+    folderGone: false,
+    backOff: false
+  };
+  if (!report || !stillFailing(item, triedPath)) return outcome;
+  if (!report.present) {
+    if (item.unshowable) turnMissing(item);
+    // null: the stat was too slow to ask about the folder as well
+    outcome.folderGone = report.folderPresent === false;
+    outcome.backOff = report.folderPresent === true;
+    return outcome;
+  }
+  // a null hash: there, but being written or unreadable right now
+  if (report.hash === null) return outcome;
+  outcome.cameBack = await showAgain(item, triedPath, report);
+  outcome.backOff = !outcome.cameBack;
+  return outcome;
+}
+
+/* The file is there and hashes to `report.hash`. Other content takes the
+ * entry's place; the same content shows again, after an off-screen load
+ * when the item is unshowable (it must decode now) or has only the fallback
+ * dimensions of a failed load. Resolves to whether the item shows again. */
+async function showAgain(item, triedPath, report) {
+  if (report.hash !== item.hash) {
+    // the file at this path was loaded before, so the new content needs its own URL
+    const file = { type: item.type, url: urlForContent(item.url, report.hash), size: report.size };
+    file.dimensions = await loadOffScreen(file);
+    return queueLibraryOperation(() => replaceContent(item, triedPath, report.hash, file));
+  }
+  let dimensions = { w: item.w, h: item.h };
+  if (item.unshowable || !hasOwnDimensions(item)) {
+    dimensions = await loadOffScreen(item);
+    if (!stillFailing(item, triedPath)) return false;
+    if (dimensions === null && item.unshowable) return false; // still does not decode
+  }
+  // a file that is back as it was is shown, not saved again
+  const changed = item.size !== report.size || item.w !== dimensions?.w || item.h !== dimensions?.h;
+  item.missing = false;
+  item.size = report.size;
+  setDimensions(item, dimensions);
+  showChanged(item.hash, changed);
+  return dimensions !== null;
+}
+
+/* Whether `item` still is the entry that was looked at: not removed,
+ * re-added from elsewhere or repaired while the question was out. */
+function stillFailing(item, triedPath) {
+  if (itemsByHash.get(item.hash) !== item || item.path !== triedPath) return false;
+  return fileProblem(item) !== null;
+}
+
+/* An unshowable item whose file is gone. */
+function turnMissing(item) {
+  item.unshowable = false;
+  item.missing = true;
+  showChanged(item.hash, false);
+}
+
+/* Gives `item` the dimensions a load found, or marks it unshowable when the
+ * load found none, leaving the dimensions to a load that succeeds. */
+function setDimensions(item, dimensions) {
+  if (dimensions === null) {
+    item.unshowable = true;
+    delete item.w;
+    delete item.h;
+    return;
+  }
+  item.unshowable = false;
+  item.w = dimensions.w;
+  item.h = dimensions.h;
+}
+
+function hasOwnDimensions(item) {
+  if (!item.w || !item.h) return false;
+  return item.w !== MISSING_W || item.h !== MISSING_H;
+}
+
+/* Resolves to the file's native dimensions, or null on error or after
+ * LOAD_TIMEOUT_MS. A video counts once its first frame decodes. */
+function loadOffScreen(item) {
+  return new Promise((resolve) => {
+    let media;
+    const timeout = setTimeout(() => settle(null), LOAD_TIMEOUT_MS);
+    const settle = (dimensions) => {
+      clearTimeout(timeout);
+      releaseMedia(media);
+      resolve(dimensions);
+    };
+    if (item.type === 'video') {
+      media = document.createElement('video');
+      media.preload = 'auto';
+      media.muted = true;
+      media.onloadeddata = () => {
+        settle({ w: media.videoWidth || MISSING_W, h: media.videoHeight || MISSING_H });
+      };
+    } else {
+      media = new Image();
+      media.onload = () => settle({ w: media.naturalWidth, h: media.naturalHeight });
+    }
+    media.onerror = () => settle(null);
+    media.src = item.url;
+  });
+}
+
+/* The path of `item` holds other content now, `file` (url, size,
+ * dimensions) hashing to `hash`: it takes the entry's place, or merges into
+ * the item already holding it. Runs on the library queue, as an add in
+ * flight dedups against the hashes it saw. Resolves to whether an item shows
+ * again. */
+function replaceContent(item, triedPath, hash, file) {
+  if (!stillFailing(item, triedPath)) return false;
+  const oldHash = item.hash;
+  let shown = item;
+  const existing = itemsByHash.get(hash);
+  if (existing) {
+    state.items.splice(state.items.indexOf(item), 1);
+    shown = fileProblem(existing) ? existing : null;
+    if (shown) {
+      shown.path = triedPath;
+      shown.url = file.url;
+      showChanged(shown.hash, true);
+    }
+  } else {
+    item.hash = hash;
+    item.url = file.url;
+  }
+  reindexItems();
+  if (shown) {
+    shown.missing = false;
+    shown.size = file.size;
+    setDimensions(shown, file.dimensions);
+  }
+  showChanged(oldHash, true);
+  return shown !== null && file.dimensions !== null;
+}
+
+/* ---------------- showing and saving the changes ----------------
+ * What the attempts change is collected and shown together at the start and
+ * the end of a round, so the files that come back in one round do not each
+ * repack the collage and write the library. */
+
+const staleTiles = new Set(); // hashes whose tile shows a state the item has left
+let saveDue = false;
+
+function showChanged(hash, save) {
+  staleTiles.add(hash);
+  if (save) saveDue = true;
+}
+
+function flushChanges() {
+  if (!staleTiles.size) return;
+  for (const hash of staleTiles) discardTile(hash); // the render builds the tile anew
+  staleTiles.clear();
+  render();
+  if (saveDue) persist();
+  saveDue = false;
+}
+
+const timer = setInterval(() => {
+  retryFailedFiles().catch((err) => console.error('Failed to retry files', err));
+}, FIRST_RETRY_MS);
+
+/* Stops the timed rounds; retryFailedFiles still runs one on demand. */
+export function stopRetrying() {
+  clearInterval(timer);
+}

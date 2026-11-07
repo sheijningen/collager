@@ -199,24 +199,30 @@ async function probeFiles(inputPaths, concurrency = 4, onProgress = null) {
   };
 }
 
-/* Rehashes items whose stored hash no longer describes the file: the size on
- * disk moved away from the stored one (a copy that was still running when it
- * was added), or a video hash predates the sampled scheme. `sizeOnDisk` holds
- * the current size of every present item; an item without one is missing and
- * left alone. Items without a stored size get theirs filled in. When a rehash
- * lands on another entry's hash the two hold the same media under two names:
- * a present entry survives over a missing one, otherwise the earlier one does.
- * Resolves to the items to keep, the rehashed and collapsed counts, and
- * whether anything changed and is worth saving. Items are updated in place. */
+/* Whether the stored hash of an entry fails to describe its file of `size`
+ * bytes: the size moved away from the stored one (a copy that was still
+ * running when it was added), or a video hash predates the sampled scheme. */
+function hashIsStale(item, size) {
+  const outdatedScheme = item.type === 'video' && !isSampledHash(item.hash);
+  const contentMoved = typeof item.size === 'number' && item.size !== size;
+  return outdatedScheme || contentMoved;
+}
+
+/* Rehashes items whose stored hash is stale (see hashIsStale). `sizeOnDisk`
+ * holds the current size of every present item; an item without one is
+ * missing and left alone. Items without a stored size get theirs filled in.
+ * When a rehash lands on another entry's hash the two hold the same media
+ * under two names: a present entry survives over a missing one, otherwise
+ * the earlier one does. Resolves to the items to keep, the rehashed and
+ * collapsed counts, and whether anything changed and is worth saving. Items
+ * are updated in place. */
 async function rehashStaleItems(items, sizeOnDisk, concurrency = 4) {
   const stale = [];
   let sized = 0;
   for (const item of items) {
     const size = sizeOnDisk.get(item);
     if (size === undefined) continue;
-    const outdatedScheme = item.type === 'video' && !isSampledHash(item.hash);
-    const contentMoved = typeof item.size === 'number' && item.size !== size;
-    if (outdatedScheme || contentMoved) {
+    if (hashIsStale(item, size)) {
       // the size lands with the new hash, so a failed rehash stays stale
       stale.push(item);
       continue;
@@ -257,6 +263,64 @@ async function rehashStaleItems(items, sizeOnDisk, concurrency = 4) {
   };
 }
 
+// a file written this recently, by a clock that may run this far ahead (FAT
+// keeps write times in even seconds), is still being copied and may already
+// have its final size; a clock off by more escapes the check
+const WRITE_SETTLE_MS = 2_000;
+// a stat this slow is on a share that is dropping out, whose folder would
+// take as long again to answer about
+const SLOW_STAT_MS = 5_000;
+
+async function isDirectory(dir) {
+  try {
+    return (await fsp.stat(dir)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/* Looks at the file of a library entry (`path`, `hash`, `size`) again.
+ * Resolves to `{ present: false, folderPresent, statMs }` when no regular
+ * file is at the path (`folderPresent` is null when the stat was too slow to
+ * ask about the folder as well), and otherwise to `{ present: true, hash,
+ * size, statMs }`: the entry's own hash while the size on disk matches it, a
+ * fresh one when it is stale (see hashIsStale), or null when the file was
+ * written within `settleMs` or could not be read. `statMs` is how long the
+ * file system took to answer about the file, hashing excluded. A path
+ * without a media extension resolves to null. */
+async function recheckMediaFile(item, settleMs = WRITE_SETTLE_MS) {
+  const filePath = item && typeof item === 'object' ? item.path : undefined;
+  const type = typeof filePath === 'string' ? typeForPath(filePath) : undefined;
+  if (!type) return null;
+  const asked = Date.now();
+  let stats = null;
+  try {
+    stats = await fsp.stat(filePath);
+  } catch {
+    // not there
+  }
+  if (!stats || !stats.isFile()) {
+    if (Date.now() - asked >= SLOW_STAT_MS) {
+      return { present: false, folderPresent: null, statMs: Date.now() - asked };
+    }
+    const folderPresent = await isDirectory(path.dirname(filePath));
+    return { present: false, folderPresent, statMs: Date.now() - asked };
+  }
+  const statMs = Date.now() - asked;
+  const { size } = stats;
+  if (Math.abs(Date.now() - stats.mtimeMs) < settleMs) {
+    return { present: true, hash: null, size, statMs };
+  }
+  if (!hashIsStale({ type, hash: item.hash, size: item.size }, size)) {
+    return { present: true, hash: item.hash, size, statMs };
+  }
+  try {
+    return { present: true, ...(await hashMedia(filePath, type)), statMs };
+  } catch {
+    return { present: true, hash: null, size, statMs };
+  }
+}
+
 module.exports = {
   MEDIA_EXTS,
   SAMPLE_BYTES,
@@ -269,5 +333,7 @@ module.exports = {
   summarizeExtensions,
   collectMediaPaths,
   probeFiles,
-  rehashStaleItems
+  rehashStaleItems,
+  hashIsStale,
+  recheckMediaFile
 };
