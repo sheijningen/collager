@@ -189,7 +189,7 @@ async function run() {
       T.setPanelOpen(true);
       T.setBreakdownOpen(false);
       T.setToolbarOpen(true);
-      for (const [id, checked] of [['scroll-loop', true], ['scroll-shuffle', false], ['scroll-awake', true]]) {
+      for (const [id, checked] of [['scroll-loop', true], ['scroll-shuffle', false], ['scroll-awake', true], ['collage-hide-scrollbar', false]]) {
         const box = document.getElementById(id);
         if (box.checked === checked) continue;
         box.checked = checked;
